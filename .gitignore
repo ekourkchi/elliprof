@@ -14,7 +14,7 @@ __pycache__/
 *.reg
 !tests/regression/baseline/**
 fort.2
-model.fits
+/model.fits
 .DS_Store
 .ipynb_checkpoints/
 # notebook run outputs
