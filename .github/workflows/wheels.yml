@@ -60,7 +60,15 @@ jobs:
       - name: Static CFITSIO (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: CFITSIO_CMAKE_GENERATOR=Ninja bash tools/ci/build_cfitsio.sh /c/cfitsio
+        # cfortran.h assumes MS PowerStation Fortran whenever WIN32 is defined,
+        # which gives the Fortran wrappers (ftgkyj etc.) names gfortran cannot
+        # link against. -UWIN32 -DgFortran selects gfortran conventions
+        # (lowercase_, trailing string lengths); in CFITSIO, WIN32 (as opposed
+        # to _WIN32) only controls DLL exports, unused in a static build.
+        run: |
+          CFLAGS="-UWIN32 -DgFortran" CFITSIO_CMAKE_GENERATOR=Ninja \
+              bash tools/ci/build_cfitsio.sh /c/cfitsio
+          nm /c/cfitsio/lib/libcfitsio.a | grep -E ' T (ftgkyj_|ftinit_|ftvers_)$'
       - name: Put the MSYS2 toolchain on PATH (Windows)
         if: runner.os == 'Windows'
         shell: bash
