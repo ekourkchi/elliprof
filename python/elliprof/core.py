@@ -15,13 +15,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
-import pandas as pd
-
 from ._native import find_backend
 from .harmonics import COS3X_RANGE, COS4X_RANGE, _int_in, harmonic_settings
 from ._version import __version__
 from .io import check_same_geometry, image_info
-from .profile import read_profile
 
 PathLike = Union[str, os.PathLike]
 
@@ -52,7 +49,7 @@ class ElliprofTimeoutError(ElliprofError):
 
 @dataclass
 class ElliprofResult:
-    profile: Optional[pd.DataFrame]
+    profile: "Optional[pandas.DataFrame]"   # None with load_profile=False
     prf_path: Optional[Path]
     csv_path: Optional[Path]
     reg_path: Optional[Path]
@@ -207,6 +204,30 @@ def _run(cmd: List[str], cwd: Path, timeout: Optional[float]):
     return proc.returncode, out, err
 
 
+PANDAS_HELP = """\
+elliprof could not import pandas, which the Python API uses to return the
+profile as a DataFrame (the fit itself finished; its files are written).
+This usually means the Python environment mixes packages built for
+NumPy 1.x with NumPy 2.x -- often old copies of numexpr, bottleneck or
+pandas itself.
+Remedies, in order of preference:
+    python -m pip install --upgrade numexpr bottleneck pandas
+    conda update numexpr bottleneck pandas   (Anaconda / conda)
+    python -m pip install "numpy<2"          (if upgrading is impossible)
+or create a fresh environment for elliprof.  The elliprof command line
+does not need pandas.  Original error: {}"""
+
+
+def _load_profile(prf: Path):
+    """The profile as a DataFrame (pandas is imported only here)."""
+    try:
+        from .profile import read_profile
+    except Exception as exc:
+        raise ImportError(PANDAS_HELP.format(
+            "{}: {}".format(type(exc).__name__, exc))) from exc
+    return read_profile(str(prf))
+
+
 def run_elliprof(image: PathLike, x0: float, y0: float, *,
                  mask: Optional[PathLike] = None,
                  sky: Optional[float] = None,
@@ -217,7 +238,7 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
                  cos4x=None, tie=None, avg=None, gain=None, gc=False,
                  verbose=False, extra: Iterable[str] = (),
                  model_harmonics=None, harmonic_mode=None,
-                 sixth_order=False,
+                 sixth_order=False, load_profile: bool = True,
                  output_dir: Optional[PathLike] = None,
                  prefix: Optional[str] = None,
                  prf_path: Optional[PathLike] = None,
@@ -256,6 +277,9 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
     ``model=True``) go to ``output_dir`` (a new temporary directory by
     default), named after ``prefix`` (default: the image name), unless
     explicit paths are given.
+
+    ``result.profile`` is a pandas DataFrame; ``load_profile=False`` skips
+    it (and never imports pandas), for callers that only need the files.
 
     ``timeout`` (seconds, default 1800; ``None`` for no limit): if the
     backend runs longer, it is terminated and
@@ -342,7 +366,8 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
         raise
     ok = code == 0
     result = ElliprofResult(
-        profile=read_profile(str(prf)) if ok and not gc else None,
+        profile=_load_profile(prf) if ok and not gc and load_profile
+        else None,
         prf_path=prf if ok and prf.exists() else None,
         csv_path=csv if ok and csv.exists() else None,
         reg_path=reg if ok and reg.exists() else None,

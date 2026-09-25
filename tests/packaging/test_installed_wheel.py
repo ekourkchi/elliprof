@@ -72,15 +72,22 @@ def test_no_compiler_needed():
 def test_help_version_diagnostics():
     import elliprof
     h = run("--help")
-    assert h.returncode == 0 and "usage: elliprof" in h.stdout
+    assert h.returncode == 0 and "elliprof IMAGE.fits X0=x Y0=y" in h.stdout
+    assert run("-h").stdout == h.stdout
     v = run("--version")
     assert v.returncode == 0
-    assert v.stdout.startswith(f"elliprof {elliprof.__version__} "
-                               f"(maintained by {elliprof.__maintainer__})")
-    assert "elliprof_native" in v.stdout and "CFITSIO" in v.stdout
+    assert v.stdout == (f"elliprof {elliprof.__version__}\n"
+                        f"Maintained by {elliprof.__maintainer__}\n"
+                        f"Email: {elliprof.__email__}\n")
+    assert run("-v").stdout == v.stdout
+    intro = run()
+    assert intro.returncode == 0 and "elliprof -h" in intro.stdout
     d = run("--diagnostics")
     assert d.returncode == 0
     assert "installed package" in d.stdout
+    assert "elliprof_native" in d.stdout and "CFITSIO" in d.stdout
+    if sys.platform == "darwin":
+        assert "backend minimum macOS" in d.stdout
 
 
 def test_python_m_elliprof():

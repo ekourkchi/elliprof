@@ -27,6 +27,14 @@ python -m pip install elliprof
 - Prebuilt wheels are provided for Linux, macOS and Windows.
 - No Fortran compiler and no separate CFITSIO installation are needed.
 
+Check the installation:
+
+```sh
+elliprof            # a short introduction
+elliprof -v         # version (also --version)
+elliprof -h         # full help: parameters, options and examples (also --help)
+```
+
 ### Compatibility
 
 Python and the operating system are separate requirements: a supported Python on an unsupported OS version still cannot install elliprof.
@@ -101,6 +109,27 @@ python -m pip install elliprof
 python3.9 -m pip install elliprof
 python3.12 -m pip install elliprof
 ```
+
+### NumPy 2 with an older Anaconda environment
+
+If using elliprof prints messages such as "A module that was compiled using NumPy 1.x cannot be run in NumPy 2.x" or "_ARRAY_API not found", the problem is not elliprof. Its compiled part does not use NumPy. The messages come from older compiled packages already in that environment, usually `numexpr` or `bottleneck`, which pandas loads.
+
+- `elliprof`, `elliprof -h`, `elliprof -v` and command-line fits do not load pandas, so they are not affected.
+- The Python API returns the profile as a pandas table, so it needs pandas to work.
+
+Update the old packages:
+
+```sh
+python -m pip install --upgrade numexpr bottleneck
+```
+
+(with Anaconda: `conda update numexpr bottleneck`). If they cannot be upgraded, go back to NumPy 1:
+
+```sh
+python -m pip install "numpy<2"
+```
+
+For a heavily aged environment, the safest solution is a fresh environment for elliprof (see above).
 
 ## Quick start
 
@@ -265,12 +294,12 @@ One row per isophote (`result.profile`, the CSV file, and the `.prf` file):
 | `--sky V` | `sky` | subtract a constant |
 | `--sky-image F` | `sky_image` | subtract an image |
 | `--mask F` | `mask` | 0 = ignored, 1 = good |
-| `NITER=` | `niter` | iterations (default 5, at most 1000) |
+| `NITER=` | `niter` | iterations (default 5, at most 1000); each one samples every isophote once, fits it and moves the ellipse towards the isophote |
 | `RLAW=` | `rlaw` | radius spacing: 0 linear, 1 logarithmic, 2 r^¼ (default) |
 | `LINEAR` | `linear` | fit intensities instead of log intensities |
 | `FIXCTR=` | `fixctr` | 0 free centres (default), 1 fixed at X0/Y0, 2 median centre |
 | `ELLIP=` | `ellip` | force this ellipticity |
-| `RMSTAR` | `rmstar` | reject star-like outliers along each isophote |
+| `RMSTAR` | `rmstar` | along each ellipse, ignore samples brighter than median + 4 × (upper quartile − median); rejects bright outliers point by point, so mask larger contaminants |
 | `MODEL`, `-m F` | `model`, `model_path` | build a model image |
 | `--model-harmonics` | `model_harmonics` | harmonic terms in the model (above) |
 | `--harmonic-mode` | `harmonic_mode` | `each` (default) or `median` |
@@ -283,9 +312,11 @@ One row per isophote (`result.profile`, the CSV file, and the `.prf` file):
 | `SKY=` | `elliprof_sky` | sky used only in ELLIPROF's de Vaucouleurs fit (it does not change the image) |
 | `GC` | `gc` | globular-cluster mode: circular annuli |
 | `-o F` `--csv F` `--reg F` | `prf_path` `csv_path` `reg_path` | output files |
-| `--timeout S` | `timeout` | stop a run after S seconds (default 1800) |
+| `--prepared F` | `prepared` | write the prepared image (after sky and mask) as ELLIPROF fits it |
+| `--sc V` | – | deprecated alias of `--sky` |
+| `--timeout S` | `timeout` | stop a run after S seconds (default 1800; exit status 124) |
 
-`OLD`, `EDIT` and `TV` (interactive options) are not supported. Invalid input fails immediately with a clear message, and the program never waits for keyboard input. `elliprof --version` and `elliprof --diagnostics` print version and platform information for bug reports.
+`OLD`, `EDIT` and `TV` (interactive options) are not supported. Invalid input fails immediately with a clear message, and the program never waits for keyboard input. `elliprof -h` describes every parameter and option. `elliprof -v` prints the version, and `elliprof --diagnostics` prints version, platform and backend information for bug reports.
 
 ## Platforms
 

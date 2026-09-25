@@ -14,7 +14,7 @@
 
 | Command | What it runs |
 |---|---|
-| `make check` | build, source hashes, unit + integration + regression (305 tests) |
+| `make check` | build, source hashes, unit + integration + regression (319 tests) |
 | `make docker-test` | the same inside Ubuntu 24.04 |
 | `pytest -c tests/packaging/pytest.ini tests/packaging` | 12 tests against an **installed** wheel (Python 3.6-3.14 in the wheels workflow) |
 | `make notebook-check` | executes the example notebook |
@@ -40,6 +40,7 @@ One test is skipped unless `ELLIPROF_SBF_DIR` points at masks written by the ori
 | REG | one ellipse per contour: (x0 − CNPIX1 + 0.5, y0 − CNPIX2 + 0.5, Rmaj, Rmaj(1 − ellip), alpha − 90); no labels; NaN rows left out | — | `unit/test_regions.py` |
 | MODEL | `-m` writes the model; within 2% of the true r^¼ image for 5 < r < 60 px; pixel data identical to the baseline on one platform | — | `regression/test_synthetic.py` |
 | Harmonics | every state (default, none, 3, 4, 3+4, median modes, 6th order) run three ways -- backend with the raw `COS3X=`/`COS4X=` keywords, Python API, CLI -- gives byte-identical `.prf` and identical model pixels; options map to the documented keyword values; model-harmonic settings leave the fitted profile byte-identical to the default, 6th order changes it; the model terms add up ((3,4) = (3)·(4)/none) | unsupported orders/modes, mixing keywords and options, 6th order without 3, COS3X outside -2..2 or COS4X outside 0..2 (API, CLI and backend) | `unit/test_harmonics.py`, `integration/test_harmonic_states.py`, `packaging/test_installed_wheel.py::test_harmonic_selection` |
+| Informational commands | `elliprof` (short introduction), `-h`/`--help` (identical full help: every option and keyword, ASCII, at most 79 columns), `-v`/`--version` (identical), `--diagnostics` -- all exit 0 with numpy and pandas imports blocked and no backend; a command-line fit with pandas blocked writes its .prf/.csv/.reg; the API with pandas broken finishes the fit and raises an ImportError that names the remedies | unknown options and a missing centre still fail | `unit/test_cli_info.py`, `unit/test_cli_args.py` |
 | Python / CLI equivalence | backend, `run_elliprof`, in-process CLI and `python -m elliprof` give byte-identical `.prf`/`.reg` and equal CSV rows (scalar sky; sky image + mask) | failures raise `ElliprofError` carrying the result | `integration/test_equivalence.py` |
 
 ## Synthetic regression (`regression/test_synthetic.py`)

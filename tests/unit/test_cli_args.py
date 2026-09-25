@@ -24,15 +24,16 @@ def img(tmp_path):
 
 def test_help(capsys):
     code, out, _ = run(capsys, "--help")
-    assert code == 0 and "usage: elliprof image.fits X0=x Y0=y" in out
+    assert code == 0 and "elliprof IMAGE.fits X0=x Y0=y" in out
     assert "monsta" not in out.lower()
 
 
 def test_version(capsys):
-    from elliprof import __maintainer__, __version__
+    from elliprof import __email__, __maintainer__, __version__
     code, out, _ = run(capsys, "--version")
     assert code == 0
-    assert out.startswith(f"elliprof {__version__} (maintained by {__maintainer__})\n")
+    assert out == (f"elliprof {__version__}\nMaintained by {__maintainer__}"
+                   f"\nEmail: {__email__}\n")
 
 
 def test_diagnostics(capsys):
@@ -48,8 +49,13 @@ def test_diagnostics(capsys):
 
 
 def test_no_image(capsys):
-    code, _, err = run(capsys)
-    assert code == 2 and "usage" in err
+    code, _, err = run(capsys, "--sky", "5")
+    assert code == 2 and "error: no image given" in err
+
+
+def test_unknown_option(capsys):
+    code, _, err = run(capsys, "img.fits", "--frobnicate")
+    assert code == 2 and "unknown option --frobnicate" in err
 
 
 @pytest.mark.parametrize("words", [FIT, ["X0=5"] + FIT, ["Y0=5"] + FIT])
