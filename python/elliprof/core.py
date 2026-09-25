@@ -18,6 +18,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 import pandas as pd
 
 from ._native import find_backend
+from .harmonics import COS3X_RANGE, COS4X_RANGE, _int_in, harmonic_settings
 from ._version import __version__
 from .io import check_same_geometry, image_info
 from .profile import read_profile
@@ -154,6 +155,10 @@ def validate_keywords(words: Sequence[str]) -> None:
         if n != int(n) or not 1 <= n <= NITER_MAX:
             raise ValueError("NITER must be an integer between 1 and "
                              f"{NITER_MAX}")
+    if "COS3X" in kw:
+        _int_in(kw["COS3X"], "COS3X", *COS3X_RANGE)
+    if "COS4X" in kw:
+        _int_in(kw["COS4X"], "COS4X", *COS4X_RANGE)
 
 
 def _require_file(path, what):
@@ -211,6 +216,8 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
                  elliprof_sky=None, model=False, rmstar=False, cos3x=None,
                  cos4x=None, tie=None, avg=None, gain=None, gc=False,
                  verbose=False, extra: Iterable[str] = (),
+                 model_harmonics=None, harmonic_mode=None,
+                 sixth_order=False,
                  output_dir: Optional[PathLike] = None,
                  prefix: Optional[str] = None,
                  prf_path: Optional[PathLike] = None,
@@ -234,6 +241,16 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
     ``r0``, ``r1``, ``nr`` are required (0 < r0 < r1, 2 <= nr <= 100).
     ``elliprof_sky`` is ELLIPROF's own ``SKY=`` keyword, used only in its
     de Vaucouleurs fit; it is unrelated to ``sky``.
+
+    Harmonics: ELLIPROF always fits and reports the 3rd- and 4th-order
+    terms (I3, A3, I4, A4).  ``model_harmonics`` (``()``, ``(3,)``,
+    ``(4,)`` or ``(3, 4)``, the default) chooses which of them go into the
+    model image, ``harmonic_mode`` (``"each"``, the default, or
+    ``"median"``) whether each isophote's own values or the median over
+    all isophotes are used, and ``sixth_order=True`` fits the 6th-order
+    term in place of the 3rd.  These set ELLIPROF's ``COS3X``/``COS4X``;
+    those original values can be given directly as ``cos3x``/``cos4x``
+    instead (see :mod:`elliprof.harmonics`).
 
     Output files (.prf, .csv, .reg, and the model FITS with
     ``model=True``) go to ``output_dir`` (a new temporary directory by
@@ -266,6 +283,16 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
         check_same_geometry(str(image), str(mask), "mask")
     if timeout is not None and not _finite(timeout, "timeout") > 0:
         raise ValueError("timeout must be positive (or None)")
+    extra = list(extra)
+    raw = _parse_words(extra)
+    friendly = (model_harmonics is not None or harmonic_mode is not None
+                or bool(sixth_order))
+    for key, value in (("COS3X", cos3x), ("COS4X", cos4x)):
+        if key in raw and (friendly or value is not None):
+            raise ValueError(f"{key} is given twice (as a keyword and as "
+                             "an option)")
+    cos3x, cos4x = harmonic_settings(model_harmonics, harmonic_mode,
+                                     sixth_order, cos3x=cos3x, cos4x=cos4x)
     words = elliprof_keywords(
         r0=r0, r1=r1, nr=nr, niter=niter, rlaw=rlaw, linear=linear,
         fixctr=fixctr, ellip=ellip, scale=scale, elliprof_sky=elliprof_sky,

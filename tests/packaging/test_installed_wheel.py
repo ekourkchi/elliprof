@@ -156,6 +156,46 @@ def test_python_api(tmp_path):
     assert (tmp_path / "cli.prf").read_bytes() == res.prf_path.read_bytes()
 
 
+def test_harmonic_selection(tmp_path):
+    """The installed package exposes ELLIPROF's harmonic settings: the
+    model-harmonic options change only the model image, the 6th-order
+    option changes the fit, and the command line and the API agree."""
+    from elliprof import read_prf, run_elliprof
+
+    def fit(path):
+        p = read_prf(str(path))
+        return np.asarray(p["params"])[:p["n"], :11]
+
+    runs = {}
+    for name, opts, args in (
+            ("default", {}, []),
+            ("none", {"model_harmonics": ()}, ["--model-harmonics", "none"]),
+            ("4 median", {"model_harmonics": (4,), "harmonic_mode": "median"},
+             ["--model-harmonics", "4", "--harmonic-mode", "median"]),
+            ("6th", {"sixth_order": True}, ["--sixth-order"])):
+        d = tmp_path / name.replace(" ", "_")
+        res = run_elliprof(GALAXY, 127.3, 121.6, sky=100, r0=3, r1=90,
+                           nr=30, model=True, output_dir=d, **opts)
+        p = run(GALAXY, *FIT, "MODEL", "--sky", "100", *args,
+                "-o", d / "cli.prf", "-m", d / "cli.fits")
+        assert p.returncode == 0, p.stderr
+        assert (d / "cli.prf").read_bytes() == res.prf_path.read_bytes()
+        runs[name] = res
+    assert [w for w in runs["4 median"].command if w.startswith("COS")] == \
+        ["COS3X=0", "COS4X=1"]
+    assert [w for w in runs["6th"].command if w.startswith("COS")] == \
+        ["COS3X=-2", "COS4X=2"]
+    default = fit(runs["default"].prf_path)
+    assert np.array_equal(fit(runs["none"].prf_path), default)
+    assert np.array_equal(fit(runs["4 median"].prf_path), default)
+    assert not np.array_equal(fit(runs["6th"].prf_path), default)
+    models = {n: runs[n].model_path.read_bytes() for n in runs}
+    assert len(set(models.values())) == 4
+    bad = run(GALAXY, *FIT, "--model-harmonics", "5",
+              "-o", tmp_path / "bad.prf")
+    assert bad.returncode == 1 and "model harmonics must be" in bad.stderr
+
+
 def test_paths_with_spaces_and_unicode(tmp_path):
     d = tmp_path / "dir with spaces"
     d.mkdir()

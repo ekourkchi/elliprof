@@ -3,7 +3,8 @@
     elliprof image.fits X0=x Y0=y R0=r R1=r NR=n [KEY=value ...]
              [--sky V | --sky-image F] [--mask F]
              [-o out.prf] [--csv out.csv] [--reg out.reg] [-m model.fits]
-             [--timeout SECONDS]
+             [--model-harmonics none|3|4|3,4] [--harmonic-mode each|median]
+             [--sixth-order] [--timeout SECONDS]
 """
 
 import sys
@@ -41,6 +42,17 @@ Output:
   --reg out.reg                fitted ellipses as a DS9 region file
   -m model.fits                model image (with MODEL)
 
+Harmonics (ELLIPROF always fits and reports the 3rd- and 4th-order terms,
+I3 A3 I4 A4; these options set its COS3X/COS4X):
+  --model-harmonics none|3|4|3,4
+                               which measured terms go into the model
+                               image (default 3,4)
+  --harmonic-mode each|median  each isophote's own values (default) or
+                               the median over all isophotes
+  --sixth-order                fit and model the 6th-order term instead
+                               of the 3rd (changes the fit; I3/A3 then
+                               hold the 6th-order term)
+
 Other:
   --timeout SECONDS            stop ELLIPROF after this long (default 1800)
   --version                    versions of elliprof and its backend
@@ -49,7 +61,8 @@ Other:
 """
 
 VALUE_OPTS = {"--mask", "--sky", "--sc", "--sky-image", "-o", "--csv",
-              "--reg", "-m", "--prepared", "--timeout"}
+              "--reg", "-m", "--prepared", "--timeout", "--model-harmonics",
+              "--harmonic-mode"}
 
 
 class UsageError(Exception):
@@ -61,7 +74,8 @@ def _parse(argv: List[str]) -> dict:
     i = 0
     while i < len(argv):
         arg = argv[i]
-        if arg in ("-h", "--help", "--version", "--diagnostics"):
+        if arg in ("-h", "--help", "--version", "--diagnostics",
+                   "--sixth-order"):
             opts[arg.lstrip("-")] = True
             i += 1
         elif arg in VALUE_OPTS:
@@ -145,6 +159,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                 csv_path=opts.get("--csv") or tmp / "p.csv",
                 reg_path=opts.get("--reg") or tmp / "p.reg",
                 model_path=opts.get("-m"), prepared=opts.get("--prepared"),
+                model_harmonics=opts.get("--model-harmonics"),
+                harmonic_mode=opts.get("--harmonic-mode"),
+                sixth_order=opts.get("sixth-order", False),
                 timeout=timeout, check=False)
             sys.stdout.write(result.stdout)
             sys.stderr.write(result.stderr)

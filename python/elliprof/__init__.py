@@ -14,6 +14,7 @@ from ._native import BackendNotFoundError, find_backend
 from ._version import __maintainer__, __email__, __version__
 from .core import (ElliprofError, ElliprofResult, ElliprofTimeoutError,
                    run_elliprof)
+from .harmonics import harmonic_settings
 from .io import GeometryError, apply_mask, subtract_sky
 from .masks import load_mask, write_bitmap_mask
 from .profile import COLUMNS, parse_elliprof_csv, read_prf, read_profile
@@ -25,5 +26,5 @@ __all__ = [
     "write_bitmap_mask", "subtract_sky", "apply_mask", "GeometryError",
     "read_prf", "read_profile", "parse_elliprof_csv", "COLUMNS",
     "write_ds9_regions", "read_ds9_regions", "find_backend",
-    "BackendNotFoundError",
+    "BackendNotFoundError", "harmonic_settings",
 ]

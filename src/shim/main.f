@@ -253,6 +253,11 @@ C     its fitting arrays hold at most 100
             END IF
          END IF
       END IF
+C     COS3X/COS4X: ELLIPROF's harmonic modes (see its help text).
+C     COS3X -2..2 (negative: 6th- instead of 3rd-order term), COS4X 0..2
+      CALL CHKMODE('COS3X', -2, 2, IERR)
+      IF (IERR .EQ. 0) CALL CHKMODE('COS4X', 0, 2, IERR)
+      IF (IERR .NE. 0) CALL EXIT(1)
       IF (SKYSTR .NE. ' ') THEN
          CALL PARSENUM(SKYSTR, SKYVAL, IERR)
          IF (IERR .NE. 0) THEN
@@ -462,6 +467,32 @@ C     The numeric value of keyword KEY= (a plain, finite number).
          END IF
  10   CONTINUE
       IERR = 1
+      RETURN
+      END
+
+C     If KEY= is given, it must be an integer from MINV to MAXV.
+      SUBROUTINE CHKMODE(KEY, MINV, MAXV, IERR)
+      INCLUDE 'vistalink.inc'
+      CHARACTER*(*) KEY
+      INTEGER MINV, MAXV, IERR, I, L
+      REAL VAL
+      IERR = 0
+      L = LEN(KEY)
+      DO 10 I = 1, NCON
+         IF (WORD(I)(1:L+1) .EQ. KEY//'=') THEN
+            CALL PARSENUM(WORD(I)(L+2:), VAL, IERR)
+            IF (IERR .EQ. 0) THEN
+               IF (VAL .NE. AINT(VAL) .OR. VAL .LT. MINV .OR.
+     $              VAL .GT. MAXV) IERR = 1
+            END IF
+            IF (IERR .NE. 0) THEN
+               WRITE (0,'(3A,I0,A,I0,3A)') 'elliprof: error: ', KEY,
+     $              ' must be an integer from ', MINV, ' to ', MAXV,
+     $              ', got "', WORD(I)(L+2:LEN_TRIM(WORD(I))), '"'
+               RETURN
+            END IF
+         END IF
+ 10   CONTINUE
       RETURN
       END
 

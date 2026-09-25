@@ -14,12 +14,22 @@ J     name   meaning
 5     alpha  position angle as ELLIPROF stores it [deg]; the major axis
              lies at ``alpha + 90`` degrees counter-clockwise from +x
 6     ellip  ellipticity ``1 - b/a``
-7     I3     cos/sin 3x amplitude relative to I0 (6x if COS3X < 0)
-8     A3     phase of the 3x (6x) term [deg]
-9     I4     cos/sin 4x amplitude relative to I0
-10    A4     phase of the 4x term [deg]
-11    slope  d log I / d log r
+7     I3     amplitude of the 3rd-order intensity variation along the
+             ellipse, as a fraction of I0 (``exp(amplitude) - 1`` of the
+             log-intensity fit); 6th-order term if COS3X < 0
+8     A3     its phase [deg, 0-120]: intensity varies as
+             ``cos(3 * (theta - A3))``; with COS3X < 0 the column holds
+             ``atan2(s6, c6) / 3``, i.e. twice the 6th-order phase
+9     I4     the same for the 4th-order term
+10    A4     its phase [deg, 0-90]: ``cos(4 * (theta - A4))``
+11    slope  d ln I / d ln r between neighbouring isophotes (set to -2
+             where it would be positive)
 ====  =====  =============================================================
+
+``theta`` is the eccentric angle along the ellipse, measured from the
+major axis (x = a cos theta, y = b sin theta in the ellipse frame).  The
+3rd- and 4th-order terms are always fitted, together with orders 0-2, but
+they never change the ellipse; see :mod:`elliprof.harmonics`.
 
 Row 12 holds the 17 run flags (x0, y0, r0, r1, nr, niter, rlaw, ...),
 not a contour.

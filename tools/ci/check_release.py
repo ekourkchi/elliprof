@@ -27,7 +27,7 @@ EXPECTED_TAGS = {
     "py3-none-musllinux_1_2_x86_64",
     "py3-none-musllinux_1_2_aarch64",
     "py3-none-macosx_11_0_arm64",
-    "py3-none-macosx_11_0_x86_64",
+    "py3-none-macosx_10_16_x86_64.macosx_11_0_x86_64",
     "py3-none-win_amd64",
 }
 
