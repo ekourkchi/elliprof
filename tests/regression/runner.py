@@ -35,8 +35,10 @@ def binary_arch(path) -> str:
         cpu = struct.unpack("<i", head[4:8])[0]
         return {0x01000007: "x86_64", 0x0100000C: "arm64"}.get(cpu, hex(cpu))
     if magic == b"\x7fELF":
-        machine = struct.unpack("<H", head[18:20])[0]
-        return {0x3E: "x86_64", 0xB7: "aarch64"}.get(machine, hex(machine))
+        order = ">" if head[5] == 2 else "<"          # EI_DATA: s390x is BE
+        machine = struct.unpack(order + "H", head[18:20])[0]
+        return {0x3E: "x86_64", 0xB7: "aarch64", 0x15: "ppc64le",
+                0x16: "s390x", 0xF3: "riscv64"}.get(machine, hex(machine))
     if magic[:2] == b"MZ":                                       # PE
         pe = struct.unpack("<I", head[0x3C:0x40])[0]
         machine = struct.unpack("<H", head[pe + 4:pe + 6])[0]

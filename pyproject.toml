@@ -67,16 +67,23 @@ markers = [
 # (py3-none-<platform>), so it is built once per platform and then
 # tested on several Pythons in the wheels workflow.
 [tool.cibuildwheel]
-build = "cp312-*"
-skip = "*-musllinux_*"
+# One wheel per platform.  Plain `cibuildwheel` builds the glibc
+# (manylinux) wheel on Linux; the workflow sets CIBW_BUILD to
+# cp312-musllinux_* for the musl wheels.
+build = "cp312-manylinux_* cp312-macosx_* cp312-win_*"
 build-verbosity = 1
 test-requires = ["pytest", "astropy"]
 test-command = "pytest -c {project}/tests/packaging/pytest.ini {project}/tests/packaging"
+# No PyPI wheels of numpy/pandas (ppc64le, s390x, riscv64) or astropy
+# (musllinux aarch64): testing inside the build container would compile
+# them, under emulation.  These wheels are tested instead by the wheels
+# workflow in clean containers (tools/ci/test_wheel_linux.sh).
+test-skip = "*-manylinux_ppc64le *-manylinux_s390x *-manylinux_riscv64 *-musllinux_aarch64"
 
 [tool.cibuildwheel.linux]
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
-before-all = "bash {project}/tools/ci/build_cfitsio.sh /opt/cfitsio"
+before-all = "sh {project}/tools/ci/linux_toolchain.sh && bash {project}/tools/ci/build_cfitsio.sh /opt/cfitsio"
 environment = { CFITSIO_DIR = "/opt/cfitsio", CMAKE_ARGS = "-DELLIPROF_STATIC_CFITSIO=ON" }
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} && auditwheel show {dest_dir}/*.whl"
 

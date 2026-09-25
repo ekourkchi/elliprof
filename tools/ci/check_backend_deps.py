@@ -35,9 +35,10 @@ def linux(exe: Path):
     deps = re.findall(r"\(NEEDED\).*\[(.+?)\]", out)
     libs = exe.parents[1].parent / "elliprof.libs"
     bundled = {p.name for p in libs.glob("*")} if libs.is_dir() else set()
-    # manylinux policy libraries every glibc system has
+    # manylinux policy libraries every glibc system has; musl's libc
     system = re.compile(r"^(libc|libm|libdl|librt|libpthread|libgcc_s|"
-                        r"libz|ld-linux[-\w]*|libutil|libresolv)\.so")
+                        r"libz|ld-linux[-\w]*|libutil|libresolv|"
+                        r"libc\.musl-\w+|ld-musl-\w+)\.so")
     bad = [d for d in deps if d not in bundled and not system.match(d)]
     return deps, bad
 

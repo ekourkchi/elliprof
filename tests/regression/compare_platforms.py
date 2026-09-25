@@ -24,7 +24,7 @@ from elliprof.profile import COLUMNS  # noqa: E402
 def platform_name(d: Path) -> str:
     for meta in sorted(d.glob("*/meta.json")):
         m = json.loads(meta.read_text())
-        return f"{m['system']} {m['machine']}"
+        return f"{m['system']} {m['machine']}, {m.get('os', '?')} [{d.name}]"
     return d.name
 
 

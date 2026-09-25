@@ -1,9 +1,11 @@
 # Binary wheels: build with cibuildwheel, repair (auditwheel / delocate /
 # delvewheel), then install each wheel in a clean environment on its own
 # platform and test it.  Artifacts only -- nothing is published.
-# NOTE: not yet run on GitHub (no remote).  The Linux x86_64/aarch64
-# and macOS arm64/x86_64 wheels were built and tested locally with the
-# same toolchains; Windows has NOT been built yet.
+#
+# ppc64le, s390x and riscv64 are built and tested under QEMU on x86_64
+# runners; musllinux natively.  Those five are tested outside
+# cibuildwheel, in clean containers (test-linux).  Windows ARM64 is only
+# probed (experimental): no wheel is built for it.
 name: wheels
 
 on:
@@ -15,17 +17,25 @@ jobs:
   build:
     name: wheel ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
         include:
           - {name: linux-x86_64,  os: ubuntu-24.04,     archs: x86_64}
           - {name: linux-aarch64, os: ubuntu-24.04-arm, archs: aarch64}
+          - {name: linux-ppc64le, os: ubuntu-24.04,     archs: ppc64le, qemu: true}
+          - {name: linux-s390x,   os: ubuntu-24.04,     archs: s390x,   qemu: true}
+          - {name: linux-riscv64, os: ubuntu-24.04,     archs: riscv64, qemu: true}
+          - {name: musllinux-x86_64,  os: ubuntu-24.04,     archs: x86_64,  build: "cp312-musllinux_*"}
+          - {name: musllinux-aarch64, os: ubuntu-24.04-arm, archs: aarch64, build: "cp312-musllinux_*"}
           - {name: macos-arm64,   os: macos-15,         archs: arm64,  target: "11.0"}
           - {name: macos-x86_64,  os: macos-15-intel,   archs: x86_64, target: "11.0"}
           - {name: windows-amd64, os: windows-latest,   archs: AMD64}
     steps:
       - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+        if: matrix.qemu
 
       # macOS: conda-forge gfortran (+ its clang driver), whose runtime
       # libraries target macOS 11.0 -- the toolchain used to build and
@@ -79,6 +89,7 @@ jobs:
       - uses: pypa/cibuildwheel@v3.2
         env:
           CIBW_ARCHS: ${{ matrix.archs }}
+          CIBW_BUILD: ${{ matrix.build || 'cp312-manylinux_* cp312-macosx_* cp312-win_*' }}
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.target }}
         with:
           output-dir: wheelhouse
@@ -91,6 +102,7 @@ jobs:
   test:
     name: test ${{ matrix.name }} / Python ${{ matrix.python }}
     needs: build
+    if: ${{ !cancelled() }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -142,3 +154,125 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: matrix.python == '3.12'
         with: {name: "wheel-spread-${{ matrix.name }}", path: spread/}
+
+  # manylinux ppc64le / s390x / riscv64 (QEMU) and musllinux: clean
+  # containers without a compiler or CFITSIO.  Debian trixie supplies
+  # numpy/pandas/astropy where PyPI has no wheels for them.
+  test-linux:
+    name: test ${{ matrix.name }} (clean container)
+    needs: build
+    if: ${{ !cancelled() }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: linux-ppc64le, os: ubuntu-24.04, platform: linux/ppc64le, image: "debian:trixie-slim", mode: apt, qemu: true}
+          - {name: linux-s390x,   os: ubuntu-24.04, platform: linux/s390x,   image: "debian:trixie-slim", mode: apt, qemu: true}
+          - {name: linux-riscv64, os: ubuntu-24.04, platform: linux/riscv64, image: "debian:trixie-slim", mode: apt, qemu: true}
+          - {name: musllinux-x86_64,  os: ubuntu-24.04,     platform: linux/amd64, image: "python:3.12-alpine", mode: pip}
+          - {name: musllinux-aarch64, os: ubuntu-24.04-arm, platform: linux/arm64, image: "python:3.12-alpine", mode: pip, prebuild: astropy}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: {name: "wheel-${{ matrix.name }}", path: wheelhouse}
+      - uses: docker/setup-qemu-action@v3
+        if: matrix.qemu
+      # PyPI has no wheel of astropy (a test dependency) for this
+      # platform: build one in a separate, throw-away container so the
+      # test container itself never has a compiler.
+      - name: Prebuild ${{ matrix.prebuild }}
+        if: matrix.prebuild
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} -v "$PWD/deps:/deps" ${{ matrix.image }} \
+            sh -c 'apk add --no-cache build-base >/dev/null && pip wheel -q -w /deps ${{ matrix.prebuild }}'
+          ls deps
+      - name: Clean-container test
+        run: |
+          mkdir -p spread
+          docker run --rm --platform ${{ matrix.platform }} \
+            -v "$PWD:/project:ro" -v "$PWD/spread:/spread" ${{ matrix.image }} \
+            sh /project/tools/ci/test_wheel_linux.sh ${{ matrix.mode }} wheel-${{ matrix.name }}
+      - uses: actions/upload-artifact@v4
+        with: {name: "wheel-spread-${{ matrix.name }}", path: spread/}
+
+  # Numerical differences of every tested wheel from the committed baselines
+  spread:
+    name: Numerical spread of the wheels
+    needs: [test, test-linux]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m pip install numpy pandas astropy
+      - uses: actions/download-artifact@v4
+        with: {path: spread, pattern: wheel-spread-*, merge-multiple: true}
+      - name: Compare with the committed baselines
+        run: |
+          PYTHONPATH=python python tests/regression/compare_platforms.py \
+            tests/regression/baseline spread/* | tee spread-report.md
+      - uses: actions/upload-artifact@v4
+        with: {name: wheel-spread-report, path: spread-report.md}
+
+  # EXPERIMENTAL: Windows ARM64.  MSYS2 has no gfortran for ARM64, only
+  # LLVM flang, which the wheel build does not accept (CMakeLists.txt
+  # requires GNU Fortran).  This job only records what the toolchain can
+  # do -- the numerical flags, a CFITSIO build, a flang-built backend
+  # and its regression outputs -- and builds no wheel.  Allowed to fail.
+  windows-arm64-probe:
+    name: experimental windows-arm64 (toolchain probe)
+    runs-on: windows-11-arm
+    continue-on-error: true
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: CLANGARM64
+          install: >-
+            mingw-w64-clang-aarch64-flang
+            mingw-w64-clang-aarch64-clang
+            mingw-w64-clang-aarch64-cmake
+            mingw-w64-clang-aarch64-ninja
+            mingw-w64-clang-aarch64-zlib
+            make curl
+      - name: Fortran compilers available
+        shell: msys2 {0}
+        run: |
+          pacman -Ss fortran | grep -i -A1 aarch64 || true
+          command -v gfortran && gfortran --version || echo "no gfortran in CLANGARM64"
+          flang --version
+          printf '      PROGRAM T\n      PRINT *, 1.0\n      END\n' > t.f
+          for f in -O -g -fno-automatic -ffp-contract=off; do
+            if flang $f -c t.f -o t.o 2> err.txt; then echo "flag accepted: $f"
+            else echo "flag REJECTED: $f: $(cat err.txt)"; fi
+          done
+      - name: CFITSIO and a flang-built backend (not a wheel)
+        shell: msys2 {0}
+        run: |
+          CFLAGS="-UWIN32 -DgFortran" CFITSIO_CMAKE_GENERATOR=Ninja \
+              bash tools/ci/build_cfitsio.sh /c/cfitsio
+          nm /c/cfitsio/lib/libcfitsio.a | grep -E ' T (ftgkyj_|ftinit_|ftvers_)$'
+          make elliprof_native FC=flang CFITSIO= LDLIBS="-L/c/cfitsio/lib -lcfitsio -lz"
+          [ -f elliprof_native.exe ] || mv elliprof_native elliprof_native.exe
+          ./elliprof_native.exe --version
+          objdump -p elliprof_native.exe | grep "DLL Name" || true
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", architecture: arm64}
+      - name: Regression outputs of the flang backend
+        shell: bash
+        run: |
+          export PATH="${{ steps.msys2.outputs.msys2-location }}/clangarm64/bin:$PATH"
+          python -c "import platform; print(platform.machine())"
+          python -m pip install --only-binary=:all: numpy pandas astropy pytest
+          export ELLIPROF_NATIVE="$PWD/elliprof_native.exe" PYTHONPATH=python
+          python -m pytest tests/regression -q -rxXs || true
+          python tests/regression/collect_outputs.py spread/windows-arm64-flang
+          python tests/regression/compare_platforms.py tests/regression/baseline spread/windows-arm64-flang
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: windows-arm64-probe-spread, path: spread/}
