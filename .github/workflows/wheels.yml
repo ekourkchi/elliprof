@@ -1,0 +1,129 @@
+# Binary wheels: build with cibuildwheel, repair (auditwheel / delocate /
+# delvewheel), then install each wheel in a clean environment on its own
+# platform and test it.  Artifacts only -- nothing is published.
+# NOTE: not yet run on GitHub (no remote).  Linux aarch64/x86_64 and
+# macOS arm64 wheels were built and tested locally with the same
+# commands; macOS x86_64 and Windows have NOT been built yet.
+name: wheels
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    name: wheel ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: linux-x86_64,  os: ubuntu-24.04,     archs: x86_64}
+          - {name: linux-aarch64, os: ubuntu-24.04-arm, archs: aarch64}
+          - {name: macos-arm64,   os: macos-15,         archs: arm64,  target: "15.0"}
+          - {name: macos-x86_64,  os: macos-15-intel,   archs: x86_64, target: "15.0"}
+          - {name: windows-amd64, os: windows-latest,   archs: AMD64}
+    steps:
+      - uses: actions/checkout@v4
+
+      # macOS: Homebrew gfortran.  Its runtime libraries target the
+      # runner's macOS, so the wheels require macOS >= 15 for now.
+      - name: gfortran (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install gcc
+          ln -sf "$(brew --prefix)/bin/gfortran-$(brew list --versions gcc | awk '{print $2}' | cut -d. -f1)" /usr/local/bin/gfortran || true
+          gfortran --version
+
+      # Windows: MSYS2 UCRT64 gfortran, CMake and make; static CFITSIO
+      # built from the pinned source with the same script.
+      - name: MSYS2 toolchain (Windows)
+        if: runner.os == 'Windows'
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc-fortran
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-zlib
+            curl
+      - name: Static CFITSIO (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: CFITSIO_CMAKE_GENERATOR=Ninja bash tools/ci/build_cfitsio.sh /c/cfitsio
+      - name: Put the MSYS2 toolchain on PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          echo "${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin" >> "$GITHUB_PATH"
+          echo "CFITSIO_DIR=C:/cfitsio" >> "$GITHUB_ENV"
+
+      - uses: pypa/cibuildwheel@v3.2
+        env:
+          CIBW_ARCHS: ${{ matrix.archs }}
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.target }}
+        with:
+          output-dir: wheelhouse
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.name }}
+          path: wheelhouse/*.whl
+
+  test:
+    name: test ${{ matrix.name }} / Python ${{ matrix.python }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        name: [linux-x86_64, linux-aarch64, macos-arm64, macos-x86_64, windows-amd64]
+        python: ["3.10", "3.12", "3.13"]
+        include:
+          - {name: linux-x86_64,  os: ubuntu-24.04}
+          - {name: linux-aarch64, os: ubuntu-24.04-arm}
+          - {name: macos-arm64,   os: macos-15}
+          - {name: macos-x86_64,  os: macos-15-intel}
+          - {name: windows-amd64, os: windows-latest}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: {name: "wheel-${{ matrix.name }}", path: wheelhouse}
+      - uses: actions/setup-python@v5
+        with: {python-version: "${{ matrix.python }}"}
+
+      # Linux: test inside a compiler-free container
+      - name: Clean-container test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm -e ELLIPROF_TEST_REQUIRE_NO_COMPILER=1 \
+            -v "$PWD:/project:ro" python:${{ matrix.python }}-slim sh -c '
+              pip install /project/wheelhouse/*.whl pytest &&
+              apt-get -qq update && apt-get -qq install -y binutils >/dev/null &&
+              python /project/tools/ci/check_backend_deps.py &&
+              cd /tmp && python -m pytest -c /project/tests/packaging/pytest.ini /project/tests/packaging'
+
+      # macOS / Windows: fresh venv, dependency check, smoke tests
+      - name: Clean-venv test (macOS, Windows)
+        if: runner.os != 'Linux'
+        shell: bash
+        run: |
+          python -m venv /tmp/clean && source /tmp/clean/bin/activate 2>/dev/null || source /tmp/clean/Scripts/activate
+          pip install wheelhouse/*.whl pytest
+          python tools/ci/check_backend_deps.py
+          cd "$RUNNER_TEMP" && python -m pytest -c "$GITHUB_WORKSPACE/tests/packaging/pytest.ini" "$GITHUB_WORKSPACE/tests/packaging"
+
+      - name: Regression outputs from the installed wheel
+        if: matrix.python == '3.12'
+        shell: bash
+        run: |
+          python -m pip install wheelhouse/*.whl
+          python -m pip install numpy pandas astropy
+          ELLIPROF_NATIVE="$(python -c 'import elliprof; print(elliprof.find_backend())')" \
+            python tests/regression/collect_outputs.py spread/wheel-${{ matrix.name }}
+      - uses: actions/upload-artifact@v4
+        if: matrix.python == '3.12'
+        with: {name: "wheel-spread-${{ matrix.name }}", path: spread/}

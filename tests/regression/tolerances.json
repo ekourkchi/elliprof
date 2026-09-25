@@ -1,0 +1,19 @@
+{
+  "_status": "PROVISIONAL - not yet derived from measured cross-platform spreads. Used only when the baseline was produced on a different platform/backend build; the same platform must match the baseline byte for byte. Replace with measured values (compare_platforms.py) before release.",
+  "_meaning": "abs: absolute limit; rel: relative limit; a value passes if it is within either. A3/A4 are compared only where I3/I4 exceed min_amplitude; alpha is not compared for nearly round isophotes (ellip < min_ellip).",
+  "min_amplitude": 0.005,
+  "min_ellip": 0.02,
+  "columns": {
+    "Rmaj":  {"abs": 1e-4, "rel": 1e-6},
+    "x0":    {"abs": 1e-3, "rel": 0},
+    "y0":    {"abs": 1e-3, "rel": 0},
+    "I0":    {"abs": 0,    "rel": 1e-4},
+    "alpha": {"abs": 1e-2, "rel": 0},
+    "ellip": {"abs": 1e-4, "rel": 0},
+    "I3":    {"abs": 1e-4, "rel": 0},
+    "A3":    {"abs": 0.5,  "rel": 0},
+    "I4":    {"abs": 1e-4, "rel": 0},
+    "A4":    {"abs": 0.5,  "rel": 0},
+    "slope": {"abs": 1e-3, "rel": 0}
+  }
+}

@@ -1,0 +1,176 @@
+"""Smoke tests for an *installed* elliprof (a wheel in a clean
+environment).  Run with the configuration next to this file so the
+source tree is not importable:
+
+    pytest -c tests/packaging/pytest.ini tests/packaging
+
+cibuildwheel runs these against every wheel it builds.
+"""
+
+import os
+import shutil
+import subprocess
+import sys
+import sysconfig
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+HERE = Path(__file__).resolve().parent
+GALAXY = HERE.parent / "data" / "synthetic_galaxy.fits"
+FIT = ["X0=127.3", "Y0=121.6", "R0=3", "R1=90", "NR=30"]
+
+
+def elliprof_cmd():
+    exe = shutil.which("elliprof")
+    assert exe, "the elliprof command is not on PATH"
+    return [exe]
+
+
+def run(*args, cwd=None):
+    return subprocess.run(elliprof_cmd() + [str(a) for a in args],
+                          capture_output=True, text=True, cwd=cwd)
+
+
+def test_imports_installed_package_not_source():
+    import elliprof
+    site = Path(sysconfig.get_paths()["purelib"]).resolve()
+    plat = Path(sysconfig.get_paths()["platlib"]).resolve()
+    where = Path(elliprof.__file__).resolve()
+    assert site in where.parents or plat in where.parents, where
+
+
+def test_backend_is_inside_installed_package():
+    import elliprof
+    from elliprof._native import backend_source
+    exe = elliprof.find_backend()
+    assert Path(elliprof.__file__).resolve().parent in exe.resolve().parents
+    assert backend_source() == "installed package"
+    assert "ELLIPROF_NATIVE" not in os.environ
+
+
+def test_no_compiler_needed():
+    """No Fortran compiler is available, and the backend only needs
+    libraries shipped in the wheel or provided by the OS."""
+    if os.environ.get("ELLIPROF_TEST_REQUIRE_NO_COMPILER") == "1":
+        assert shutil.which("gfortran") is None, \
+            "gfortran is visible: run this test without a compiler"
+    elif shutil.which("gfortran"):
+        pytest.skip("gfortran is on PATH here (e.g. inside the build "
+                    "container); the clean-environment job checks this")
+    import elliprof
+    exe = elliprof.find_backend()
+    proc = subprocess.run([str(exe), "--version"], capture_output=True,
+                          text=True)
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.startswith("elliprof_native ")
+
+
+def test_help_version_diagnostics():
+    import elliprof
+    h = run("--help")
+    assert h.returncode == 0 and "usage: elliprof" in h.stdout
+    v = run("--version")
+    assert v.returncode == 0
+    assert v.stdout.startswith(f"elliprof {elliprof.__version__}")
+    assert "elliprof_native" in v.stdout and "CFITSIO" in v.stdout
+    d = run("--diagnostics")
+    assert d.returncode == 0
+    assert "installed package" in d.stdout
+
+
+def test_python_m_elliprof():
+    proc = subprocess.run([sys.executable, "-m", "elliprof", "--version"],
+                          capture_output=True, text=True)
+    assert proc.returncode == 0 and proc.stdout.startswith("elliprof ")
+
+
+def _profile_files(tmp_path, stem):
+    return [tmp_path / f"{stem}.{ext}" for ext in ("prf", "csv", "reg")]
+
+
+def _check_outputs(tmp_path, stem, n):
+    from elliprof import parse_elliprof_csv, read_ds9_regions, read_profile
+    prf, csv, reg = _profile_files(tmp_path, stem)
+    assert len(read_profile(str(prf))) == n
+    df, _ = parse_elliprof_csv(csv)
+    assert len(df) == n and not df.isna().any().any()
+    assert len(read_ds9_regions(reg)) == n
+
+
+def test_explicit_center_scalar_sky(tmp_path):
+    prf, csv, reg = _profile_files(tmp_path, "a")
+    p = run(GALAXY, *FIT, "--sky", "100", "-o", prf, "--csv", csv,
+            "--reg", reg)
+    assert p.returncode == 0, p.stderr
+    assert "Center source: explicit image coordinates" in p.stdout
+    _check_outputs(tmp_path, "a", 30)
+    from elliprof import read_profile
+    last = read_profile(str(prf)).iloc[-1]
+    assert abs(last.x0 - 127.3) < 0.05 and abs(last.y0 - 121.6) < 0.05
+    assert abs(last.ellip - 0.3) < 0.01
+
+
+def test_automatic_center(tmp_path):
+    prf, csv, reg = _profile_files(tmp_path, "b")
+    p = run(GALAXY, "R0=3", "R1=90", "NR=30", "--sky", "100", "-o", prf,
+            "--csv", csv, "--reg", reg)
+    assert p.returncode == 0, p.stderr
+    assert "Center source: image center" in p.stdout
+    assert "X0=128.0000 Y0=128.0000" in p.stdout
+    _check_outputs(tmp_path, "b", 30)
+
+
+def test_sky_image_and_mask(tmp_path):
+    from astropy.io import fits
+    from elliprof import write_bitmap_mask
+    data = fits.getdata(GALAXY)
+    fits.PrimaryHDU(np.full(data.shape, 100.0, np.float32)).writeto(
+        tmp_path / "sky.fits")
+    m = np.ones(data.shape)
+    m[200:220, 20:40] = 0
+    write_bitmap_mask(tmp_path / "m.dmask", m)
+    prf, csv, reg = _profile_files(tmp_path, "c")
+    p = run(GALAXY, *FIT, "--sky-image", tmp_path / "sky.fits", "--mask",
+            tmp_path / "m.dmask", "-o", prf, "--csv", csv, "--reg", reg)
+    assert p.returncode == 0, p.stderr
+    assert "400 pixels masked" in p.stdout
+    _check_outputs(tmp_path, "c", 30)
+    # the same sky as a constant gives the same fit
+    q = run(GALAXY, *FIT, "--sky", "100", "--mask", tmp_path / "m.dmask",
+            "-o", tmp_path / "d.prf")
+    assert q.returncode == 0
+    assert (tmp_path / "d.prf").read_bytes() == prf.read_bytes()
+
+
+def test_python_api(tmp_path):
+    from elliprof import run_elliprof
+    res = run_elliprof(GALAXY, sky=100, center=(127.3, 121.6), r0=3, r1=90,
+                       nr=30, model=True, output_dir=tmp_path)
+    assert res.ok and len(res.profile) == 30
+    assert list(res.profile.columns)[:3] == ["Rmaj", "x0", "y0"]
+    for p in (res.prf_path, res.csv_path, res.reg_path, res.model_path):
+        assert p.is_file()
+    # identical to the command line
+    p = run(GALAXY, *FIT, "--sky", "100", "-o", tmp_path / "cli.prf")
+    assert p.returncode == 0
+    assert (tmp_path / "cli.prf").read_bytes() == res.prf_path.read_bytes()
+
+
+def test_paths_with_spaces_and_unicode(tmp_path):
+    d = tmp_path / "dir with spaces"
+    d.mkdir()
+    img = d / "galaxy image.fits"
+    shutil.copy(GALAXY, img)
+    out = d / "out.csv"
+    p = run(img, *FIT, "--sky", "100", "--csv", out)
+    assert p.returncode == 0, p.stderr
+    assert out.is_file()
+    u = tmp_path / "gálaxy"
+    u.mkdir()
+    shutil.copy(GALAXY, u / "g.fits")
+    p = run(u / "g.fits", *FIT, "--sky", "100", "--csv", u / "o.csv")
+    if sys.platform == "win32" and p.returncode != 0:
+        pytest.xfail("non-ASCII paths are not supported on Windows yet")
+    assert p.returncode == 0, p.stderr

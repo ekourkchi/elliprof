@@ -21,7 +21,7 @@ C     ELLIPROF only calls it with TV when X0/Y0 or R0/R1/NR are missing.
       CHARACTER*(*) KEY
       WRITE (0,*) 'elliprof: TV cursor input is not available;',
      $     ' give X0= Y0= R0= R1= NR= instead'
-      STOP 2
+      CALL EXIT(2)
       END
 
 C     TVCROSS, TVCIRC: overlays on the TV display (tvgraph.f).  No-ops.

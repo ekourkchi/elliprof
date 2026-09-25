@@ -1,96 +1,175 @@
-# Standalone ELLIPROF
+# elliprof
 
-ELLIPROF is MONSTA/VISTA's elliptical-isophote surface photometry command. This directory builds it as a single program with gfortran and CFITSIO. It doesn't need the rest of MONSTA, X11, Mongo or readline.
+**Elliptical-isophote surface photometry of galaxies.** elliprof fits a set of concentric ellipses to a galaxy image. For each isophote it measures:
+- the centre, position angle and ellipticity;
+- the mean surface brightness;
+- the 3θ and 4θ harmonic (boxy/disky) terms;
+- the logarithmic slope.
 
-**Status:** this version builds and runs, but it hasn't yet been checked against output from the original MONSTA. See "Not yet done" below.
+It can also build a smooth model image of the galaxy.
 
-## Build
+The fitting code is ELLIPROF from John Tonry's MONSTA package (a descendant of Lick VISTA), compiled unchanged from the original Fortran. elliprof adds FITS input and output, masks, sky subtraction, flexible centre selection, CSV and DS9 output, and a Python API.
 
-Requirements are gfortran and CFITSIO. On macOS: `brew install gcc cfitsio`.
+> **Status:** technically complete, but **not yet published**. Redistribution rights for the legacy source code are still being resolved; see [LICENSING_STATUS.md](LICENSING_STATUS.md). Until then, install from source or from locally built wheels.
+
+## Installation
+
+Once released:
 
 ```sh
-make                  # builds ./elliprof
-make test             # also writes test_image.fits and runs ELLIPROF on it
+pip install elliprof
 ```
 
-If CFITSIO isn't installed through Homebrew, point the build at it with `make CFITSIO=/path/to/prefix`. Use `make WARN=-Wall` to see compiler warnings. The original sources produce many warnings; that's expected.
+Binary wheels will contain everything needed, including the compiled backend, CFITSIO and the Fortran runtime. **No compiler, gfortran or CFITSIO is needed.**
 
-## Run
+**From source**, you need gfortran and CFITSIO:
 
 ```sh
-./elliprof image.fits X0=127.3 Y0=121.6 R0=3 R1=90 NR=30 [SKY=100] [options] \
-           [-o out.prf] [-m model.fits] [--csv out.csv] [--reg out.reg]
+brew install gcc cfitsio                          # macOS
+sudo apt install gfortran libcfitsio-dev          # Debian / Ubuntu
+pip install .                                     # or: pip install -e .
 ```
 
-- **Keywords:** these are the MONSTA ELLIPROF keywords, in the same syntax as `ELLIPROF buf ...` inside MONSTA. The program joins them into a command line and splits it with the original `UPPER`/`DISSECT` routines, exactly as `vista.f` does. That means:
-  - Case doesn't matter.
-  - `KEY=value` values can be expressions.
-  - At most 16 keywords are accepted.
-  - A bare integer (MONSTA's buffer number) is accepted and ignored.
-- **Keyword list:** `X0= Y0= R0= R1= NR= RLAW= LINEAR FIXCTR= ELLIP= NITER= SCALE= SKY= MODEL RMSTAR COS3X= COS4X= TIE= AVG= GAIN= GC VERBOSE TEST DUMP= EDIT`. The full descriptions are in the `Chelp` lines at the top of `src/original/elliprof.f`.
-- **`-o out.prf`:** writes the profile in the same format as MONSTA's `SAVE ELLIPROF=out ASCII`, using list-directed `N_PRF, PRF_SC, PARAM_PRF(12,250), PRF_HEAD`. This file keeps full precision, so use it for numerical comparisons.
-- **`-m model.fits`:** with `MODEL` (or `GC MODEL`), writes the model image that ELLIPROF leaves in the image buffer.
-- **`--csv out.csv`:** writes the profile as comma-separated values in fixed-width columns, after a few `#` comment lines. There is one row per contour: `Rmaj, x0, y0, I0, alpha, ellip, I3, A3, I4, A4, slope`.
-  - The values are the same as in the `.prf`, in MONSTA's coordinate convention.
-  - I0, I3 and I4 are written as `ES15.7`, which keeps full REAL\*4 precision.
-  - The other columns use 4 or 6 decimals (at most 5e-5 pixels or degrees of rounding). For exact values, use the `.prf`.
-- **`--reg out.reg`:** writes one DS9 `ellipse(x,y,a,b,angle)` per contour, in `image` coordinates with no labels.
-  - Centre: `x0 − CNPIX1 + 0.5`, `y0 − CNPIX2 + 0.5`, converting MONSTA's pixel convention (see Coordinates) to DS9's.
-  - Axes: `a = Rmaj`, `b = Rmaj·(1 − ellip)`.
-  - Angle: `alpha − 90`. The major axis lies at `alpha + 90`; the two differ by 180°, which is the same ellipse.
-  - Contours with NaN are written as `#` comment lines instead of ellipses, and a warning goes to stderr.
-- **Where the files come from:** `--csv` and `--reg` are both generated from the final `/PRF/` after ELLIPROF returns. Leaving them out changes nothing else: stdout and the `.prf` are byte-identical either way.
-- **Image input:** `image.fits` is read as REAL\*4 through CFITSIO, with BSCALE/BZERO applied and no NULL substitution. For an extension, use CFITSIO's `file.fits[1]` syntax.
+## Quick start
 
-### Coordinates
+```sh
+elliprof galaxy.fits \
+    --mask galaxy.dmask \
+    --sky 1234.5 \
+    X0=500 Y0=500 \
+    R0=5 R1=200 NR=40 \
+    --csv galaxy.csv --reg galaxy.reg -o galaxy.prf
+```
 
-These follow VISTA's conventions:
-- The centre of pixel `DATA(ix,iy)` is at `(x,y) = (ix-0.5, iy-0.5)`.
-- The image origin is `CNPIX1`/`CNPIX2` from the header, or 0 if those keywords are missing. MONSTA's default CNPIX mode does the same. Output `x0`/`y0` include that origin.
-- In the printed table, `alpha` is MONSTA's stored position angle, which is ELLIPROF's internal angle (CCW from +x) minus 90°. So an ellipse whose major axis is at 30° from +x prints as 120.
+```python
+from elliprof import run_elliprof
 
-### Output
+result = run_elliprof("galaxy.fits", mask="galaxy.dmask", sky=1234.5,
+                      center=(500, 500), r0=5, r1=200, nr=40)
+result.profile          # pandas DataFrame, one row per isophote
+result.csv_path, result.reg_path, result.prf_path
+```
 
-stdout contains:
-1. ELLIPROF's own output: the final-iteration table and the `Re / Ie / Sky` line from the de Vaucouleurs fits along the major and minor axes.
-2. The same table that MONSTA's `PRINT EPROF` produces, using that command's FORMAT statements.
+`python -m elliprof` is the same as the `elliprof` command. A worked example on a real HST image is in [examples/u12517](examples/u12517/README.md) and [notebooks/elliprof_example.ipynb](notebooks/elliprof_example.ipynb).
 
-Progress from `MODEL` goes to stderr. `DUMP=k` writes `fort.2`, as it does in the original.
+## What happens to the image
 
-## Layout
+1. **Read** the FITS image. It is converted to 32-bit floats, with BSCALE/BZERO applied.
+2. **Subtract the sky**: either a constant with `--sky V` (Python: `sky=`), or an image of the same size with `--sky-image F` (`sky_image=`). You can't give both.
+3. **Apply the mask** with `--mask F` (`mask=`). The image is multiplied by the mask: **0 = masked, 1 = good**. Masked pixels become exactly 0, and ELLIPROF ignores pixels that are exactly 0. That's why the sky has to be subtracted *first*.
+4. **Fit** with ELLIPROF.
 
-| Path | Contents |
+Masks can be ordinary FITS images or MONSTA/SBF `.dmask` bitmaps (`BITPIX = 1`, which other FITS readers can't open); elliprof decodes these exactly as MONSTA does. A mask or sky image must have the same size and origin as the science image, otherwise elliprof stops with an error.
+
+`--sky` is **not** ELLIPROF's own `SKY=` keyword. `SKY=` (Python: `elliprof_sky=`) only sets the sky used in ELLIPROF's final de Vaucouleurs fit and doesn't change the image. `--sc` is a deprecated alias for `--sky`.
+
+## Choosing the centre
+
+Give at most one of these:
+
+| Command line | Python | Coordinates |
+|---|---|---|
+| `X0=x Y0=y` | `center=(x, y)` | ELLIPROF image coordinates (below) |
+| `--center-physical X Y` | `center_physical=(x, y)` | IRAF/DS9 physical coordinates (`LTV`/`LTM` keywords) |
+| `--center-radec RA DEC` | `center_radec=(ra, dec)` | celestial, via the image's FITS WCS (astropy). Decimal degrees (`188.73658 -12.58242`) or sexagesimal (`12:34:56.78 -12:34:56.7`), read in the WCS's own frame. A `SkyCoord` is also accepted. |
+| (none) | (none) | the geometric image centre |
+
+The chosen centre is always reported, for example `Center source: RA/DEC` / `Converted center: X0=567.1321 Y0=562.1094`. The centre is only the starting point: ELLIPROF fits the centre of every isophote (unless `FIXCTR=1`). A RA/DEC centre on an image without a WCS is an error, never a silent fallback.
+
+**ELLIPROF image coordinates** put the centre of the pixel in FITS column *i* at x = *i* − 0.5, so the image spans 0 ≤ x ≤ NCOL. That's half a pixel less than FITS/DS9 image coordinates. The geometric centre is (NCOL/2, NROW/2).
+
+## Fit parameters
+
+The ELLIPROF keywords, as `KEY=value` on the command line or as keyword arguments in Python:
+
+| Keyword | Python | Meaning |
+|---|---|---|
+| `R0=` `R1=` `NR=` | `r0` `r1` `nr` | inner and outer semi-major axis (pixels) and number of isophotes (required) |
+| `NITER=` | `niter` | iterations (default 5) |
+| `RLAW=` | `rlaw` | radius spacing: 0 linear, 1 logarithmic, 2 r^¼ (default) |
+| `LINEAR` | `linear` | fit intensities instead of log intensities |
+| `FIXCTR=` | `fixctr` | 0 free centres, 1 fixed, 2 median centre |
+| `ELLIP=` | `ellip` | force this ellipticity |
+| `RMSTAR` | `rmstar` | reject star-like outliers along each isophote |
+| `COS3X=` `COS4X=` | `cos3x` `cos4x` | 3θ/4θ terms in the model (0 none, 1 median, 2 each isophote; `COS3X<0` uses 6θ) |
+| `TIE=` | `tie` | smooth the parameters with radius (polynomial order, or −n: n-point smoothing) |
+| `AVG=` | `avg` | average a (2n+1)² box when sampling |
+| `GAIN=` | `gain` | iteration gain (default 1) |
+| `SCALE=` | `scale` | arcsec/pixel, recorded in the profile |
+| `SKY=` | `elliprof_sky` | sky for the de Vaucouleurs fit only (see above) |
+| `MODEL` | `model` | make a model image (`-m model.fits`) |
+| `GC` | `gc` | globular-cluster mode: circular annuli |
+| `VERBOSE` | `verbose` | print every iteration |
+
+## Output
+
+| Option | File |
 |---|---|
-| `src/original/` | `elliprof.f jtutil.f gcfit.f assign.f dissect.f value.f operate.f variable.f upper.f`, byte-identical copies of `monsta/libvista/fcode/` |
-| `include/` | `vistalink.inc imagelink.inc profile.inc mongo.par`, byte-identical (`mongo.par` is the target of the libvista symlink) |
-| `src/shim/main.f` | Driver. Sets the COMMON state VISTA normally sets up (`GO`, `XERR`, `NOGO`, `WORD()`, `ISR`/`ISC`/`IM`, `HEADBUF`), calls `ELLIPROF(DATA,NROW,NCOL)`, prints and saves `/PRF/` |
-| `src/shim/stubs.f` | Replaces `INVISTA` (reads a line from stdin), `MARK` (stops with a message; there's no cursor), `TVCROSS`/`TVCIRC` (no-ops) and `TELLME` (progress to stderr) |
-| `src/shim/fitsio.f` | CFITSIO read and write |
-| `src/shim/profout.f` | `--csv` and `--reg` writers. The column mapping comes from where ELLIPROF fills `PARAM_PRF` (`elliprof.f`, loop 30) and from `PRINT EPROF`; the comments in `profile.inc` describe an older layout and are wrong for ELLIPROF |
-| `tests/mktestimage.f` | Generates `test_image.fits`, a noiseless r^¼ galaxy: centre (127.3,121.6), Re=20, Ie=200, ellipticity 0.3, PA 30° from +x, sky 100 |
+| `-o out.prf` | the profile in MONSTA's `SAVE ELLIPROF` format, with exact values (`elliprof.read_profile`) |
+| `--csv out.csv` | the same as comma-separated, fixed-width columns with `#` header lines (`elliprof.parse_elliprof_csv`) |
+| `--reg out.reg` | one DS9 ellipse per isophote, in DS9 `image` coordinates, no labels |
+| `-m model.fits` | the model image, with `MODEL` |
 
-## Compiler flags
+Profile columns:
 
-`-O -g -fno-automatic -ffp-contract=off`
+| Column | Meaning |
+|---|---|
+| `Rmaj` | semi-major axis (pixels) |
+| `x0`, `y0` | isophote centre (ELLIPROF coordinates, plus the image origin CNPIX if any) |
+| `I0` | mean intensity on the isophote (image units, above the subtracted sky) |
+| `alpha` | position angle; the major axis lies at `alpha + 90`° counter-clockwise from +x |
+| `ellip` | ellipticity 1 − b/a |
+| `I3`, `A3` / `I4`, `A4` | 3θ / 4θ amplitude (relative to I0) and phase (degrees) |
+| `slope` | d log I / d log r |
 
-- `-O -g -fno-automatic` are MONSTA's own flags. `-fno-automatic` gives local variables static storage and zero initialization, which the code relies on.
-- `-ffp-contract=off` stops GCC from fusing multiply-adds into FMA instructions (it does this by default on arm64), so REAL\*4 results stay reproducible.
-- Never build with bounds checking. The F77 code declares dummy arrays as `X(1)`/`X(2)` and indexes past them on purpose.
+**DS9:** `ds9 galaxy.fits -regions galaxy.reg`, or *Region → Open…*. Each ellipse is `ellipse(x0 + 0.5, y0 + 0.5, Rmaj, Rmaj·(1−ellip), alpha − 90)`. The angle `alpha − 90` and the major-axis angle `alpha + 90` differ by 180°, which draws the same ellipse.
+
+`elliprof --version` and `elliprof --diagnostics` report versions, platform and the backend in use, which is useful for bug reports.
+
+## Platforms
+
+| Platform | Status |
+|---|---|
+| Linux x86_64 (manylinux_2_28) | wheel built and tested in clean containers, Python 3.12; tests on real CI runners pending |
+| Linux aarch64 (manylinux_2_28) | wheel built and tested in clean containers, Python 3.10 and 3.13 |
+| macOS arm64 | wheel built and tested locally (tagged macOS 26 by the local toolchain; CI wheels will target macOS 15) |
+| macOS x86_64 | **not yet built** (CI workflow ready) |
+| Windows x86_64 | **not yet built** (CI workflow ready, MSYS2 gfortran; unverified) |
+| Windows ARM64 | not supported (no gfortran for Windows on ARM) |
+
+## Testing
+
+```sh
+make check            # build, source checksums, unit + integration + regression tests
+make docker-test      # the same inside an Ubuntu container
+make notebook-check   # run the example notebook
+```
+
+The test plan is in [tests/TEST_PLAN.md](tests/TEST_PLAN.md).
+
+---
+
+## Reference: how it is built
+
+* **The reference code is never changed.** `src/original/` (9 Fortran files) and `include/` (4 files) are byte-identical copies from MONSTA, checked against SHA-256 hashes in `tests/original_source_hashes.txt` on every test run.
+* **`src/shim/` stands in for the MONSTA environment** that normally surrounds ELLIPROF:
+  - reading the image (`RD`);
+  - sky and mask arithmetic, exactly as MONSTA's `SC`, `SI` and `MI`;
+  - splitting the command line into keywords with MONSTA's own parser;
+  - output as `PRINT EPROF` / `SAVE ELLIPROF` would produce it.
+  - The display and terminal routines ELLIPROF calls are stubbed out.
+* **`python/elliprof/`** handles centre selection, validation, running the backend in a subprocess, and reading the results. The compiled backend (`elliprof_native`) is an implementation detail. It can be run directly, but it needs explicit `X0=`/`Y0=`.
+* **Build:** `make` for development, CMake via scikit-build-core for wheels, cibuildwheel for release builds. Both builds use exactly the same compiler flags, checked by a test: `-O -g -fno-automatic -ffp-contract=off`, with no preprocessing and no bounds checking. Different builds on one machine produce byte-identical results.
+* **Across platforms**, Linux x86_64 and aarch64 give bit-identical results. macOS differs from Linux only at the level of rounding in the maths library (see `tests/regression/spread/`).
 
 ## Known limitations
 
-- **TV:** `TV` works only when `X0 Y0 R0 R1 NR` are all given. Otherwise ELLIPROF asks for the cursor, and `MARK` stops the program.
-- **`OLD` and `EDIT`:** these start from an earlier profile held in `/PRF/`. The program doesn't load a `.prf` file yet (MONSTA's `GET ELLIPROF=`), so they start from an empty profile.
-- **Model header:** the model image is written with a minimal header (BITPIX -32, CNPIX if nonzero). It doesn't copy the input header the way MONSTA's `WD` does.
-
-These bugs in the original code are kept as-is:
-- `FITPROFILE` has room for only 100 radii, so `NR > 100` overwrites memory.
-- `ARRAYCENTER` assumes an image at most 2048 pixels on a side (GC mode).
-- `TRIMIT` doesn't remove the neighbours of a rejected star.
-- Radii with fewer than 9 samples (R < ~2.9 px) make `FITCONTOUR` give up, which produces `NaN` on that isophote.
-
-## Not yet done
-
-- **Baseline comparison:** there isn't yet a baseline from the full MONSTA build to compare against.
-- **What the synthetic image shows:** it only proves the program runs. It isn't evidence that the results are scientifically equivalent to MONSTA's.
-- **Reading differences for integer images:** MONSTA normally reads FITS with its own reader (`disk.f`) and only falls back to CFITSIO. For BITPIX = -32 images the pixel values should be identical. For scaled integer images, the last bits may differ.
+* **`OLD` and `EDIT`** continue a previous profile held in memory, which elliprof can't load yet. They are refused.
+* **`TV`** (interactive display and cursor) isn't available.
+* **Legacy behaviour is kept as it is**, for equivalence with MONSTA:
+  - `NR` must be ≤ 100 (the internal fit arrays hold 100 radii);
+  - isophotes smaller than about 3 pixels have too few samples and give `NaN`;
+  - `GC` mode assumes images at most 2048 pixels on a side;
+  - `RMSTAR` does not remove the neighbours of a rejected star.
+* **Model image:** it has a minimal FITS header and is sky-subtracted.
+* **Windows paths:** non-ASCII paths may not work on Windows.

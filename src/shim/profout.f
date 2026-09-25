@@ -53,8 +53,10 @@ C     NaN compares unequal to itself; DS9 cannot parse such a line
 
 C     Comma-separated profile with fixed-width columns and # comments.
 C     Values are PARAM_PRF exactly as stored (MONSTA coordinates).
-      SUBROUTINE WRITECSV(FNAME, IMAGE, PREP, ISC, ISR, IERR)
-      CHARACTER*(*) FNAME, IMAGE, PREP
+C     MASK and SKY describe the preparation ('none' if not used), CSRC
+C     where the centre came from.
+      SUBROUTINE WRITECSV(FNAME, IMAGE, MASK, SKY, CSRC, ISC, ISR, IERR)
+      CHARACTER*(*) FNAME, IMAGE, MASK, SKY, CSRC
       INTEGER ISC, ISR, IERR
       INCLUDE 'profile.inc'
       INTEGER K, J
@@ -66,9 +68,10 @@ C     Values are PARAM_PRF exactly as stored (MONSTA coordinates).
          RETURN
       END IF
       WRITE (7,'(A)') '# ELLIPROF surface photometry profile',
-     $     '# Input: '//IMAGE(1:LEN_TRIM(IMAGE))
-      IF (PREP .NE. ' ') WRITE (7,'(A)')
-     $     '# Preprocessing: '//PREP(1:LEN_TRIM(PREP))
+     $     '# Input: '//IMAGE(1:LEN_TRIM(IMAGE)),
+     $     '# Mask: '//MASK(1:LEN_TRIM(MASK)),
+     $     '# Sky: '//SKY(1:LEN_TRIM(SKY)),
+     $     '# Center source: '//CSRC(1:LEN_TRIM(CSRC))
       WRITE (7,1001) N_PRF, PRF_SC, ISC, ISR
  1001 FORMAT ('# Contours: ',I0,'   SCALE: ',G0,
      $     '   Image origin (CNPIX1,CNPIX2): ',I0,',',I0)

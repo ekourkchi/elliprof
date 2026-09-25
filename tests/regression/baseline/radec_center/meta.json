@@ -1,0 +1,25 @@
+{
+ "system": "Darwin",
+ "machine": "arm64",
+ "backend": "elliprof_native 0.1.0 (CFITSIO 4.7; GCC version 16.2.0)",
+ "case": "radec_center",
+ "center": [
+  100.0,
+  99.99999999993685
+ ],
+ "center_source": "RA/DEC",
+ "dvfit": {
+  "re": [
+   15.0,
+   10.4
+  ],
+  "ie": [
+   300.8,
+   305.3
+  ],
+  "sky": [
+   0.0,
+   0.0
+  ]
+ }
+}

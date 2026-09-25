@@ -1,0 +1,16 @@
+# SHA-256 of the original MONSTA/VISTA files copied unchanged from
+# monsta/libvista/fcode/ (mongo.par = libmongo/include/mongo.par).
+# These must never change. Do not regenerate this file automatically.
+a4f3a964dedef3b9229e1277a4731c80ed5ea33d56248268316ab634639cd972  src/original/assign.f
+590c8e4c0ce43483481bc43b0c90fbfcee89dd03bfc74f57d27cae3dfba6e1b5  src/original/dissect.f
+24dfd9a8ab6967c2075c1b3f428ff3293145ae78cecf91a0f6612e1aee508d2b  src/original/elliprof.f
+e3dc70c61b45e7fcce906536807dfce8a8ceed274166c3e0763e428b5ecd99cc  src/original/gcfit.f
+c8a3a2b2090e7e92085e4db742176b1a292078d2f5fea10daae41aeb1185d570  src/original/jtutil.f
+6244618cd2bde7c85cef26cd2cac3896f55e1a6999fdb2977b81c80912e37c93  src/original/operate.f
+05d789936eef102607606f2eb769bbd90f38353564c68a730ddf16e37300b86c  src/original/upper.f
+ab44b6a05c6e2e3d5178144608e33dfc9a6646029434782435f490b0cd5fc6a1  src/original/value.f
+9efb2851415fe48fe2cd8ce795bd3e05a74a7d49423fd6a080b38d8d0baaa7a1  src/original/variable.f
+26deb06ed419e9c116d612be975114842904c0608e63d16c178f3fd77b16958b  include/imagelink.inc
+7ba99f95fc7147d6d2b50af4991a129e96d69f0ba83581e91e42d82379c6ef78  include/mongo.par
+402823d988e005b4af1c06c810441517e6d324c5a35b2ac1f975004ed52a3209  include/profile.inc
+6b1dfb937d28dec1cd702340fe919c224d2cab16d6322ddeab51b95eb410e9b6  include/vistalink.inc

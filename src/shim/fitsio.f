@@ -84,9 +84,26 @@ C     substitution, as cfitsdisk.c does), then close the file.
       RETURN
       END
 
+C     Close a file left open by FITSOPENIM without reading it.
+      SUBROUTINE FITSCLOSE(IUNIT)
+      INTEGER IUNIT, STATUS
+      STATUS = 0
+      CALL FTCLOS(IUNIT, STATUS)
+      CALL FTFIOU(IUNIT, STATUS)
+      RETURN
+      END
+
+C     CFITSIO library version, for --version.
+      SUBROUTINE FITSLIBVER(VERSION)
+      REAL VERSION
+      CALL FTVERS(VERSION)
+      RETURN
+      END
+
 C     Write a REAL*4 image, replacing any existing file.
-      SUBROUTINE FITSWRITEIM(FNAME, NCOL, NROW, PIX, ISC, ISR, IERR)
-      CHARACTER*(*) FNAME
+      SUBROUTINE FITSWRITEIM(FNAME, NCOL, NROW, PIX, ISC, ISR, HIST,
+     $     IERR)
+      CHARACTER*(*) FNAME, HIST
       INTEGER NCOL, NROW, ISC, ISR, IERR
       REAL PIX(NCOL,NROW)
       INTEGER STATUS, IUNIT, NAXES(2)
@@ -101,7 +118,7 @@ C     Write a REAL*4 image, replacing any existing file.
          CALL FTPKYJ(IUNIT, 'CNPIX1', ISC, 'Start column', STATUS)
          CALL FTPKYJ(IUNIT, 'CNPIX2', ISR, 'Start row', STATUS)
       END IF
-      CALL FTPHIS(IUNIT, 'Model image from standalone ELLIPROF', STATUS)
+      CALL FTPHIS(IUNIT, HIST, STATUS)
       CALL FTPPRE(IUNIT, 1, 1, NCOL*NROW, PIX, STATUS)
       CALL FTCLOS(IUNIT, STATUS)
       CALL FTFIOU(IUNIT, STATUS)

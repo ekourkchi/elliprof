@@ -1,0 +1,91 @@
+[build-system]
+requires = ["scikit-build-core>=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "elliprof"
+dynamic = ["version"]
+description = "Elliptical-isophote surface photometry of galaxies (MONSTA's ELLIPROF)"
+readme = "README.md"
+requires-python = ">=3.10"
+# No license is declared on purpose: redistribution rights for the
+# legacy MONSTA/VISTA sources are unresolved.  See LICENSING_STATUS.md.
+authors = [{ name = "elliprof maintainers" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Fortran",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+]
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "astropy>=5.3",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+notebook = ["matplotlib>=3.7", "nbclient>=0.8", "nbformat>=5.9", "ipykernel>=6"]
+
+[project.scripts]
+elliprof = "elliprof.cli:main"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+cmake.version = ">=3.21"
+build.verbose = true
+# The wheel holds a standalone executable and no Python extension, so
+# it works with every Python 3: tag it py3-none-<platform>.
+wheel.py-api = "py3"
+wheel.packages = ["python/elliprof"]
+sdist.exclude = [".venv", "build", "dist", "wheelhouse", "*.prf", "*.csv",
+                 "*.reg", "examples/**/.ipynb_checkpoints"]
+
+[tool.scikit-build.metadata.version]
+provider = "scikit_build_core.metadata.regex"
+input = "VERSION"
+regex = "(?P<value>[^\\s]+)"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit", "tests/integration", "tests/regression"]
+# Run against the source tree.  The installed-wheel tests
+# (tests/packaging) override this with -o pythonpath= so that they
+# import the installed package instead.
+pythonpath = ["python", "tests", "tests/regression"]
+markers = [
+    "native: needs the compiled elliprof_native backend",
+    "slow: takes more than a few seconds",
+]
+
+# ---------------------------------------------------------------------
+# Release wheels (cibuildwheel).  The wheel is Python-independent
+# (py3-none-<platform>), so it is built once per platform and then
+# tested on several Pythons in the wheels workflow.
+[tool.cibuildwheel]
+build = "cp312-*"
+skip = "*-musllinux_*"
+build-verbosity = 1
+test-requires = ["pytest"]
+test-command = "pytest -c {project}/tests/packaging/pytest.ini {project}/tests/packaging"
+
+[tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+before-all = "bash {project}/tools/ci/build_cfitsio.sh /opt/cfitsio"
+environment = { CFITSIO_DIR = "/opt/cfitsio", CMAKE_ARGS = "-DELLIPROF_STATIC_CFITSIO=ON" }
+repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} && auditwheel show {dest_dir}/*.whl"
+
+[tool.cibuildwheel.macos]
+before-all = "bash {project}/tools/ci/build_cfitsio.sh $HOME/cfitsio"
+environment = { CFITSIO_DIR = "$HOME/cfitsio", CMAKE_ARGS = "-DELLIPROF_STATIC_CFITSIO=ON" }
+repair-wheel-command = "delocate-listdeps --all {wheel} && delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
+
+[tool.cibuildwheel.windows]
+# gfortran and CFITSIO come from MSYS2 UCRT64 (see .github/workflows/wheels.yml)
+environment = { CMAKE_ARGS = "-DELLIPROF_STATIC_CFITSIO=ON" }
+before-build = "pip install delvewheel"
+repair-wheel-command = "delvewheel show --analyze-existing-exes {wheel} && delvewheel repair --analyze-existing-exes -w {dest_dir} {wheel}"

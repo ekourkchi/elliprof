@@ -1,0 +1,5 @@
+src/original/*.f -text
+include/* -text
+*.fits binary
+*.dmask binary
+tests/regression/baseline/** -text

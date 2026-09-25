@@ -1,0 +1,11 @@
+.venv
+build
+dist
+wheelhouse
+elliprof
+elliprof_native
+elliprof_native.exe
+**/__pycache__
+**/.ipynb_checkpoints
+*.egg-info
+.git

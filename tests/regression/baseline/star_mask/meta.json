@@ -1,0 +1,25 @@
+{
+ "system": "Darwin",
+ "machine": "arm64",
+ "backend": "elliprof_native 0.1.0 (CFITSIO 4.7; GCC version 16.2.0)",
+ "case": "star_mask",
+ "center": [
+  100.3,
+  99.6
+ ],
+ "center_source": "explicit image coordinates",
+ "dvfit": {
+  "re": [
+   15.0,
+   10.4
+  ],
+  "ie": [
+   300.3,
+   304.8
+  ],
+  "sky": [
+   0.0,
+   0.0
+  ]
+ }
+}

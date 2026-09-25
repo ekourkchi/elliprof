@@ -1,10 +1,21 @@
-build/
-elliprof
-test_image.fits
+# build products (root of the project only)
+/build/
+/elliprof
+/elliprof_native
+/elliprof_native.exe
+/dist/
+/wheelhouse/
+/.venv/
+*.egg-info/
+__pycache__/
+# outputs of example / smoke runs (baselines are kept: see below)
 *.prf
 *.csv
 *.reg
+!tests/regression/baseline/**
 fort.2
+model.fits
 .DS_Store
 .ipynb_checkpoints/
-model.fits
+# notebook run outputs
+notebooks/elliprof_output/
