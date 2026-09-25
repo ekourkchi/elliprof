@@ -88,5 +88,8 @@ repair-wheel-command = "delocate-listdeps --all {wheel} && delocate-wheel --requ
 [tool.cibuildwheel.windows]
 # gfortran and CFITSIO come from MSYS2 UCRT64 (see .github/workflows/wheels.yml)
 environment = { CMAKE_ARGS = "-DELLIPROF_STATIC_CFITSIO=ON" }
+# The MinGW runtime DLLs are installed next to the backend by CMake (a
+# separate process cannot use delvewheel's elliprof.libs), so the wheel is
+# already self-contained: delvewheel only inspects it.
 before-build = "pip install delvewheel"
-repair-wheel-command = "delvewheel show --analyze-existing-exes {wheel} && delvewheel repair --analyze-existing-exes -w {dest_dir} {wheel}"
+repair-wheel-command = "delvewheel show --analyze-existing-exes {wheel} && python -c \"import shutil, sys; shutil.copy(sys.argv[1], sys.argv[2])\" {wheel} {dest_dir}"

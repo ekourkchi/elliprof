@@ -43,16 +43,29 @@ def linux(exe: Path):
 
 
 def windows(exe: Path):
-    out = subprocess.run(["objdump", "-p", str(exe)], capture_output=True,
-                         text=True, check=True).stdout
-    deps = re.findall(r"DLL Name: (\S+)", out)
-    here = {p.name.lower() for p in exe.parent.glob("*.dll")}
-    libs = exe.parents[1].parent / "elliprof.libs"
-    if libs.is_dir():
-        here |= {p.name.lower() for p in libs.glob("*.dll")}
+    # The backend is its own process: only DLLs next to it (or in the
+    # system) are found -- not the elliprof.libs directory that delvewheel
+    # registers for the Python process.  Follow bundled DLLs transitively.
+    def imports(pe: Path):
+        out = subprocess.run(["objdump", "-p", str(pe)], capture_output=True,
+                             text=True, check=True).stdout
+        return re.findall(r"DLL Name: (\S+)", out)
+
+    here = {p.name.lower(): p for p in exe.parent.glob("*.dll")}
     system = re.compile(r"^(kernel32|msvcrt|ucrtbase|api-ms-win-.*|user32|"
                         r"advapi32|ws2_32|shell32|ntdll)\.dll$", re.I)
-    bad = [d for d in deps if d.lower() not in here and not system.match(d)]
+    deps, bad, todo, seen = [], [], [exe], set()
+    while todo:
+        pe = todo.pop()
+        for d in imports(pe):
+            if d.lower() in seen:
+                continue
+            seen.add(d.lower())
+            deps.append(d)
+            if d.lower() in here:
+                todo.append(here[d.lower()])
+            elif not system.match(d):
+                bad.append(d)
     return deps, bad
 
 

@@ -96,6 +96,28 @@ target_link_libraries(elliprof_native PRIVATE ${CFITSIO_LIBRARY}
 # scikit-build-core installs relative paths into the wheel's package dir
 install(TARGETS elliprof_native RUNTIME DESTINATION elliprof/_bin)
 
+# Windows (MinGW): the backend runs as a separate process, which never
+# sees the DLL directory delvewheel registers for the Python process.
+# Its gfortran runtime and zlib DLLs go next to it instead, where Windows
+# always looks first.
+if(MINGW)
+  get_filename_component(_mingw_bin "${CMAKE_Fortran_COMPILER}" DIRECTORY)
+  install(CODE "
+    file(GET_RUNTIME_DEPENDENCIES
+      EXECUTABLES \"$<TARGET_FILE:elliprof_native>\"
+      DIRECTORIES \"${_mingw_bin}\"
+      RESOLVED_DEPENDENCIES_VAR _deps
+      UNRESOLVED_DEPENDENCIES_VAR _unresolved
+      PRE_EXCLUDE_REGEXES \"^[Aa][Pp][Ii]-[Mm][Ss]-\" \"^[Ee][Xx][Tt]-[Mm][Ss]-\"
+      POST_EXCLUDE_REGEXES \"[Ss][Yy][Ss][Tt][Ee][Mm]32\")
+    foreach(_d \${_deps})
+      message(STATUS \"bundling \${_d}\")
+    endforeach()
+    file(INSTALL \${_deps}
+         DESTINATION \"\${CMAKE_INSTALL_PREFIX}/elliprof/_bin\")
+  ")
+endif()
+
 # Notices travel with every wheel
 install(FILES LICENSE THIRD_PARTY_NOTICES.md
         DESTINATION elliprof/_notices)
