@@ -112,13 +112,16 @@ jobs:
       fail-fast: false
       matrix:
         name: [linux-x86_64, linux-aarch64, macos-arm64, macos-x86_64, windows-amd64]
-        python: ["3.10", "3.12", "3.13"]
+        python: ["3.9", "3.10", "3.12", "3.13"]
         include:
           - {name: linux-x86_64,  os: ubuntu-24.04}
           - {name: linux-aarch64, os: ubuntu-24.04-arm}
           - {name: macos-arm64,   os: macos-15}
           - {name: macos-x86_64,  os: macos-15-intel}
           - {name: windows-amd64, os: windows-latest}
+          # the oldest supported Python, exact patch release (Ubuntu runner,
+          # tested in a python:3.9.13-slim container)
+          - {name: linux-x86_64,  os: ubuntu-22.04, python: "3.9.13"}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4

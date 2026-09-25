@@ -114,9 +114,18 @@ def csv_rows(path):
     return [l for l in open(path) if not l.startswith("#")]
 
 
+def toolchain(backend: str) -> str:
+    """The part of `elliprof_native --version` that can change results:
+    "elliprof_native 0.1.1 (CFITSIO 4.7; GCC version 16.2.0)" -> the text
+    in parentheses.  The package version number itself does not."""
+    start = backend.find("(")
+    return backend[start:] if start >= 0 else backend
+
+
 def same_platform(a: dict, b: dict) -> bool:
-    return all(a.get(k) == b.get(k) for k in ("system", "os", "machine",
-                                               "backend"))
+    return (all(a.get(k) == b.get(k) for k in ("system", "os", "machine"))
+            and toolchain(a.get("backend", "")) ==
+            toolchain(b.get("backend", "")))
 
 
 def column_differences(ref: Path, new: Path) -> dict:

@@ -7,7 +7,7 @@ name = "elliprof"
 dynamic = ["version"]
 description = "Fit elliptical isophotes to astronomical FITS images (ELLIPROF)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 license = "MIT"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "licenses/*.txt"]
 maintainers = [{ name = "Ehsan Kourkchi (Edwin Kay)", email = "ekourkchi@gmail.com" }]
@@ -17,6 +17,11 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Astronomy",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Fortran",
     "Operating System :: MacOS",
     "Operating System :: POSIX :: Linux",
