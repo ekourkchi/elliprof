@@ -126,5 +126,6 @@ def test_legacy_symlink_name_still_works(galaxy_fits, tmp_path):
         pytest.skip("./elliprof development link not built")
     proc = subprocess.run([str(legacy), str(galaxy_fits), *GOOD, "SKY=100",
                            "-o", str(tmp_path / "t.prf")],
-                          capture_output=True, text=True)
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          universal_newlines=True)
     assert proc.returncode == 0, proc.stderr

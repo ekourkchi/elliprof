@@ -125,7 +125,8 @@ def test_maskinfo_tool(maskinfo, tmp_path):
     m[1, 2] = 1
     write_bitmap_mask(tmp_path / "m.dmask", m)
     out = subprocess.run([str(maskinfo), str(tmp_path / "m.dmask")],
-                         capture_output=True, text=True, check=True).stdout
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         universal_newlines=True, check=True).stdout
     assert "value 0 (masked): 35" in out
     assert "value 1 (good):   1" in out
 

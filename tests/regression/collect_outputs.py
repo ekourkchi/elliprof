@@ -5,8 +5,6 @@ comparison (CI uploads the directory as an artifact).
     python tests/regression/compare_platforms.py DIR1 DIR2 [...]
 """
 
-from __future__ import annotations
-
 import sys
 from pathlib import Path
 

@@ -1,7 +1,5 @@
 """Environment report for bug reports (``elliprof --diagnostics``)."""
 
-from __future__ import annotations
-
 import platform
 import subprocess
 import sys
@@ -21,8 +19,9 @@ def diagnostics() -> Dict[str, str]:
     try:
         exe = find_backend()
         info["native backend"] = f"{exe} [{backend_source()}]"
-        proc = subprocess.run([str(exe), "--version"], capture_output=True,
-                              text=True, timeout=30)
+        proc = subprocess.run([str(exe), "--version"], stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,
+                              universal_newlines=True, timeout=30)
         info["backend version"] = (proc.stdout.strip() or
                                    f"failed: {proc.stderr.strip()}")
     except BackendNotFoundError as exc:

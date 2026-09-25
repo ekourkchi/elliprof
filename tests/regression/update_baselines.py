@@ -6,8 +6,6 @@ Never run by `make test` or `make check`.  Review the printed
 differences and commit the new baselines deliberately.
 """
 
-from __future__ import annotations
-
 import json
 import shutil
 import sys

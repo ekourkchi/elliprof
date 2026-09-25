@@ -8,8 +8,6 @@ and lists offending libraries otherwise.  Uses otool (macOS), readelf
 (Linux) or objdump (Windows, e.g. from MSYS2/MinGW).
 """
 
-from __future__ import annotations
-
 import re
 import subprocess
 import sys
@@ -22,16 +20,19 @@ def backend() -> Path:
 
 
 def macos(exe: Path):
-    out = subprocess.run(["otool", "-L", str(exe)], capture_output=True,
-                         text=True, check=True).stdout.splitlines()[1:]
+    out = subprocess.run(["otool", "-L", str(exe)], stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE,
+                         universal_newlines=True,
+                         check=True).stdout.splitlines()[1:]
     deps = [l.split(" (")[0].strip() for l in out if l.strip()]
     ok = ("@loader_path/", "@rpath/", "/usr/lib/", "/System/Library/")
     return deps, [d for d in deps if not d.startswith(ok)]
 
 
 def linux(exe: Path):
-    out = subprocess.run(["readelf", "-d", str(exe)], capture_output=True,
-                         text=True, check=True).stdout
+    out = subprocess.run(["readelf", "-d", str(exe)], stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE,
+                         universal_newlines=True, check=True).stdout
     deps = re.findall(r"\(NEEDED\).*\[(.+?)\]", out)
     libs = exe.parents[1].parent / "elliprof.libs"
     bundled = {p.name for p in libs.glob("*")} if libs.is_dir() else set()
@@ -48,8 +49,9 @@ def windows(exe: Path):
     # system) are found -- not the elliprof.libs directory that delvewheel
     # registers for the Python process.  Follow bundled DLLs transitively.
     def imports(pe: Path):
-        out = subprocess.run(["objdump", "-p", str(pe)], capture_output=True,
-                             text=True, check=True).stdout
+        out = subprocess.run(["objdump", "-p", str(pe)],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             universal_newlines=True, check=True).stdout
         return re.findall(r"DLL Name: (\S+)", out)
 
     here = {p.name.lower(): p for p in exe.parent.glob("*.dll")}

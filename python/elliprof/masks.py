@@ -24,8 +24,6 @@ The native backend decodes these files with its own transcription of
 ``bitfp_`` (src/shim/maskio.f); the tests check that both agree.
 """
 
-from __future__ import annotations
-
 import os
 from typing import Dict, Optional, Tuple
 

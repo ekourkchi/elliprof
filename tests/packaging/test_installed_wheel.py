@@ -30,7 +30,8 @@ def elliprof_cmd():
 
 def run(*args, cwd=None):
     return subprocess.run(elliprof_cmd() + [str(a) for a in args],
-                          capture_output=True, text=True, cwd=cwd)
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          universal_newlines=True, cwd=cwd)
 
 
 def test_imports_installed_package_not_source():
@@ -61,8 +62,9 @@ def test_no_compiler_needed():
                     "container); the clean-environment job checks this")
     import elliprof
     exe = elliprof.find_backend()
-    proc = subprocess.run([str(exe), "--version"], capture_output=True,
-                          text=True)
+    proc = subprocess.run([str(exe), "--version"], stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE,
+                          universal_newlines=True)
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.startswith("elliprof_native ")
 
@@ -83,7 +85,8 @@ def test_help_version_diagnostics():
 
 def test_python_m_elliprof():
     proc = subprocess.run([sys.executable, "-m", "elliprof", "--version"],
-                          capture_output=True, text=True)
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          universal_newlines=True)
     assert proc.returncode == 0 and proc.stdout.startswith("elliprof ")
 
 
@@ -118,7 +121,7 @@ def test_center_is_required(tmp_path):
     assert "error: X0 and Y0 are required" in p.stderr
 
 def test_sky_image_and_mask(tmp_path):
-    from astropy.io import fits
+    fits = pytest.importorskip("astropy.io.fits")   # test-only dependency
     from elliprof import write_bitmap_mask
     data = fits.getdata(GALAXY)
     fits.PrimaryHDU(np.full(data.shape, 100.0, np.float32)).writeto(
@@ -183,7 +186,8 @@ res = run_elliprof({str(GALAXY)!r}, 127.3, 121.6, sky=100, r0=3, r1=90,
 assert res.ok and len(res.profile) == 30
 print("ok")
 """
-    proc = subprocess.run([sys.executable, "-c", code], capture_output=True,
-                          text=True)
+    proc = subprocess.run([sys.executable, "-c", code], stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE,
+                          universal_newlines=True)
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.strip() == "ok"

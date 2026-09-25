@@ -12,8 +12,6 @@ images are generated once by make_synthetic.py and stored in
 tests/data/regression/, so every platform fits exactly the same bytes.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]

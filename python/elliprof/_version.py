@@ -4,8 +4,6 @@ Installed packages get it from their metadata (scikit-build-core reads
 VERSION at build time); a source checkout reads VERSION directly.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 
@@ -15,7 +13,10 @@ def _read_version() -> str:
     if source.is_file() and (root / "src" / "original").is_dir():
         return source.read_text().strip()
     try:
-        from importlib.metadata import version
+        try:
+            from importlib.metadata import version
+        except ImportError:  # Python < 3.8: the importlib-metadata backport
+            from importlib_metadata import version
         return version("elliprof")
     except Exception:  # pragma: no cover - not installed, no VERSION
         return "0+unknown"

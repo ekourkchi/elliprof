@@ -9,12 +9,11 @@ backend and nothing from a build or test tree.  `twine check --strict` is
 run separately.
 """
 
-from __future__ import annotations
-
 import re
 import sys
 import zipfile
 from pathlib import Path
+from typing import List, Tuple
 
 NAME = "elliprof"
 
@@ -63,7 +62,7 @@ def metadata_version(text: str) -> str:
     return m.group(1) if m else "?"
 
 
-def check_wheel(path: Path, version: str, errors) -> tuple[str, str]:
+def check_wheel(path: Path, version: str, errors) -> Tuple[str, str]:
     m = re.fullmatch(rf"{NAME}-([^-]+)-(py3-none-.+)\.whl", path.name)
     if not m:
         fail(errors, f"{path.name}: unexpected wheel name")
@@ -92,7 +91,7 @@ def check_wheel(path: Path, version: str, errors) -> tuple[str, str]:
 
 
 def main(dist: str, version: str) -> int:
-    errors: list[str] = []
+    errors: List[str] = []
     files = sorted(Path(dist).iterdir())
     wheels = [f for f in files if f.suffix == ".whl"]
     for f in files:

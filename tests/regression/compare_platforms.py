@@ -9,8 +9,6 @@ per column, as a Markdown table.  Used to choose the cross-platform
 tolerances in tolerances.json: measure first, then set.
 """
 
-from __future__ import annotations
-
 import json
 import sys
 from pathlib import Path

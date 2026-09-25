@@ -21,7 +21,8 @@ def outputs(tmp_path_factory, native, galaxy_fits):
     proc = subprocess.run([str(native), str(galaxy_fits), *ARGS,
                            "-o", str(d / "g.prf"), "--csv", str(d / "g.csv"),
                            "--reg", str(d / "g.reg")],
-                          capture_output=True, text=True, check=True)
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          universal_newlines=True, check=True)
     return d, proc.stdout
 
 

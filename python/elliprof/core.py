@@ -5,8 +5,6 @@ separate process.  This module validates the inputs, builds the command
 line, runs the backend with a time limit, and reads the results.
 """
 
-from __future__ import annotations
-
 import math
 import os
 import shutil
@@ -178,14 +176,15 @@ def _kill_process_tree(proc: subprocess.Popen) -> None:
                 continue
     else:  # Windows: kill the whole process tree
         subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
-                       capture_output=True)
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         proc.kill()
 
 
 def _run(cmd: List[str], cwd: Path, timeout: Optional[float]):
     """Run the backend with no terminal input and a time limit."""
     kwargs = dict(cwd=str(cwd), stdin=subprocess.DEVNULL,
-                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                  stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                  universal_newlines=True)
     if os.name == "posix":
         kwargs["start_new_session"] = True     # own process group
     else:

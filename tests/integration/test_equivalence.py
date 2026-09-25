@@ -29,7 +29,8 @@ def python_cli_subprocess(args, cwd):
     env["PYTHONPATH"] = str(ROOT / "python") + os.pathsep + \
         env.get("PYTHONPATH", "")
     return subprocess.run([sys.executable, "-m", "elliprof", *map(str, args)],
-                          cwd=cwd, env=env, capture_output=True, text=True)
+                          cwd=cwd, env=env, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, universal_newlines=True)
 
 
 def three_ways(tmp_path, native, image, native_words, api_kwargs,
@@ -41,7 +42,8 @@ def three_ways(tmp_path, native, image, native_words, api_kwargs,
     proc = subprocess.run([str(native), str(image), *map(str, native_words),
                            "-o", d / "r.prf", "--csv", d / "r.csv",
                            "--reg", d / "r.reg"],
-                          capture_output=True, text=True)
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          universal_newlines=True)
     assert proc.returncode == 0, proc.stderr
     out["native"] = (d / "r.prf", d / "r.csv", d / "r.reg", proc.stdout)
 

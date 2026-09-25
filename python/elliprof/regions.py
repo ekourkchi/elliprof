@@ -14,8 +14,6 @@ and I4/A4 are harmonic terms and are not used for the ellipse.
 The native backend writes the same file with ``--reg``.
 """
 
-from __future__ import annotations
-
 import math
 import re
 from typing import List, Sequence, Tuple

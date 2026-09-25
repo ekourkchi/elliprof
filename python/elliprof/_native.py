@@ -12,11 +12,8 @@ Search order:
 The package never looks in the current working directory.
 """
 
-from __future__ import annotations
-
 import os
 import sys
-from importlib import resources
 from pathlib import Path
 from typing import Optional
 
@@ -29,9 +26,15 @@ class BackendNotFoundError(RuntimeError):
 
 def _packaged() -> Optional[Path]:
     try:
-        candidate = resources.files("elliprof") / "_bin" / EXE_NAME
-    except (ModuleNotFoundError, TypeError):  # pragma: no cover
-        return None
+        from importlib.resources import files   # Python >= 3.9
+    except ImportError:
+        # Python < 3.9: wheels install _bin/ next to this file
+        candidate = Path(__file__).parent / "_bin" / EXE_NAME
+    else:
+        try:
+            candidate = files("elliprof") / "_bin" / EXE_NAME
+        except (ModuleNotFoundError, TypeError):  # pragma: no cover
+            return None
     path = Path(str(candidate))
     return path if path.is_file() else None
 

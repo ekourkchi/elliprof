@@ -7,8 +7,6 @@ pyproject.toml) and the native backend found by
 copy, or ./elliprof_native built by ``make``).
 """
 
-from __future__ import annotations
-
 import os
 import subprocess
 from pathlib import Path
@@ -48,7 +46,8 @@ def run_native(native):
     """Run the backend; returns the CompletedProcess."""
     def run(*args, cwd=None, check=False):
         proc = subprocess.run([str(native), *map(str, args)], cwd=cwd,
-                              capture_output=True, text=True, timeout=600)
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              universal_newlines=True, timeout=600)
         if check and proc.returncode != 0:
             raise AssertionError(
                 f"elliprof_native failed ({proc.returncode}):\n"

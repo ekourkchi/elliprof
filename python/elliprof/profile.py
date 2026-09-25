@@ -25,8 +25,6 @@ Row 12 holds the 17 run flags (x0, y0, r0, r1, nr, niter, rlaw, ...),
 not a contour.
 """
 
-from __future__ import annotations
-
 import re
 from typing import Dict, Tuple
 

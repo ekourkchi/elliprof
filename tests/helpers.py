@@ -1,7 +1,5 @@
 """Constants and small helpers shared by the test suites."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import numpy as np

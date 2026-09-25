@@ -1,8 +1,6 @@
 """Run regression cases and compare outputs (shared by the tests,
 update_baselines.py and the cross-platform tools)."""
 
-from __future__ import annotations
-
 import hashlib
 import json
 import platform
@@ -60,8 +58,9 @@ def os_version() -> str:
 
 def platform_id() -> dict:
     exe = find_backend()
-    version = subprocess.run([str(exe), "--version"], capture_output=True,
-                             text=True).stdout.strip()
+    version = subprocess.run([str(exe), "--version"], stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE,
+                             universal_newlines=True).stdout.strip()
     return {"system": platform.system(), "os": os_version(),
             "machine": binary_arch(exe), "backend": version}
 

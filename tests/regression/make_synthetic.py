@@ -4,8 +4,6 @@ stored in tests/data/regression and must not change afterwards).
     python tests/regression/make_synthetic.py [--force]
 """
 
-from __future__ import annotations
-
 import sys
 from pathlib import Path
 

@@ -6,8 +6,6 @@ REAL*4 preparation for inspection and plotting; the exact image the
 backend fits can be saved with ``run_elliprof(..., prepared=...)``.
 """
 
-from __future__ import annotations
-
 import os
 from typing import Dict, Tuple
 

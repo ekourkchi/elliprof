@@ -7,7 +7,7 @@ name = "elliprof"
 dynamic = ["version"]
 description = "Fit elliptical isophotes to astronomical FITS images (ELLIPROF)"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.6"
 license = "MIT"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "licenses/*.txt"]
 maintainers = [{ name = "Ehsan Kourkchi (Edwin Kay)", email = "ekourkchi@gmail.com" }]
@@ -17,23 +17,33 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Astronomy",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Fortran",
     "Operating System :: MacOS",
     "Operating System :: POSIX :: Linux",
     "Operating System :: Microsoft :: Windows",
 ]
+# Python 3.6/3.7 get the last numpy/pandas releases that support them
 dependencies = [
-    "numpy>=1.24",
-    "pandas>=2.0",
+    "numpy>=1.24; python_version >= '3.8'",
+    "numpy>=1.19; python_version < '3.8'",
+    "pandas>=2.0; python_version >= '3.8'",
+    "pandas>=1.1; python_version < '3.8'",
+    "importlib-metadata; python_version < '3.8'",
+    "dataclasses; python_version < '3.7'",
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=7", "astropy>=5.3"]
+test = ["pytest>=7", "astropy>=5.3; python_version >= '3.9'",
+        "astropy>=4.1; python_version < '3.9'"]
 notebook = ["astropy>=5.3", "matplotlib>=3.7", "nbclient>=0.8",
             "nbformat>=5.9", "ipykernel>=6"]
 
