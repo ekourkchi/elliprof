@@ -1,0 +1,156 @@
+# Publish a release to PyPI.  Manual only (Actions > release > Run
+# workflow, on main), never on push or tag.  Uses PyPI Trusted Publishing
+# (OIDC): no API token or password is stored anywhere.
+#
+# Wheels only, no sdist: Supported platforms install a prebuilt wheel;
+# other platforms fail cleanly instead of attempting a source build
+# (which needs gfortran and CFITSIO).  Builds the Supported platforms with
+# the same cibuildwheel configuration and toolchain steps as wheels.yml
+# (Experimental targets -- Linux riscv64, Windows ARM64 -- are not
+# released), checks the upload set, and publishes it from the `pypi`
+# environment.
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (must equal the VERSION file)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Check version and branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release only from main, only the version in VERSION
+        run: |
+          test "$GITHUB_REF" = "refs/heads/main" || { echo "run this on main, not $GITHUB_REF"; exit 1; }
+          file=$(tr -d '[:space:]' < VERSION)
+          test "$file" = "${{ inputs.version }}" || { echo "VERSION is $file, input is ${{ inputs.version }}"; exit 1; }
+          echo "releasing elliprof $file from $GITHUB_SHA"
+
+  build:
+    name: wheel ${{ matrix.name }}
+    needs: guard
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - {name: linux-x86_64,  os: ubuntu-24.04,     archs: x86_64}
+          - {name: linux-aarch64, os: ubuntu-24.04-arm, archs: aarch64}
+          - {name: linux-ppc64le, os: ubuntu-24.04,     archs: ppc64le, qemu: true}
+          - {name: linux-s390x,   os: ubuntu-24.04,     archs: s390x,   qemu: true}
+          - {name: musllinux-x86_64,  os: ubuntu-24.04,     archs: x86_64,  build: "cp312-musllinux_*"}
+          - {name: musllinux-aarch64, os: ubuntu-24.04-arm, archs: aarch64, build: "cp312-musllinux_*"}
+          - {name: macos-arm64,   os: macos-15,         archs: arm64,  target: "11.0"}
+          - {name: macos-x86_64,  os: macos-15-intel,   archs: x86_64, target: "11.0"}
+          - {name: windows-amd64, os: windows-latest,   archs: AMD64}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+        if: matrix.qemu
+
+      # toolchain steps: as in wheels.yml
+      - name: gfortran (macOS, conda-forge)
+        if: runner.os == 'macOS'
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: fortran
+          create-args: gfortran clang
+      - name: Use the conda-forge toolchain (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          echo "$MAMBA_ROOT_PREFIX/envs/fortran/bin" >> "$GITHUB_PATH"
+          echo "FC=$MAMBA_ROOT_PREFIX/envs/fortran/bin/gfortran" >> "$GITHUB_ENV"
+          echo "SDKROOT=$(xcrun --show-sdk-path)" >> "$GITHUB_ENV"
+      - name: MSYS2 toolchain (Windows)
+        if: runner.os == 'Windows'
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc-fortran
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-zlib
+            curl
+      - name: Static CFITSIO (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          CFLAGS="-UWIN32 -DgFortran" CFITSIO_CMAKE_GENERATOR=Ninja \
+              bash tools/ci/build_cfitsio.sh /c/cfitsio
+          nm /c/cfitsio/lib/libcfitsio.a | grep -E ' T (ftgkyj_|ftinit_|ftvers_)$'
+      - name: Put the MSYS2 toolchain on PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          echo "${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin" >> "$GITHUB_PATH"
+          echo "CFITSIO_DIR=C:/cfitsio" >> "$GITHUB_ENV"
+
+      # same cibuildwheel configuration (pyproject.toml), including its
+      # installed-wheel tests where they run inside the build
+      - uses: pypa/cibuildwheel@v3.2
+        env:
+          CIBW_ARCHS: ${{ matrix.archs }}
+          CIBW_BUILD: ${{ matrix.build || 'cp312-manylinux_* cp312-macosx_* cp312-win_*' }}
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.target }}
+        with:
+          output-dir: wheelhouse
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-wheel-${{ matrix.name }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+          retention-days: 3
+
+  verify:
+    name: Verify the upload set
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m pip install twine
+      - uses: actions/download-artifact@v4
+        with: {path: dist, pattern: release-wheel-*, merge-multiple: true}
+      - name: Version, platform tags, notices, no stray files
+        run: python tools/ci/check_release.py dist "${{ inputs.version }}"
+      - name: twine check
+        run: python -m twine check --strict dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pypi-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    name: Publish to PyPI
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/elliprof/
+    permissions:
+      id-token: write          # Trusted Publishing (OIDC); no stored secrets
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {name: pypi-dist, path: dist}
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/

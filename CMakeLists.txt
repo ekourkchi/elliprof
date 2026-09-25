@@ -121,6 +121,9 @@ endif()
 # Notices travel with every wheel
 install(FILES LICENSE THIRD_PARTY_NOTICES.md
         DESTINATION elliprof/_notices)
+# licence texts of the runtime libraries bundled in the wheels
+file(GLOB _runtime_licenses "${PROJECT_SOURCE_DIR}/licenses/*.txt")
+install(FILES ${_runtime_licenses} DESTINATION elliprof/_notices)
 if(CFITSIO_LIBRARY MATCHES "\\.a$")
   get_filename_component(_cfitsio_prefix "${CFITSIO_LIBRARY}" DIRECTORY)
   get_filename_component(_cfitsio_prefix "${_cfitsio_prefix}" DIRECTORY)

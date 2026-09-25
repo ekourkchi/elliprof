@@ -25,19 +25,29 @@ Statically linked into the `elliprof_native` backend in the binary wheels. It is
 >
 > THE SOFTWARE IS PROVIDED 'AS IS' WITHOUT ANY WARRANTY OF ANY KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, ANY WARRANTY THAT THE SOFTWARE WILL CONFORM TO SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND FREEDOM FROM INFRINGEMENT, AND ANY WARRANTY THAT THE DOCUMENTATION WILL CONFORM TO THE SOFTWARE, OR ANY WARRANTY THAT THE SOFTWARE WILL BE ERROR FREE. IN NO EVENT SHALL NASA BE LIABLE FOR ANY DAMAGES, INCLUDING, BUT NOT LIMITED TO, DIRECT, INDIRECT, SPECIAL OR CONSEQUENTIAL DAMAGES, ARISING OUT OF, RESULTING FROM, OR IN ANY WAY CONNECTED WITH THIS SOFTWARE, WHETHER OR NOT BASED UPON WARRANTY, CONTRACT, TORT , OR OTHERWISE, WHETHER OR NOT INJURY WAS SUSTAINED BY PERSONS OR PROPERTY OR OTHERWISE, AND WHETHER OR NOT LOSS WAS SUSTAINED FROM, OR AROSE OUT OF THE RESULTS OF, OR USE OF, THE SOFTWARE OR SERVICES PROVIDED HEREUNDER.
 
-## GCC Fortran runtime libraries
+## Runtime libraries bundled in the binary wheels
 
-The wheel-repair tools ship these as shared libraries next to the backend, so they are dynamically linked and replaceable.
+The wheel-repair tools (auditwheel, delocate) and, on Windows, the build put these shared libraries into the wheel next to the backend. They are dynamically linked and can be replaced. These are the libraries found in the tested wheels:
 
-| Library | In wheels | Licence |
+| Wheel | Bundled libraries |
+|---|---|
+| macOS arm64, x86_64 | libgfortran, libquadmath, libgcc_s |
+| manylinux x86_64, ppc64le | libgfortran, libquadmath |
+| manylinux aarch64, s390x | libgfortran |
+| musllinux x86_64 | libgcc_s, libgfortran, libquadmath |
+| musllinux aarch64 | libgcc_s, libgfortran |
+| Windows x86_64 | libgcc_s_seh-1, libgfortran-5, libquadmath-0, libwinpthread-1, zlib1 |
+
+| Library | Licence | Licence text in the wheel (`elliprof/_notices/`) |
 |---|---|---|
-| libgfortran | all | GNU GPL v3 with the GCC Runtime Library Exception 3.1 |
-| libgcc_s | macOS | GNU GPL v3 with the GCC Runtime Library Exception 3.1 |
-| libquadmath | macOS, Linux x86_64 | GNU LGPL v2.1 or later |
+| libgfortran, libgcc_s, libgcc_s_seh-1 (GCC) | GNU GPL v3 with the GCC Runtime Library Exception 3.1 | `GPL-3.0.txt`, `GCC-RUNTIME-LIBRARY-EXCEPTION-3.1.txt` |
+| libquadmath (GCC) | GNU LGPL v2.1 or later | `LGPL-2.1.txt` |
+| libwinpthread (MinGW-w64 winpthreads) | MIT-style, with parts under a BSD-style licence (Lockless Inc.) | `winpthreads-COPYING.txt` |
+| zlib1 (zlib) | zlib licence | `zlib-LICENSE.txt` |
 
-The Windows wheels are expected to add `libgcc_s_seh-1.dll`, `libwinpthread-1.dll` (MinGW-w64) and `zlib1.dll` (zlib licence). This must be confirmed against the first real Windows wheel.
+The same texts are also in the wheel's `.dist-info/licenses/licenses/` directory and in the repository's `licenses/` directory.
 
-Licence texts: <https://www.gnu.org/licenses/gcc-exception-3.1.html>, <https://www.gnu.org/licenses/gpl-3.0.html>, <https://www.gnu.org/licenses/lgpl-2.1.html>.
+The GCC libraries are unmodified builds from each platform's toolchain: conda-forge (macOS), the manylinux `gcc-toolset` (manylinux), Alpine Linux (musllinux) and MSYS2 UCRT64 (Windows). Their corresponding source code is the GNU Compiler Collection, available from <https://gcc.gnu.org/> and from those distributions' source packages. The winpthreads source is at <https://www.mingw-w64.org/> and zlib's at <https://zlib.net/>.
 
 ## System libraries (not bundled)
 
