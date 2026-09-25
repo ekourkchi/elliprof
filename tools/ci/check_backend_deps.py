@@ -29,6 +29,55 @@ def macos(exe: Path):
     return deps, [d for d in deps if not d.startswith(ok)]
 
 
+def _run(*cmd):
+    return subprocess.run(list(cmd), stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, universal_newlines=True,
+                          check=True).stdout
+
+
+def _minos(path: Path):
+    """Minimum macOS of a Mach-O file (LC_BUILD_VERSION minos, or
+    LC_VERSION_MIN_MACOSX version for older targets)."""
+    lines = _run("otool", "-l", str(path)).splitlines()
+    for i, line in enumerate(lines):
+        cmd = line.split()[-1:] == ["LC_BUILD_VERSION"] and "minos" or \
+            line.split()[-1:] == ["LC_VERSION_MIN_MACOSX"] and "version"
+        if cmd:
+            for follow in lines[i + 1:i + 6]:
+                parts = follow.split()
+                if parts[:1] == [cmd]:
+                    return tuple(int(x) for x in parts[1].split("."))
+    return None
+
+
+def macos_minimums(exe: Path) -> int:
+    """Every Mach-O shipped in the wheel must run on the oldest macOS its
+    platform tag promises (the tag alone proves nothing)."""
+    site = exe.parents[2]
+    wheel = sorted(site.glob("elliprof-*.dist-info/WHEEL"))
+    tags = [l.split(":", 1)[1].strip() for l in wheel[-1].read_text()
+            .splitlines() if l.startswith("Tag:")] if wheel else []
+    promised = [tuple(int(x) for x in m.groups()) for t in tags
+                for m in [re.search(r"macosx_(\d+)_(\d+)_", t)] if m]
+    if not promised:
+        print("macOS minimum: no macosx tag found, not checked")
+        return 0
+    floor = min(promised)
+    if floor == (10, 16):      # macOS 11 in the old-SDK numbering
+        floor = (11, 0)
+    files = [exe] + sorted((exe.parents[1] / ".dylibs").glob("*.dylib"))
+    bad = 0
+    print("macOS minimum promised by the wheel tag: %d.%d" % floor)
+    for f in files:
+        m = _minos(f)
+        flag = ""
+        if m is None or m > floor:
+            flag, bad = "   <-- NEWER THAN THE TAG (or unknown)", bad + 1
+        print("  %-28s minos %s%s" % (f.name, ".".join(map(str, m or ())),
+                                      flag))
+    return bad
+
+
 def linux(exe: Path):
     out = subprocess.run(["readelf", "-d", str(exe)], stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE,
@@ -83,6 +132,9 @@ def main() -> int:
         print("FAIL: the backend depends on libraries outside the wheel")
         return 1
     print("OK: every dependency is bundled or part of the OS")
+    if sys.platform == "darwin" and macos_minimums(exe):
+        print("FAIL: a binary needs a newer macOS than the wheel claims")
+        return 1
     return 0
 
 

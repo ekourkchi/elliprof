@@ -32,23 +32,28 @@ jobs:
           - {name: linux-riscv64, os: ubuntu-24.04,     archs: riscv64, qemu: true, experimental: true}
           - {name: musllinux-x86_64,  os: ubuntu-24.04,     archs: x86_64,  build: "cp312-musllinux_*"}
           - {name: musllinux-aarch64, os: ubuntu-24.04-arm, archs: aarch64, build: "cp312-musllinux_*"}
-          - {name: macos-arm64,   os: macos-15,         archs: arm64,  target: "11.0"}
-          - {name: macos-x86_64,  os: macos-15-intel,   archs: x86_64, target: "11.0"}
+          - {name: macos-arm64,   os: macos-15,         archs: arm64,  target: "11.0",
+             fortran: "gfortran clang"}
+          - {name: macos-x86_64,  os: macos-15-intel,   archs: x86_64, target: "10.13",
+             fortran: "gfortran=15.1 libgfortran5=15.1 libgfortran=15.1 clang"}
           - {name: windows-amd64, os: windows-latest,   archs: AMD64}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
         if: matrix.qemu
 
-      # macOS: conda-forge gfortran (+ its clang driver), whose runtime
-      # libraries target macOS 11.0 -- the toolchain used to build and
-      # verify the local macOS 11.0 arm64 and x86_64 wheels.
+      # macOS: conda-forge gfortran (+ its clang driver).  The wheel bundles
+      # its runtime (libgfortran, libquadmath, libgcc_s), so the runtime sets
+      # the lowest macOS the wheel can run on.  Intel: gfortran/libgfortran
+      # 15.1, the last conda-forge runtime built for macOS 10.13 (15.2+ need
+      # macOS 11); every binary is built for 10.13.  Apple Silicon: current
+      # toolchain, macOS 11 (the first release for arm64).
       - name: gfortran (macOS, conda-forge)
         if: runner.os == 'macOS'
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-name: fortran
-          create-args: gfortran clang
+          create-args: ${{ matrix.fortran }}
       - name: Use the conda-forge toolchain (macOS)
         if: runner.os == 'macOS'
         run: |

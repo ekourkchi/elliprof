@@ -24,18 +24,40 @@ It describes a galaxy as a set of nested ellipses, so it is not necessarily the 
 python -m pip install elliprof
 ```
 
-- Prebuilt wheels are provided for Linux, macOS and Windows (see [Platforms](#platforms)).
+- Prebuilt wheels are provided for Linux, macOS and Windows.
 - No Fortran compiler and no separate CFITSIO installation are needed.
-- Python 3.6 to 3.14 are supported.
+
+### Compatibility
+
+Python and the operating system are separate requirements: a supported Python on an unsupported OS version still cannot install elliprof.
+
+**Supported Python:** 3.6 through 3.14.
+
+**Supported macOS:**
+- Intel (x86_64): macOS 10.13 High Sierra or newer
+- Apple Silicon (arm64): macOS 11 Big Sur or newer (the first macOS for Apple Silicon)
+
+**Supported Linux and Windows:** see [Platforms](#platforms).
 
 ### If pip says "No matching distribution found"
 
-University and observatory computers often have an old Python or an old pip. First check which ones you are using:
+This message means pip found no elliprof build that fits your computer. The usual reasons are:
+
+- a Python older than 3.6,
+- an old pip that does not recognize current package names,
+- an operating system older than the minimum above,
+- a processor type with no elliprof build (for example 32-bit systems).
+
+University and observatory computers often have an old Python or an old pip. First check what you have:
 
 ```sh
 python --version
 python -m pip --version
+uname -m        # x86_64 = Intel, arm64 = Apple Silicon
+sw_vers         # macOS only: the macOS version
 ```
+
+On a Mac, Intel and Apple Silicon have different minimums: Intel needs macOS 10.13 or newer, Apple Silicon macOS 11 or newer.
 
 **If Python is 3.6–3.14**, upgrade pip and try again:
 
@@ -272,12 +294,13 @@ One row per isophote (`result.profile`, the CSV file, and the `.prf` file):
 | Linux x86_64, aarch64 (manylinux_2_28) | Supported |
 | Linux ppc64le, s390x (manylinux_2_28) | Supported (wheels tested under QEMU emulation) |
 | Linux x86_64, aarch64 (musllinux_1_2, e.g. Alpine) | Supported |
-| macOS 11+ arm64, x86_64 | Supported |
+| macOS 10.13+ x86_64 (Intel) | Supported |
+| macOS 11+ arm64 (Apple Silicon) | Supported |
 | Windows x86_64 | Supported |
 | Linux riscv64 (manylinux_2_39) | Experimental: the wheel builds, but its tests have not completed |
 | Windows ARM64 | Experimental: no wheel (no GNU Fortran toolchain yet) |
 
-Python 3.6 to 3.14. Supported means the wheel was installed and passed the installed-wheel and regression tests in a clean environment without a compiler or CFITSIO. On ppc64le and s390x, PyPI has no numpy or pandas wheels, so install those from your Linux distribution or conda. 32-bit systems and macOS older than 11 are not supported.
+Python 3.6 to 3.14. The Intel macOS wheel is built for macOS 10.13 throughout: the program, its CFITSIO, and the bundled Fortran runtime libraries. Supported means the wheel was installed and passed the installed-wheel and regression tests in a clean environment without a compiler or CFITSIO. On ppc64le and s390x, PyPI has no numpy or pandas wheels, so install those from your Linux distribution or conda. 32-bit systems, Intel Macs older than macOS 10.13, and Apple Silicon Macs older than macOS 11 are not supported.
 
 ## Development
 

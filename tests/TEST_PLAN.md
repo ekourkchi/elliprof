@@ -83,7 +83,7 @@ Run against an installed wheel in a clean environment:
 - the Python API is byte-identical to the CLI;
 - spaces and non-ASCII characters in paths.
 
-`tools/ci/check_backend_deps.py` must report that every library is bundled or part of the OS. The CMake-built backend reproduces the Makefile-built baselines byte for byte.
+`tools/ci/check_backend_deps.py` must report that every library is bundled or part of the OS, and, on macOS, that no Mach-O file in the wheel (the backend and each bundled dylib) needs a newer macOS than the wheel's platform tag promises. The CMake-built backend reproduces the Makefile-built baselines byte for byte.
 
 ## Source integrity
 
