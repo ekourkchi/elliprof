@@ -32,6 +32,11 @@ test = ["pytest>=7", "astropy>=5.3"]
 notebook = ["astropy>=5.3", "matplotlib>=3.7", "nbclient>=0.8",
             "nbformat>=5.9", "ipykernel>=6"]
 
+[project.urls]
+Homepage = "https://github.com/ekourkchi/elliprof"
+Source = "https://github.com/ekourkchi/elliprof"
+Issues = "https://github.com/ekourkchi/elliprof/issues"
+
 [project.scripts]
 elliprof = "elliprof.cli:main"
 

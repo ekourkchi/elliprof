@@ -2,6 +2,8 @@
 
 ELLIPROF fits elliptical isophotes to astronomical FITS images.
 
+Source code and issue tracker: <https://github.com/ekourkchi/elliprof>
+
 For each isophote it measures the centre, position angle, ellipticity, mean intensity, the 3θ and 4θ (boxy/disky) harmonic terms, and the logarithmic slope. It can also write a smooth model image of the galaxy. The numerical code is the original ELLIPROF Fortran, compiled unchanged; `elliprof` makes it easy to install and run, from the command line or from Python.
 
 ## Installation
