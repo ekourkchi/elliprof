@@ -44,12 +44,24 @@ def binary_arch(path) -> str:
     return platform.machine()
 
 
+def os_version() -> str:
+    """OS release that provides the maths library: results can differ in
+    the last bits between macOS versions or glibc versions."""
+    system = platform.system()
+    if system == "Darwin":
+        return "macOS " + platform.mac_ver()[0]
+    if system == "Linux":
+        lib, ver = platform.libc_ver()
+        return f"{lib} {ver}".strip()
+    return platform.version()
+
+
 def platform_id() -> dict:
     exe = find_backend()
     version = subprocess.run([str(exe), "--version"], capture_output=True,
                              text=True).stdout.strip()
-    return {"system": platform.system(), "machine": binary_arch(exe),
-            "backend": version}
+    return {"system": platform.system(), "os": os_version(),
+            "machine": binary_arch(exe), "backend": version}
 
 
 def run_case(name, image, kwargs, outdir: Path):
@@ -101,7 +113,7 @@ def csv_rows(path):
 
 
 def same_platform(a: dict, b: dict) -> bool:
-    return all(a.get(k) == b.get(k) for k in ("system", "machine",
+    return all(a.get(k) == b.get(k) for k in ("system", "os", "machine",
                                                "backend"))
 
 
