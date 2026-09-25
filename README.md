@@ -143,9 +143,24 @@ elliprof galaxy.fits \
 
 - `X0`, `Y0`: initial galaxy centre, in pixels (see [Coordinates](#coordinates)).
 - `R0`, `R1`: the range of semi-major axes to fit, in pixels (0 < R0 < R1).
-- `NR`: number of isophotes (2–100), spaced evenly in r^¼ by default.
+- `NR`: number of isophotes (2–100), including R0 and R1, spaced evenly in r^¼ by default (`RLAW=1` for logarithmic, `RLAW=0` for linear spacing).
 - `profile.csv`: the radial profile, one row per isophote.
 - `profile.reg`: the fitted ellipses as a DS9 region file. View them with `ds9 galaxy.fits -regions profile.reg`.
+
+### Profile files and the model image
+
+elliprof produces two different kinds of result:
+
+- **The profile** (`-o profile.prf`, `--csv profile.csv`): numbers, one set per fitted isophote (radius, centre, intensity, position angle, ellipticity, harmonic terms, slope). The `.prf` is ELLIPROF's native profile format at full precision, with the run settings. **It is a table of numbers, not an image.** The CSV holds the same profile as a readable table.
+- **The model image** (`MODEL -m model.fits`): a 2-D FITS image of the galaxy reconstructed from the fitted isophotes. It follows the fitted intensity, centre, ellipticity and position angle with radius, plus the harmonic terms chosen with `--model-harmonics`. It is relative to the subtracted sky.
+
+```sh
+elliprof u12517j.fits --mask u12517j.dmask --sky 3246.0 \
+    X0=567 Y0=562 R0=9 R1=347 NR=23 NITER=10 RMSTAR \
+    MODEL -m u12517j_model.fits -o u12517j.prf
+```
+
+Subtracting the model from the sky-subtracted image shows the light the smooth isophotal model does not describe. That can reveal dust, embedded disks, shells or tidal features, and it is also where fitting problems show up. Both `MODEL` and `-m` are needed. The residual needs care in interpretation: it depends on the fit, the mask and the model settings.
 
 ### Sky and masks
 

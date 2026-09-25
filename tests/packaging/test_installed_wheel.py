@@ -77,6 +77,8 @@ def test_help_version_diagnostics():
     v = run("--version")
     assert v.returncode == 0
     assert v.stdout == (f"elliprof {elliprof.__version__}\n"
+                        "ELLIPROF was originally developed by John Tonry "
+                        "as part of MONSTA.\n"
                         f"Maintained by {elliprof.__maintainer__}\n"
                         f"Email: {elliprof.__email__}\n")
     assert run("-v").stdout == v.stdout

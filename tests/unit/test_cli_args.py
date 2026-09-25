@@ -25,15 +25,18 @@ def img(tmp_path):
 def test_help(capsys):
     code, out, _ = run(capsys, "--help")
     assert code == 0 and "elliprof IMAGE.fits X0=x Y0=y" in out
-    assert "monsta" not in out.lower()
+    # MONSTA appears only in the historical credit
+    assert "monsta" not in out.replace(cli.CREDIT, "").lower()
 
 
 def test_version(capsys):
     from elliprof import __email__, __maintainer__, __version__
     code, out, _ = run(capsys, "--version")
     assert code == 0
-    assert out == (f"elliprof {__version__}\nMaintained by {__maintainer__}"
-                   f"\nEmail: {__email__}\n")
+    assert out == (f"elliprof {__version__}\n"
+                   "ELLIPROF was originally developed by John Tonry as "
+                   "part of MONSTA.\n"
+                   f"Maintained by {__maintainer__}\nEmail: {__email__}\n")
 
 
 def test_diagnostics(capsys):

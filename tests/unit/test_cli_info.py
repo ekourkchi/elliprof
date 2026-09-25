@@ -51,8 +51,10 @@ def _run(args, blocked=("numpy", "pandas"),
                           universal_newlines=True, env=env, timeout=60)
 
 
-VERSION_TEXT = (f"elliprof {__version__}\nMaintained by {__maintainer__}\n"
-                f"Email: {__email__}\n")
+CREDIT = ("ELLIPROF was originally developed by John Tonry as part of "
+          "MONSTA.")
+VERSION_TEXT = (f"elliprof {__version__}\n{CREDIT}\n"
+                f"Maintained by {__maintainer__}\nEmail: {__email__}\n")
 
 
 @pytest.mark.parametrize("args", [[], ["-h"], ["--help"], ["-v"],
@@ -70,6 +72,7 @@ def test_no_arguments_prints_a_short_introduction():
     assert proc.returncode == 0
     out = proc.stdout
     assert out.startswith("ELLIPROF - Galaxy Isophote Fitting\n")
+    assert CREDIT in out
     assert f"Maintained by {__maintainer__}" in out
     assert f"Email: {__email__}" in out
     assert "elliprof -h" in out
@@ -90,10 +93,11 @@ def test_help_is_plain_ascii_and_fits_a_terminal():
     assert max(len(l) for l in text.splitlines()) <= 79
 
 
-HELP_SECTIONS = ["USAGE", "INPUT IMAGE AND CENTRE", "RADIAL FITTING PARAMETERS",
-                 "SKY / BACKGROUND AND MASK", "HARMONIC / MODEL CONTROLS",
-                 "LEGACY ELLIPROF KEYWORDS", "OUTPUT FILES",
-                 "GENERAL OPTIONS", "EXAMPLES"]
+HELP_SECTIONS = ["USAGE", "INPUT IMAGE AND INITIAL CENTRE",
+                 "RADIAL FITTING PARAMETERS", "SKY / BACKGROUND AND MASK",
+                 "MODEL AND HARMONIC CONTROLS", "OUTPUT FILES",
+                 "PROFILE COLUMNS", "LEGACY ELLIPROF CONTROLS",
+                 "DIAGNOSTICS AND RUNTIME OPTIONS", "EXAMPLES"]
 
 
 def test_help_documents_every_public_option_and_keyword():
@@ -110,8 +114,14 @@ def test_help_documents_every_public_option_and_keyword():
                "COS3X=", "COS4X="):
         assert kw in text, kw
     assert "--sc VALUE         deprecated alias of --sky" in text
-    assert "0 = bad / ignored, 1 = good" in text
+    assert "0 = bad / excluded, 1 = good" in text
     assert "(default 1800)" in text and "status 124" in text
+    # profile columns, and the profile is not an image
+    for col in ("Rmaj", "x0 y0", "I0", "alpha", "ellip", "I3 I4", "A3 A4",
+                "slope"):
+        assert "\n  " + col in text, col
+    assert "NOT an image" in text and "2-D model image" in text
+    assert CREDIT in text
 
 
 def test_diagnostics_do_not_import_the_scientific_stack():
