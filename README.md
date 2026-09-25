@@ -168,9 +168,9 @@ The original numerical sources in `src/original/` and `include/` are never modif
 
 Historical note: ELLIPROF was originally developed by John Tonry as part of MONSTA.
 
-Author: Ehsan Kourkchi (Edwin Kay)
-Email: ekourkchi@gmail.com
+Maintained by Ehsan Kourkchi (Edwin Kay)
+Email: [ekourkchi@gmail.com](mailto:ekourkchi@gmail.com)
 
 License: MIT for the elliprof package code (see [LICENSE](LICENSE)). The original ELLIPROF sources and bundled libraries keep their own terms (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
-**Disclaimer.** This software is provided as-is, without warranty of any kind. The author is not responsible for software errors, incorrect scientific results, data loss, or decisions made using results produced by this software. Users are responsible for independently validating results for their scientific application.
+**Disclaimer.** This software is provided as-is, without warranty of any kind. The maintainer is not responsible for software errors, incorrect scientific results, data loss, or decisions made using results produced by this software. Users are responsible for independently validating results for their scientific application.

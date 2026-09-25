@@ -74,7 +74,7 @@ def test_help_version_diagnostics():
     v = run("--version")
     assert v.returncode == 0
     assert v.stdout.startswith(f"elliprof {elliprof.__version__} "
-                               f"({elliprof.__author__})")
+                               f"(maintained by {elliprof.__maintainer__})")
     assert "elliprof_native" in v.stdout and "CFITSIO" in v.stdout
     d = run("--diagnostics")
     assert d.returncode == 0

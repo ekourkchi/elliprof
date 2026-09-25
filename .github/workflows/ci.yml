@@ -1,0 +1,66 @@
+# Basic automatic check: one Linux x86_64 job on pushes and pull requests
+# to main.  Cross-platform wheels are validated manually (wheels.yml).
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "LICENSE", "notebooks/**", ".gitignore"]
+  pull_request:
+    branches: [main]
+    paths-ignore: ["**.md", "LICENSE", "notebooks/**", ".gitignore"]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  basic:
+    name: Linux x86_64 / Python 3.12
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Native build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gfortran libcfitsio-dev pkg-config
+
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+
+      - name: Python dependencies
+        run: python -m pip install numpy pandas astropy pytest
+
+      # builds ./elliprof_native, checks the SHA-256 of the protected
+      # original sources, runs the unit, integration and regression tests
+      - name: Build and test (make check)
+        run: make PYTHON=python check
+
+      - name: Install the package
+        run: python -m pip install .
+
+      - name: Installed command and a synthetic end-to-end fit
+        working-directory: ${{ runner.temp }}
+        run: |
+          python -c "from elliprof import run_elliprof; print('import ok')"
+          elliprof --version
+          elliprof --diagnostics
+          elliprof "$GITHUB_WORKSPACE/tests/data/regression/elliptical.fits" \
+              X0=100.3 Y0=99.6 R0=3 R1=80 NR=25 NITER=5 \
+              -o fit.prf --csv fit.csv
+          python - <<'EOF'
+          from elliprof import parse_elliprof_csv
+          prof, _ = parse_elliprof_csv("fit.csv")
+          print(prof[["Rmaj", "x0", "y0", "I0", "ellip"]].to_string())
+          assert len(prof) == 25, len(prof)
+          inner = prof[(prof.Rmaj >= 5) & (prof.Rmaj <= 60)]
+          assert (abs(inner.x0 - 100.3) < 0.05).all() and (abs(inner.y0 - 99.6) < 0.05).all()
+          assert (abs(inner.ellip - 0.4) < 0.015).all()
+          print("end-to-end fit ok")
+          EOF

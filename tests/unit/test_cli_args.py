@@ -29,10 +29,10 @@ def test_help(capsys):
 
 
 def test_version(capsys):
-    from elliprof import __author__, __version__
+    from elliprof import __maintainer__, __version__
     code, out, _ = run(capsys, "--version")
     assert code == 0
-    assert out.startswith(f"elliprof {__version__} ({__author__})\n")
+    assert out.startswith(f"elliprof {__version__} (maintained by {__maintainer__})\n")
 
 
 def test_diagnostics(capsys):

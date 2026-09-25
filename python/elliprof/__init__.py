@@ -11,7 +11,7 @@ the inputs and reads the results.
 """
 
 from ._native import BackendNotFoundError, find_backend
-from ._version import __author__, __email__, __version__
+from ._version import __maintainer__, __email__, __version__
 from .core import (ElliprofError, ElliprofResult, ElliprofTimeoutError,
                    run_elliprof)
 from .io import GeometryError, apply_mask, subtract_sky
@@ -20,7 +20,7 @@ from .profile import COLUMNS, parse_elliprof_csv, read_prf, read_profile
 from .regions import read_ds9_regions, write_ds9_regions
 
 __all__ = [
-    "__version__", "__author__", "__email__", "run_elliprof",
+    "__version__", "__maintainer__", "__email__", "run_elliprof",
     "ElliprofResult", "ElliprofError", "ElliprofTimeoutError", "load_mask",
     "write_bitmap_mask", "subtract_sky", "apply_mask", "GeometryError",
     "read_prf", "read_profile", "parse_elliprof_csv", "COLUMNS",

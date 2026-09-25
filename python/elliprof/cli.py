@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional
 
-from ._version import __author__, __version__
+from ._version import __maintainer__, __version__
 
 USAGE = """\
 usage: elliprof image.fits X0=x Y0=y R0=r R1=r NR=n [KEY=value ...] [options]
@@ -115,7 +115,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if opts.get("version"):
         from .diagnostics import diagnostics
         info = diagnostics()
-        print(f"elliprof {__version__} ({__author__})")
+        print(f"elliprof {__version__} (maintained by {__maintainer__})")
         print(info.get("backend version", info.get("native backend")))
         return 0
     if opts.get("diagnostics"):

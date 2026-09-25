@@ -8,10 +8,10 @@
 # probed (experimental): no wheel is built for it.
 name: wheels
 
+# Release/platform validation: manual only (Actions > wheels > Run
+# workflow).  Not triggered by pushes, pull requests or tags.
 on:
   workflow_dispatch:
-  push:
-    tags: ["v*"]
 
 jobs:
   build:
@@ -98,6 +98,7 @@ jobs:
         with:
           name: wheel-${{ matrix.name }}
           path: wheelhouse/*.whl
+          retention-days: 2
 
   test:
     name: test ${{ matrix.name }} / Python ${{ matrix.python }}
@@ -153,7 +154,7 @@ jobs:
             python tests/regression/collect_outputs.py spread/wheel-${{ matrix.name }}
       - uses: actions/upload-artifact@v4
         if: matrix.python == '3.12'
-        with: {name: "wheel-spread-${{ matrix.name }}", path: spread/}
+        with: {name: "wheel-spread-${{ matrix.name }}", path: spread/, retention-days: 2}
 
   # manylinux ppc64le / s390x / riscv64 (QEMU) and musllinux: clean
   # containers without a compiler or CFITSIO.  Debian trixie supplies
@@ -195,7 +196,7 @@ jobs:
             -v "$PWD:/project:ro" -v "$PWD/spread:/spread" ${{ matrix.image }} \
             sh /project/tools/ci/test_wheel_linux.sh ${{ matrix.mode }} wheel-${{ matrix.name }}
       - uses: actions/upload-artifact@v4
-        with: {name: "wheel-spread-${{ matrix.name }}", path: spread/}
+        with: {name: "wheel-spread-${{ matrix.name }}", path: spread/, retention-days: 2}
 
   # Numerical differences of every tested wheel from the committed baselines
   spread:
@@ -215,7 +216,7 @@ jobs:
           PYTHONPATH=python python tests/regression/compare_platforms.py \
             tests/regression/baseline spread/* | tee spread-report.md
       - uses: actions/upload-artifact@v4
-        with: {name: wheel-spread-report, path: spread-report.md}
+        with: {name: wheel-spread-report, path: spread-report.md, retention-days: 2}
 
   # EXPERIMENTAL: Windows ARM64.  MSYS2 has no gfortran for ARM64, only
   # LLVM flang, which the wheel build does not accept (CMakeLists.txt
@@ -275,4 +276,4 @@ jobs:
           python tests/regression/compare_platforms.py tests/regression/baseline spread/windows-arm64-flang
       - uses: actions/upload-artifact@v4
         if: always()
-        with: {name: windows-arm64-probe-spread, path: spread/}
+        with: {name: windows-arm64-probe-spread, path: spread/, retention-days: 2}
