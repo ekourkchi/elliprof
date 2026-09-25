@@ -143,10 +143,15 @@ To view the fit in DS9: `ds9 galaxy.fits -regions profile.reg`.
 
 | Platform | Status |
 |---|---|
-| Linux x86_64, Linux aarch64 | wheels built and tested in clean environments |
-| macOS arm64 | wheel built and tested; see TEST_PLAN for the deployment target |
-| macOS x86_64, Windows x86_64 | build configured, not yet tested |
-| Windows ARM64 | not supported |
+| Linux x86_64, aarch64 (manylinux_2_28) | Supported |
+| Linux ppc64le, s390x (manylinux_2_28) | Supported (wheels tested under QEMU emulation) |
+| Linux x86_64, aarch64 (musllinux_1_2, e.g. Alpine) | Supported |
+| macOS 11+ arm64, x86_64 | Supported |
+| Windows x86_64 | Supported |
+| Linux riscv64 (manylinux_2_39) | Experimental: the wheel builds, but its tests have not completed |
+| Windows ARM64 | Experimental: no wheel (no GNU Fortran toolchain yet) |
+
+Supported means the wheel was installed and passed the installed-wheel and regression tests in a clean environment without a compiler or CFITSIO. On ppc64le and s390x, PyPI has no numpy or pandas wheels, so install those from your Linux distribution or conda. 32-bit systems and macOS older than 11 are not supported.
 
 ## Development
 
