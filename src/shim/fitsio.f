@@ -1,8 +1,8 @@
 C     FITS image input/output through the CFITSIO Fortran interface.
-C     Replaces MONSTA's RD/WD path (disk.f, cfitsdisk.c) for one image.
+C     Reads the science image and writes model/diagnostic images.
 
-C     Open an image, return its size, the MONSTA image origin and the
-C     header cards.  Like MONSTA's default (CNPIX mode), the origin is
+C     Open an image, return its size, the image origin and the header
+C     cards.  As in the original environment, the origin is
 C     ISC = CNPIX1, ISR = CNPIX2, or 0 when those keywords are absent.
       SUBROUTINE FITSOPENIM(FNAME, IUNIT, NCOL, NROW, ISC, ISR,
      $     HEAD, IERR)
@@ -66,7 +66,7 @@ C     ISC = CNPIX1, ISR = CNPIX2, or 0 when those keywords are absent.
       END
 
 C     Read the pixels as REAL*4 (BSCALE/BZERO applied, no NULL
-C     substitution, as cfitsdisk.c does), then close the file.
+C     substitution, as the original reader), then close the file.
       SUBROUTINE FITSREADPIX(IUNIT, NCOL, NROW, PIX, IERR)
       INTEGER IUNIT, NCOL, NROW, IERR
       REAL PIX(NCOL,NROW), NULVAL

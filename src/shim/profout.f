@@ -1,7 +1,8 @@
 C     Extra, human-oriented outputs made from the final /PRF/ contents
 C     after ELLIPROF returns.  PARAM_PRF(J,K) for contour K, as filled
 C     at the end of ELLIPROF (elliprof.f, loop 30) and printed by
-C     PRINT EPROF (the comments in profile.inc are out of date):
+C     the original profile printout (the comments in profile.inc are
+C     out of date):
 C        1 Rmaj   2 x0 (+ISC)   3 y0 (+ISR)   4 I0
 C        5 alpha  (ELLIPROF internal PA, CCW from +x, minus 90 deg)
 C        6 ellip  (1 - b/a)
@@ -52,13 +53,15 @@ C     NaN compares unequal to itself; DS9 cannot parse such a line
       END
 
 C     Comma-separated profile with fixed-width columns and # comments.
-C     Values are PARAM_PRF exactly as stored (MONSTA coordinates).
-C     MASK and SKY describe the preparation ('none' if not used), CSRC
-C     where the centre came from.
-      SUBROUTINE WRITECSV(FNAME, IMAGE, MASK, SKY, CSRC, ISC, ISR, IERR)
-      CHARACTER*(*) FNAME, IMAGE, MASK, SKY, CSRC
+C     Values are PARAM_PRF exactly as stored.  PARAMS is the ELLIPROF
+C     keyword line, recorded for provenance.
+C     MASK and SKY describe the preparation ('none' if not used).
+      SUBROUTINE WRITECSV(FNAME, IMAGE, MASK, SKY, PARAMS, ISC, ISR,
+     $     IERR)
+      CHARACTER*(*) FNAME, IMAGE, MASK, SKY, PARAMS
       INTEGER ISC, ISR, IERR
       INCLUDE 'profile.inc'
+      INCLUDE 'version.inc'
       INTEGER K, J
 
       OPEN (7, FILE=FNAME, FORM='FORMATTED', STATUS='UNKNOWN',
@@ -71,7 +74,8 @@ C     where the centre came from.
      $     '# Input: '//IMAGE(1:LEN_TRIM(IMAGE)),
      $     '# Mask: '//MASK(1:LEN_TRIM(MASK)),
      $     '# Sky: '//SKY(1:LEN_TRIM(SKY)),
-     $     '# Center source: '//CSRC(1:LEN_TRIM(CSRC))
+     $     '# Parameters: '//PARAMS(1:LEN_TRIM(PARAMS)),
+     $     '# elliprof version: '//VERSTR
       WRITE (7,1001) N_PRF, PRF_SC, ISC, ISR
  1001 FORMAT ('# Contours: ',I0,'   SCALE: ',G0,
      $     '   Image origin (CNPIX1,CNPIX2): ',I0,',',I0)
@@ -80,9 +84,11 @@ C     where the centre came from.
      $ '# Units: Rmaj,x0,y0=pixels; alpha,A3,A4=degrees;'//
      $ ' I0=image units; I3,I4=amplitude relative to I0;'//
      $ ' slope=dlogI/dlogr',
-     $ '# x0,y0: MONSTA convention, centre of pixel ix at ix-0.5,'//
+     $ '# x0,y0: ELLIPROF image coordinates, centre of pixel ix at '//
+     $ 'ix-0.5,'//
      $ ' plus image origin (DS9 image x = x0 - CNPIX1 + 0.5)',
-     $ '# alpha: MONSTA PA; major axis at alpha+90 deg CCW from +x',
+     $ '# alpha: position angle; major axis at alpha+90 deg CCW '//
+     $ 'from +x',
      $ '#'
       WRITE (7,1002) '#', 'Rmaj', 'x0', 'y0', 'I0', 'alpha', 'ellip',
      $     'I3', 'A3', 'I4', 'A4', 'slope'

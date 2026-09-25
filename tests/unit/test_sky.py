@@ -1,8 +1,7 @@
 """Sky subtraction and its order with respect to the mask (native).
 
-MONSTA semantics: --sky V is `SC 1 V` (A = A + (-V) in REAL*4),
---sky-image F is `SI 1 2` (A = A - B), --mask is `MI 1 2` (A = A * M),
-applied in that order.  Results must be bit-exact.
+--sky V is A = A + (-V) in REAL*4, --sky-image F is A = A - B, --mask
+is A = A * M, applied in that order.  Results must be bit-exact.
 """
 
 import numpy as np
@@ -63,8 +62,9 @@ def test_sky_before_mask_leaves_masked_pixels_zero(image, prepare,
 
 
 @pytest.mark.parametrize("shape,cnpix,message", [
-    ((12, 18), None, "pixels but the image is"),
-    ((12, 17), (3, 4), "has origin"),
+    ((12, 18), None, "sky image dimensions (18 x 12) do not match "
+                     "science image dimensions (17 x 12)"),
+    ((12, 17), (3, 4), "sky image origin (CNPIX1,CNPIX2) = (3,4)"),
 ])
 def test_sky_image_registration(shape, cnpix, message, image, tmp_path,
                                 run_native):
@@ -85,10 +85,11 @@ def test_origin_follows_cnpix(tmp_path, prepare):
 
 
 @pytest.mark.parametrize("args,message", [
-    (["--sky", "1", "--sky-image", "x.fits"], "only one of"),
-    (["--sc", "1", "--sky", "2"], "only one of"),
-    (["--sky", "abc"], "needs one number"),
-    (["--sky", "1 2"], "needs one number"),
+    (["--sky", "1", "--sky-image", "x.fits"], "cannot be used together"),
+    (["--sc", "1", "--sky", "2"], "cannot be used together"),
+    (["--sky", "abc"], "needs one finite number"),
+    (["--sky", "1 2"], "needs one finite number"),
+    (["--sky", "nan"], "needs one finite number"),
 ])
 def test_sky_option_errors(args, message, image, run_native, tmp_path):
     path, _ = image

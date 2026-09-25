@@ -1,14 +1,21 @@
 # Third-party components
 
-The binary wheels of elliprof contain, besides the elliprof code itself (whose licensing is pending, see [LICENSING_STATUS.md](LICENSING_STATUS.md)), the following third-party components.
+The code written for elliprof is under the MIT License (see [LICENSE](LICENSE)). The components below are not; they keep their own terms.
+
+## Original ELLIPROF sources (`src/original/`, `include/`)
+
+These files are the numerical reference implementation. They are copied byte-for-byte from the original distribution, never modified, and checked against SHA-256 hashes on every test run. Their authorship and notices are kept exactly as written:
+
+* `elliprof.f`, `jtutil.f`, `gcfit.f`, `profile.inc`: John Tonry.
+* `assign.f`, `value.f`, `operate.f`, `variable.f`, `vistalink.inc`, `imagelink.inc`: Tod R. Lauer.
+* `dissect.f`, `upper.f`: Richard J. Stover.
+* `mongo.par`: "Copyright (c) 1987, 1994 - John Tonry". The graphics package it belongs to was distributed under the GNU GPL, version 1 or later.
+
+Most of these files carry no explicit licence statement. In addition, several routines in `gcfit.f` (`MRQMIN`, `MRQCOF`, `COVSRT`, `GAUSSJ`, `GAMMQ`, `GSER`, `GCF`, `GAMMLN`, used only by the `GC` option) and `ZBRENT` in `jtutil.f` (used by `MODEL`) follow *Numerical Recipes* (Press, Teukolsky, Vetterling & Flannery), whose own licence restricts redistribution. The MIT License of this package does not apply to any of these files.
 
 ## CFITSIO 4.7.0
 
-Statically linked into the `elliprof_native` backend in every binary wheel. It is built by `tools/ci/build_cfitsio.sh` from the official source tarball, pinned by SHA-256, without curl and without bzip2 support. Source builds link whatever CFITSIO is installed.
-
-HEASARC, NASA Goddard Space Flight Center: <https://heasarc.gsfc.nasa.gov/fitsio/>
-
-Licence (from `licenses/License.txt` in the CFITSIO distribution):
+Statically linked into the `elliprof_native` backend in the binary wheels. It is built from the official source, pinned by SHA-256, without curl or bzip2. Source: <https://heasarc.gsfc.nasa.gov/fitsio/>. Its licence text ships in every wheel as `elliprof/_notices/CFITSIO_License.txt`:
 
 > Copyright (Unpublished--all rights reserved under the copyright laws of the United States), U.S. Government as represented by the Administrator of the National Aeronautics and Space Administration. No copyright is claimed in the United States under Title 17, U.S. Code.
 >
@@ -20,26 +27,21 @@ Licence (from `licenses/License.txt` in the CFITSIO distribution):
 
 ## GCC Fortran runtime libraries
 
-These are shipped as shared libraries next to the backend by the wheel-repair tools (delocate, auditwheel, delvewheel), so they are dynamically linked and replaceable.
+The wheel-repair tools ship these as shared libraries next to the backend, so they are dynamically linked and replaceable.
 
-| Library | Wheels (verified) | Licence |
+| Library | In wheels | Licence |
 |---|---|---|
-| libgfortran | macOS arm64, Linux aarch64, Linux x86_64 | GNU GPL v3 with the **GCC Runtime Library Exception 3.1** |
-| libgcc_s | macOS arm64 (Linux uses the system copy) | GNU GPL v3 with the GCC Runtime Library Exception 3.1 |
-| libquadmath | macOS arm64, Linux x86_64 | GNU LGPL v2.1 or later |
+| libgfortran | all | GNU GPL v3 with the GCC Runtime Library Exception 3.1 |
+| libgcc_s | macOS | GNU GPL v3 with the GCC Runtime Library Exception 3.1 |
+| libquadmath | macOS, Linux x86_64 | GNU LGPL v2.1 or later |
 
-The Runtime Library Exception allows these libraries to be distributed with programs compiled by GCC, under terms of the distributor's choice. libquadmath is under the LGPL. Shipping it as an unmodified, replaceable shared library, with its licence text, meets the LGPL's terms.
+The Windows wheels are expected to add `libgcc_s_seh-1.dll`, `libwinpthread-1.dll` (MinGW-w64) and `zlib1.dll` (zlib licence). This must be confirmed against the first real Windows wheel.
 
-The Windows wheels are expected to add `libgcc_s_seh-1.dll`, `libwinpthread-1.dll` (MinGW-w64, permissive licence) and `zlib1.dll` (zlib licence) from MSYS2. They haven't been built yet, so this list must be checked against the first real Windows wheel.
-
-GCC: <https://gcc.gnu.org/>. Licence texts: <https://www.gnu.org/licenses/gcc-exception-3.1.html>, <https://www.gnu.org/licenses/gpl-3.0.html>, <https://www.gnu.org/licenses/lgpl-2.1.html>.
-
-**Before release:** put the full texts of these licences in the wheel (see LICENSING_STATUS.md). They are not included yet.
+Licence texts: <https://www.gnu.org/licenses/gcc-exception-3.1.html>, <https://www.gnu.org/licenses/gpl-3.0.html>, <https://www.gnu.org/licenses/lgpl-2.1.html>.
 
 ## System libraries (not bundled)
 
-* zlib (`libz`), used by CFITSIO, comes from the operating system on macOS and Linux (it's in the manylinux policy).
-* The C library, maths library and system frameworks.
+zlib (used by CFITSIO) on macOS and Linux, the C and maths libraries, and system frameworks.
 
 ## Python dependencies (installed by pip, not bundled)
 
@@ -47,6 +49,5 @@ GCC: <https://gcc.gnu.org/>. Licence texts: <https://www.gnu.org/licenses/gcc-ex
 |---|---|
 | numpy | BSD 3-Clause |
 | pandas | BSD 3-Clause |
-| astropy | BSD 3-Clause |
 
-Optional: matplotlib (PSF-based matplotlib licence), nbclient / nbformat / ipykernel (BSD 3-Clause), pytest (MIT).
+Optional, for tests and the notebook: astropy (BSD 3-Clause), matplotlib (matplotlib licence), nbclient, nbformat and ipykernel (BSD 3-Clause), pytest (MIT).

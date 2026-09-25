@@ -2,13 +2,14 @@
 # Input: <ROOT>/tests/data/regression/rotated.fits
 # Mask: none
 # Sky: none
-# Center source: explicit image coordinates
+# Parameters: X0=100.3 Y0=99.6 R0=3 R1=80 NR=25 NITER=5
+# elliprof version: 0.1.0
 # Contours: 25   SCALE: 1.00000000   Image origin (CNPIX1,CNPIX2): 0,0
 # Columns:
 # Rmaj, x0, y0, I0, alpha, ellip, I3, A3, I4, A4, slope
 # Units: Rmaj,x0,y0=pixels; alpha,A3,A4=degrees; I0=image units; I3,I4=amplitude relative to I0; slope=dlogI/dlogr
-# x0,y0: MONSTA convention, centre of pixel ix at ix-0.5, plus image origin (DS9 image x = x0 - CNPIX1 + 0.5)
-# alpha: MONSTA PA; major axis at alpha+90 deg CCW from +x
+# x0,y0: ELLIPROF image coordinates, centre of pixel ix at ix-0.5, plus image origin (DS9 image x = x0 - CNPIX1 + 0.5)
+# alpha: position angle; major axis at alpha+90 deg CCW from +x
 #
 #     Rmaj,         x0,         y0,              I0,      alpha,      ellip,              I3,         A3,              I4,         A4,      slope
     3.0000,   100.2892,    99.5908,   3.8324919E+03,   145.4061,   0.391015,   1.2769222E-02,    81.6762,   1.1759162E-02,    55.0981,  -1.068386

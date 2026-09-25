@@ -2,13 +2,14 @@
 # Input: <ROOT>/examples/u12517/u12517j.fits
 # Mask: <ROOT>/examples/u12517/u12517j.dmask
 # Sky: scalar 3246.00000
-# Center source: explicit image coordinates
+# Parameters: X0=567.0 Y0=562.0 R0=9 R1=347 NR=23 NITER=10 RMSTAR
+# elliprof version: 0.1.0
 # Contours: 23   SCALE: 1.00000000   Image origin (CNPIX1,CNPIX2): 0,0
 # Columns:
 # Rmaj, x0, y0, I0, alpha, ellip, I3, A3, I4, A4, slope
 # Units: Rmaj,x0,y0=pixels; alpha,A3,A4=degrees; I0=image units; I3,I4=amplitude relative to I0; slope=dlogI/dlogr
-# x0,y0: MONSTA convention, centre of pixel ix at ix-0.5, plus image origin (DS9 image x = x0 - CNPIX1 + 0.5)
-# alpha: MONSTA PA; major axis at alpha+90 deg CCW from +x
+# x0,y0: ELLIPROF image coordinates, centre of pixel ix at ix-0.5, plus image origin (DS9 image x = x0 - CNPIX1 + 0.5)
+# alpha: position angle; major axis at alpha+90 deg CCW from +x
 #
 #     Rmaj,         x0,         y0,              I0,      alpha,      ellip,              I3,         A3,              I4,         A4,      slope
     9.0000,   567.0000,   562.0000,   4.8629281E+05,     3.6000,   0.219101,   0.0000000E+00,     0.0000,   0.0000000E+00,     0.0000,  -0.232092

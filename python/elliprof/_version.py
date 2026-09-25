@@ -22,3 +22,5 @@ def _read_version() -> str:
 
 
 __version__ = _read_version()
+__author__ = "Ehsan Kourkchi (Edwin Kay)"
+__email__ = "ekourkchi@gmail.com"

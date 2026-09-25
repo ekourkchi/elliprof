@@ -101,14 +101,6 @@ def test_mask_removes_the_star(runs):
     assert abs(dv_masked["ie"][0] - t["ie"]) < abs(dv_raw["ie"][0] - t["ie"])
 
 
-def test_automatic_and_radec_centres(runs):
-    for name in ("auto_center", "radec_center"):
-        meta = json.loads((runs(name) / "meta.json").read_text())
-        assert meta["center"] == pytest.approx([100.0, 100.0], abs=1e-6)
-    assert json.loads((runs("auto_center") / "meta.json").read_text()
-                      )["center_source"] == "image center"
-    assert json.loads((runs("radec_center") / "meta.json").read_text()
-                      )["center_source"] == "RA/DEC"
 
 
 def test_model_image(runs):

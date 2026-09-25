@@ -1,9 +1,9 @@
 # Binary wheels: build with cibuildwheel, repair (auditwheel / delocate /
 # delvewheel), then install each wheel in a clean environment on its own
 # platform and test it.  Artifacts only -- nothing is published.
-# NOTE: not yet run on GitHub (no remote).  Linux aarch64/x86_64 and
-# macOS arm64 wheels were built and tested locally with the same
-# commands; macOS x86_64 and Windows have NOT been built yet.
+# NOTE: not yet run on GitHub (no remote).  The Linux x86_64/aarch64
+# and macOS arm64/x86_64 wheels were built and tested locally with the
+# same toolchains; Windows has NOT been built yet.
 name: wheels
 
 on:
@@ -21,20 +21,27 @@ jobs:
         include:
           - {name: linux-x86_64,  os: ubuntu-24.04,     archs: x86_64}
           - {name: linux-aarch64, os: ubuntu-24.04-arm, archs: aarch64}
-          - {name: macos-arm64,   os: macos-15,         archs: arm64,  target: "15.0"}
-          - {name: macos-x86_64,  os: macos-15-intel,   archs: x86_64, target: "15.0"}
+          - {name: macos-arm64,   os: macos-15,         archs: arm64,  target: "11.0"}
+          - {name: macos-x86_64,  os: macos-15-intel,   archs: x86_64, target: "11.0"}
           - {name: windows-amd64, os: windows-latest,   archs: AMD64}
     steps:
       - uses: actions/checkout@v4
 
-      # macOS: Homebrew gfortran.  Its runtime libraries target the
-      # runner's macOS, so the wheels require macOS >= 15 for now.
-      - name: gfortran (macOS)
+      # macOS: conda-forge gfortran (+ its clang driver), whose runtime
+      # libraries target macOS 11.0 -- the toolchain used to build and
+      # verify the local macOS 11.0 arm64 and x86_64 wheels.
+      - name: gfortran (macOS, conda-forge)
+        if: runner.os == 'macOS'
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: fortran
+          create-args: gfortran clang
+      - name: Use the conda-forge toolchain (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install gcc
-          ln -sf "$(brew --prefix)/bin/gfortran-$(brew list --versions gcc | awk '{print $2}' | cut -d. -f1)" /usr/local/bin/gfortran || true
-          gfortran --version
+          echo "$MAMBA_ROOT_PREFIX/envs/fortran/bin" >> "$GITHUB_PATH"
+          echo "FC=$MAMBA_ROOT_PREFIX/envs/fortran/bin/gfortran" >> "$GITHUB_ENV"
+          echo "SDKROOT=$(xcrun --show-sdk-path)" >> "$GITHUB_ENV"
 
       # Windows: MSYS2 UCRT64 gfortran, CMake and make; static CFITSIO
       # built from the pinned source with the same script.
@@ -101,7 +108,7 @@ jobs:
         run: |
           docker run --rm -e ELLIPROF_TEST_REQUIRE_NO_COMPILER=1 \
             -v "$PWD:/project:ro" python:${{ matrix.python }}-slim sh -c '
-              pip install /project/wheelhouse/*.whl pytest &&
+              pip install /project/wheelhouse/*.whl pytest astropy &&
               apt-get -qq update && apt-get -qq install -y binutils >/dev/null &&
               python /project/tools/ci/check_backend_deps.py &&
               cd /tmp && python -m pytest -c /project/tests/packaging/pytest.ini /project/tests/packaging'
@@ -112,7 +119,7 @@ jobs:
         shell: bash
         run: |
           python -m venv /tmp/clean && source /tmp/clean/bin/activate 2>/dev/null || source /tmp/clean/Scripts/activate
-          pip install wheelhouse/*.whl pytest
+          pip install wheelhouse/*.whl pytest astropy
           python tools/ci/check_backend_deps.py
           cd "$RUNNER_TEMP" && python -m pytest -c "$GITHUB_WORKSPACE/tests/packaging/pytest.ini" "$GITHUB_WORKSPACE/tests/packaging"
 

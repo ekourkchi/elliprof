@@ -1,18 +1,18 @@
 """Mask files: 0 = masked (bad) pixel, 1 = good pixel.
 
-Masks are applied the way MONSTA's ``MI`` command does it: the
-sky-subtracted image is multiplied by the mask, so masked pixels become
-exactly 0, which ELLIPROF skips as missing data.
+The sky-subtracted image is multiplied by the mask, so masked pixels
+become exactly 0, which ELLIPROF skips as missing data.
 
-Besides ordinary FITS images, masks may use MONSTA's bitmap format:
-FITS-like files with ``BITPIX = 1``, which standard FITS readers
-(CFITSIO, astropy) reject.  The layout, from ``bitfp_``/``fpbit_`` and
-``FITSorder`` in MONSTA's ``libvista/ccode/fitsdisk.c``:
+Besides ordinary FITS images, masks may use a legacy bitmap format:
+FITS-like files with ``BITPIX = 1`` (for example ``*.dmask``), which
+standard FITS readers (CFITSIO, astropy) reject.  The layout, from the
+original reader and writer (routines ``bitfp_``, ``fpbit_`` and
+``FITSorder``):
 
 * the data start at the first 2880-byte block after the ``END`` card
   and are ``2*((npix+15)//16)`` bytes long, bits packed continuously
   across rows (no row padding);
-* the bytes are swapped in pairs (MONSTA's bitmap is a sequence of
+* the bytes are swapped in pairs (the bitmap is a sequence of
   little-endian 16-bit words);
 * after that swap, pixel ``i`` (0-based, row-major) is bit ``i % 8``,
   lowest bit first, of byte ``i // 8``; a set bit is 1.0 (good);
@@ -74,7 +74,7 @@ def bitmap_nbytes(npix: int) -> int:
 
 
 def decode_bitmap(data: bytes, npix: int) -> np.ndarray:
-    """Decode MONSTA bitmap data to a flat float32 array of 0.0/1.0.
+    """Decode legacy bitmap data to a flat float32 array of 0.0/1.0.
 
     ``data`` are the raw file bytes after the header.  This reproduces
     ``FITSorder(1, npix, data)`` (pair swap) followed by ``bitfp_``.
@@ -97,7 +97,7 @@ def decode_bitmap(data: bytes, npix: int) -> np.ndarray:
 
 
 def encode_bitmap(values: np.ndarray) -> bytes:
-    """Encode a flat array (nonzero = good) as MONSTA bitmap data.
+    """Encode a flat array (nonzero = good) as legacy bitmap data.
 
     A transcription of ``fpbit_`` (shift each pixel in from the top of
     the current byte, move on after 8) and ``FITSorder`` (pair swap).
@@ -129,7 +129,7 @@ def _card(key: str, value: str, comment: str = "") -> bytes:
 
 def write_bitmap_mask(path: str, mask: np.ndarray,
                       cnpix: Optional[Tuple[int, int]] = None) -> None:
-    """Write a 2-D mask (rows, cols) in MONSTA's BITPIX = 1 format."""
+    """Write a 2-D mask (rows, cols) in the legacy BITPIX = 1 format."""
     mask = np.asarray(mask)
     if mask.ndim != 2:
         raise ValueError("mask must be 2-D")
@@ -164,10 +164,11 @@ def mask_info(path: str) -> Dict[str, int]:
 
 
 def load_mask(path: str) -> np.ndarray:
-    """Read a mask as float32 (rows, cols), as MONSTA's RD would.
+    """Read a mask as float32 (rows, cols), as the backend sees it.
 
-    BITPIX = 1 bitmaps are decoded here; other masks are read with
-    astropy and keep their values (MI multiplies by them).
+    BITPIX = 1 bitmaps are decoded here.  Other masks are read with
+    astropy (install it for this helper) and keep their values, which
+    multiply the image.
     """
     if not os.path.exists(path):
         raise FileNotFoundError(path)
@@ -178,5 +179,10 @@ def load_mask(path: str) -> np.ndarray:
             f.seek(info["offset"])
             data = f.read(bitmap_nbytes(npix))
         return decode_bitmap(data, npix).reshape(info["nrow"], info["ncol"])
-    from astropy.io import fits
+    try:
+        from astropy.io import fits
+    except ImportError:  # pragma: no cover
+        raise ImportError("reading a standard FITS mask in Python needs "
+                          "astropy (pip install astropy); the elliprof "
+                          "command itself does not") from None
     return np.asarray(fits.getdata(path), dtype=np.float32)

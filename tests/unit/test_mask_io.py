@@ -1,7 +1,7 @@
-"""MONSTA BITPIX = 1 mask decoding (Python and native) and mask checks.
+"""Legacy BITPIX = 1 mask decoding (Python and native) and mask checks.
 
 The reference for every pattern is the array itself: it is written with
-a transcription of MONSTA's *writer* (fpbit_), then decoded by the
+a transcription of the original *writer* (fpbit_), then decoded by the
 Python transcription of the *reader* (bitfp_) and by the native decoder
 (src/shim/maskio.f, seen through --prepare-only on an image of ones).
 Hand-computed byte sequences pin down the byte-pair swap, the low-bit-
@@ -130,16 +130,16 @@ def test_maskinfo_tool(maskinfo, tmp_path):
     assert "value 1 (good):   1" in out
 
 
-# --- files MONSTA itself wrote (optional, outside the repository) ---------
+# --- files the original software wrote (optional, outside the repo) ------
 
 SBF = os.environ.get("ELLIPROF_SBF_DIR")
 
 
 @pytest.mark.skipif(not SBF, reason="set ELLIPROF_SBF_DIR to the "
                     "u12517 pipeline output folder to run")
-def test_against_masks_written_by_monsta():
+def test_against_masks_written_by_original_software():
     """mask.000 = common.mask * dmask and mask.002 (bitmap) were written
-    by MONSTA itself in the SBF pipeline."""
+    by the original software in an earlier analysis."""
     from astropy.io import fits
     d = SBF
     common = load_mask(os.path.join(d, "common.mask"))
@@ -200,8 +200,9 @@ def test_invalid_mask_fails_clearly(kind, tmp_path, run_native):
 
 @pytest.mark.native
 @pytest.mark.parametrize("shape,cnpix,message", [
-    ((10, 11), None, "pixels but the image is"),
-    ((10, 10), (5, 0), "has origin"),
+    ((10, 11), None, "mask dimensions (11 x 10) do not match science "
+                     "image dimensions (10 x 10)"),
+    ((10, 10), (5, 0), "mask origin (CNPIX1,CNPIX2) = (5,0)"),
 ])
 def test_mask_registration(shape, cnpix, message, tmp_path, run_native):
     img = write_fits(tmp_path / "img.fits", np.ones((10, 10)))

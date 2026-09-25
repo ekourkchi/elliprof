@@ -2,13 +2,14 @@
 # Input: <ROOT>/tests/data/regression/noisy.fits
 # Mask: none
 # Sky: scalar 50.0000000
-# Center source: explicit image coordinates
+# Parameters: X0=100.3 Y0=99.6 R0=3 R1=80 NR=25 NITER=5
+# elliprof version: 0.1.0
 # Contours: 25   SCALE: 1.00000000   Image origin (CNPIX1,CNPIX2): 0,0
 # Columns:
 # Rmaj, x0, y0, I0, alpha, ellip, I3, A3, I4, A4, slope
 # Units: Rmaj,x0,y0=pixels; alpha,A3,A4=degrees; I0=image units; I3,I4=amplitude relative to I0; slope=dlogI/dlogr
-# x0,y0: MONSTA convention, centre of pixel ix at ix-0.5, plus image origin (DS9 image x = x0 - CNPIX1 + 0.5)
-# alpha: MONSTA PA; major axis at alpha+90 deg CCW from +x
+# x0,y0: ELLIPROF image coordinates, centre of pixel ix at ix-0.5, plus image origin (DS9 image x = x0 - CNPIX1 + 0.5)
+# alpha: position angle; major axis at alpha+90 deg CCW from +x
 #
 #     Rmaj,         x0,         y0,              I0,      alpha,      ellip,              I3,         A3,              I4,         A4,      slope
     3.0000,   100.2974,    99.6333,   3.8241836E+03,   120.0965,   0.287796,   1.0603666E-02,    33.2577,   8.1139803E-03,    70.3935,  -1.057628

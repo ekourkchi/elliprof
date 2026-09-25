@@ -1,16 +1,9 @@
 """The ``elliprof`` command.
 
-Same syntax as the native backend, plus automatic, physical and RA/DEC
-centres::
-
-    elliprof image.fits [KEY=value ...] [X0=x Y0=y |
-                        --center-physical X Y | --center-radec RA DEC]
-                        [--sky V | --sky-image F] [--mask F]
-                        [-o out.prf] [--csv out.csv] [--reg out.reg]
-                        [-m model.fits]
-
-The chosen centre is converted to ELLIPROF's X0/Y0 and passed to the
-compiled backend together with everything else.
+    elliprof image.fits X0=x Y0=y R0=r R1=r NR=n [KEY=value ...]
+             [--sky V | --sky-image F] [--mask F]
+             [-o out.prf] [--csv out.csv] [--reg out.reg] [-m model.fits]
+             [--timeout SECONDS]
 """
 
 from __future__ import annotations
@@ -20,48 +13,45 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional
 
-from ._version import __version__
+from ._version import __author__, __version__
 
 USAGE = """\
-usage: elliprof image.fits [KEY=value ...] [options]
+usage: elliprof image.fits X0=x Y0=y R0=r R1=r NR=n [KEY=value ...] [options]
 
-Fit elliptical isophotes (MONSTA's ELLIPROF) to a FITS image.
+Fit elliptical isophotes (ELLIPROF) to a FITS image.
 
-Fit parameters (ELLIPROF keywords, case-insensitive):
-  R0=r R1=r NR=n       inner/outer semi-major axis and number of isophotes
-                       (required)
+Required:
+  X0=x Y0=y            initial centre (ELLIPROF image coordinates: the
+                       centre of the pixel in FITS column i is at i - 0.5)
+  R0=r R1=r NR=n       inner/outer semi-major axis (0 < R0 < R1) and
+                       number of isophotes (2..100)
+
+Optional ELLIPROF keywords (case-insensitive):
   NITER=n RLAW=k LINEAR FIXCTR=k ELLIP=e SCALE=s RMSTAR COS3X=k COS4X=k
   TIE=k AVG=n GAIN=g GC VERBOSE MODEL SKY=s (SKY= only affects ELLIPROF's
   de Vaucouleurs fit; use --sky to subtract the background)
 
-Centre (default: the geometric image centre):
-  X0=x Y0=y                    ELLIPROF image coordinates
-  --center-physical X Y        IRAF/DS9 physical coordinates (LTV/LTM)
-  --center-radec RA DEC        celestial, via the FITS WCS; decimal degrees
-                               or sexagesimal (12:34:56.7 -12:34:56)
-
-Preprocessing (in this order):
-  --sky V | --sky-image F      subtract a constant or an image
-  --mask F                     then multiply by a mask (0 = masked,
-                               1 = good; MONSTA BITPIX=1 .dmask files OK)
-  --sc V                       deprecated alias for --sky
+Preparation (in this order):
+  --sky V | --sky-image F      subtract a constant or an image of the
+                               same size
+  --mask F                     then multiply by a mask of the same size
+                               (0 = masked, 1 = good; BITPIX=1 .dmask OK)
 
 Output:
-  -o out.prf                   MONSTA-compatible profile
+  -o out.prf                   profile, full precision
   --csv out.csv                commented, fixed-width CSV profile
   --reg out.reg                fitted ellipses as a DS9 region file
   -m model.fits                model image (with MODEL)
-  --prepared F                 the image after sky and mask (diagnostic)
 
 Other:
+  --timeout SECONDS            stop ELLIPROF after this long (default 1800)
   --version                    versions of elliprof and its backend
   --diagnostics                environment report for bug reports
   -h, --help                   this help
 """
 
-VALUE_OPTS = {"--mask", "--sky", "--sc", "--sky-image", "-o", "--prf",
-              "--csv", "--reg", "-m", "--prepared"}
-PAIR_OPTS = {"--center-physical", "--center-radec"}
+VALUE_OPTS = {"--mask", "--sky", "--sc", "--sky-image", "-o", "--csv",
+              "--reg", "-m", "--prepared", "--timeout"}
 
 
 class UsageError(Exception):
@@ -79,7 +69,7 @@ def _parse(argv: List[str]) -> dict:
         elif arg in VALUE_OPTS:
             if i + 1 >= len(argv):
                 raise UsageError(f"{arg} needs a value")
-            key = {"--sc": "--sky", "--prf": "-o"}.get(arg, arg)
+            key = "--sky" if arg == "--sc" else arg
             if arg == "--sc":
                 print("elliprof: --sc is deprecated, use --sky",
                       file=sys.stderr)
@@ -87,13 +77,6 @@ def _parse(argv: List[str]) -> dict:
                 raise UsageError(f"{arg} given more than once")
             opts[key] = argv[i + 1]
             i += 2
-        elif arg in PAIR_OPTS:
-            if i + 2 >= len(argv):
-                raise UsageError(f"{arg} needs two values")
-            if arg in opts:
-                raise UsageError(f"{arg} given more than once")
-            opts[arg] = (argv[i + 1], argv[i + 2])
-            i += 3
         elif arg.startswith("-"):
             raise UsageError(f"unknown option {arg}")
         elif opts["image"] is None:
@@ -106,20 +89,17 @@ def _parse(argv: List[str]) -> dict:
 
 
 def _split_center(words: List[str]):
-    """Take X0=/Y0= out of the ELLIPROF words."""
+    """Take X0=/Y0= out of the ELLIPROF words; both are required."""
     found, rest = {}, []
     for w in words:
-        key = w.split("=", 1)[0].upper()
-        if key in ("X0", "Y0") and "=" in w:
-            try:
-                found[key] = float(w.split("=", 1)[1])
-            except ValueError:
-                raise UsageError(f"{w}: X0/Y0 must be numbers") from None
+        key, eq, value = w.partition("=")
+        if key.upper() in ("X0", "Y0") and eq:
+            found[key.upper()] = value
         else:
             rest.append(w)
-    if len(found) == 1:
-        raise UsageError("X0= and Y0= must be given together")
-    return ((found["X0"], found["Y0"]) if found else None), rest
+    if len(found) != 2:
+        raise UsageError("X0 and Y0 are required")
+    return found["X0"], found["Y0"], rest
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -135,7 +115,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if opts.get("version"):
         from .diagnostics import diagnostics
         info = diagnostics()
-        print(f"elliprof {__version__}")
+        print(f"elliprof {__version__} ({__author__})")
         print(info.get("backend version", info.get("native backend")))
         return 0
     if opts.get("diagnostics"):
@@ -146,35 +126,38 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(USAGE, end="", file=sys.stderr)
         return 2
 
-    from .core import ElliprofError, run_elliprof
+    from .core import (DEFAULT_TIMEOUT, ElliprofError, ElliprofTimeoutError,
+                       run_elliprof)
     try:
-        center, words = _split_center(opts["words"])
-        sky = opts.get("--sky")
-        if sky is not None:
-            try:
-                float(sky)
-            except ValueError:
-                raise UsageError(f"--sky needs a number, got {sky}") \
-                    from None
+        if "--sky" in opts and "--sky-image" in opts:
+            raise UsageError("--sky and --sky-image cannot be used together")
+        x0, y0, words = _split_center(opts["words"])
+        try:
+            timeout = float(opts.get("--timeout", DEFAULT_TIMEOUT))
+        except ValueError:
+            raise UsageError("--timeout needs a number of seconds") \
+                from None
         with tempfile.TemporaryDirectory(prefix="elliprof-") as tmp:
             tmp = Path(tmp)
             result = run_elliprof(
-                opts["image"], mask=opts.get("--mask"), sky=sky,
-                sky_image=opts.get("--sky-image"), center=center,
-                center_physical=opts.get("--center-physical"),
-                center_radec=opts.get("--center-radec"), extra=words,
-                output_dir=tmp, prf_path=opts.get("-o") or tmp / "p.prf",
+                opts["image"], x0, y0, mask=opts.get("--mask"),
+                sky=opts.get("--sky"), sky_image=opts.get("--sky-image"),
+                extra=words, output_dir=tmp,
+                prf_path=opts.get("-o") or tmp / "p.prf",
                 csv_path=opts.get("--csv") or tmp / "p.csv",
                 reg_path=opts.get("--reg") or tmp / "p.reg",
                 model_path=opts.get("-m"), prepared=opts.get("--prepared"),
-                check=False)
-            print(result.center_info.describe())
+                timeout=timeout, check=False)
             sys.stdout.write(result.stdout)
             sys.stderr.write(result.stderr)
             return result.returncode
     except UsageError as exc:
         print(f"elliprof: error: {exc}", file=sys.stderr)
         return 2
+    except ElliprofTimeoutError as exc:
+        print(f"elliprof: error: {exc}", file=sys.stderr)
+        print("command: " + " ".join(exc.command), file=sys.stderr)
+        return 124
     except (ValueError, FileNotFoundError, ElliprofError) as exc:
         print(f"elliprof: error: {exc}", file=sys.stderr)
         return 1

@@ -32,23 +32,35 @@ def test_no_arguments(run_native):
 def test_missing_center_points_to_python_cli(galaxy_fits, run_native):
     proc = run_native(galaxy_fits, "R0=3", "R1=90", "NR=30")
     assert proc.returncode == 1
-    assert "X0 and Y0 are required by elliprof_native." in proc.stderr
-    assert "Python `elliprof` command" in proc.stderr
+    assert proc.stderr.strip() == "elliprof: error: X0 and Y0 are required"
     assert "STOP" not in proc.stderr
 
 
 @pytest.mark.parametrize("args,message", [
-    (["X0=1", "R0=3", "R1=90", "NR=30"], "must be given together"),
-    (["Y0=1", "R0=3", "R1=90", "NR=30"], "must be given together"),
-    (["X0=1", "Y0=1", "R1=90", "NR=30"], "R0=, R1= and NR= are required"),
-    (["X0=1", "Y0=1", "R0=3", "NR=30"], "R0=, R1= and NR= are required"),
-    (["X0=1", "Y0=1", "R0=3", "R1=90"], "R0=, R1= and NR= are required"),
-    (["X0=1", "Y0=1", "GC"], "GC needs NR="),
+    (["X0=1", "R0=3", "R1=90", "NR=30"], "X0 and Y0 are required"),
+    (["Y0=1", "R0=3", "R1=90", "NR=30"], "X0 and Y0 are required"),
+    (["X0=1", "Y0=1", "R1=90", "NR=30"], "R0, R1 and NR are required"),
+    (["X0=1", "Y0=1", "R0=3", "NR=30"], "R0, R1 and NR are required"),
+    (["X0=1", "Y0=1", "R0=3", "R1=90"], "R0, R1 and NR are required"),
+    (["X0=nan", "Y0=1", "R0=3", "R1=9", "NR=5"],
+     'X0 must be a finite number, got "NAN"'),
+    (["X0=1", "Y0=1e999", "R0=3", "R1=9", "NR=5"], "Y0 must be a finite"),
+    (["X0=1", "Y0=1", "R0=9", "R1=3", "NR=5"], "0 < R0 < R1"),
+    (["X0=1", "Y0=1", "R0=0", "R1=3", "NR=5"], "0 < R0 < R1"),
+    (["X0=1", "Y0=1", "R0=3", "R1=9", "NR=1"], "between 2 and 100"),
+    (["X0=1", "Y0=1", "R0=3", "R1=9", "NR=101"], "between 2 and 100"),
+    (["X0=1", "Y0=1", "R0=3", "R1=9", "NR=5.5"], "between 2 and 100"),
+    (GOOD + ["NITER=0"], "NITER must be an integer between 1 and 1000"),
+    (GOOD + ["NITER=abc"], "NITER must be a finite number"),
+    (["X0=1", "Y0=1", "GC"], "R0, R1 and NR are required"),
     (GOOD + ["--bogus"], "unknown option --bogus"),
     (GOOD + ["--csv"], "--csv needs a value"),
     (GOOD + ["--prepare-only"], "--prepare-only needs --prepared"),
-    (GOOD + ["OLD"], "OLD needs a previous profile"),
-    (GOOD + ["edit"], "EDIT needs a previous profile"),
+    (GOOD + ["OLD"], "error: OLD is not supported"),
+    (GOOD + ["edit"], "error: EDIT is not supported"),
+    (GOOD + ["TV"], "error: TV is not supported"),
+    (GOOD + ["--sky", "1", "--sky-image", "x.fits"],
+     "--sky and --sky-image cannot be used together"),
 ])
 def test_argument_errors(args, message, galaxy_fits, run_native):
     proc = run_native(galaxy_fits, *args)

@@ -5,14 +5,15 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "elliprof"
 dynamic = ["version"]
-description = "Elliptical-isophote surface photometry of galaxies (MONSTA's ELLIPROF)"
+description = "Fit elliptical isophotes to astronomical FITS images (ELLIPROF)"
 readme = "README.md"
 requires-python = ">=3.10"
-# No license is declared on purpose: redistribution rights for the
-# legacy MONSTA/VISTA sources are unresolved.  See LICENSING_STATUS.md.
-authors = [{ name = "elliprof maintainers" }]
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+authors = [{ name = "Ehsan Kourkchi (Edwin Kay)", email = "ekourkchi@gmail.com" }]
+keywords = ["astronomy", "surface photometry", "isophotes", "galaxies", "FITS"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Astronomy",
     "Programming Language :: Python :: 3",
@@ -24,12 +25,12 @@ classifiers = [
 dependencies = [
     "numpy>=1.24",
     "pandas>=2.0",
-    "astropy>=5.3",
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=7"]
-notebook = ["matplotlib>=3.7", "nbclient>=0.8", "nbformat>=5.9", "ipykernel>=6"]
+test = ["pytest>=7", "astropy>=5.3"]
+notebook = ["astropy>=5.3", "matplotlib>=3.7", "nbclient>=0.8",
+            "nbformat>=5.9", "ipykernel>=6"]
 
 [project.scripts]
 elliprof = "elliprof.cli:main"
@@ -69,7 +70,7 @@ markers = [
 build = "cp312-*"
 skip = "*-musllinux_*"
 build-verbosity = 1
-test-requires = ["pytest"]
+test-requires = ["pytest", "astropy"]
 test-command = "pytest -c {project}/tests/packaging/pytest.ini {project}/tests/packaging"
 
 [tool.cibuildwheel.linux]

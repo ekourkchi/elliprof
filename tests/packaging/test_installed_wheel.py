@@ -73,7 +73,8 @@ def test_help_version_diagnostics():
     assert h.returncode == 0 and "usage: elliprof" in h.stdout
     v = run("--version")
     assert v.returncode == 0
-    assert v.stdout.startswith(f"elliprof {elliprof.__version__}")
+    assert v.stdout.startswith(f"elliprof {elliprof.__version__} "
+                               f"({elliprof.__author__})")
     assert "elliprof_native" in v.stdout and "CFITSIO" in v.stdout
     d = run("--diagnostics")
     assert d.returncode == 0
@@ -104,7 +105,6 @@ def test_explicit_center_scalar_sky(tmp_path):
     p = run(GALAXY, *FIT, "--sky", "100", "-o", prf, "--csv", csv,
             "--reg", reg)
     assert p.returncode == 0, p.stderr
-    assert "Center source: explicit image coordinates" in p.stdout
     _check_outputs(tmp_path, "a", 30)
     from elliprof import read_profile
     last = read_profile(str(prf)).iloc[-1]
@@ -112,15 +112,10 @@ def test_explicit_center_scalar_sky(tmp_path):
     assert abs(last.ellip - 0.3) < 0.01
 
 
-def test_automatic_center(tmp_path):
-    prf, csv, reg = _profile_files(tmp_path, "b")
-    p = run(GALAXY, "R0=3", "R1=90", "NR=30", "--sky", "100", "-o", prf,
-            "--csv", csv, "--reg", reg)
-    assert p.returncode == 0, p.stderr
-    assert "Center source: image center" in p.stdout
-    assert "X0=128.0000 Y0=128.0000" in p.stdout
-    _check_outputs(tmp_path, "b", 30)
-
+def test_center_is_required(tmp_path):
+    p = run(GALAXY, "R0=3", "R1=90", "NR=30", "--sky", "100")
+    assert p.returncode == 2
+    assert "error: X0 and Y0 are required" in p.stderr
 
 def test_sky_image_and_mask(tmp_path):
     from astropy.io import fits
@@ -146,7 +141,7 @@ def test_sky_image_and_mask(tmp_path):
 
 def test_python_api(tmp_path):
     from elliprof import run_elliprof
-    res = run_elliprof(GALAXY, sky=100, center=(127.3, 121.6), r0=3, r1=90,
+    res = run_elliprof(GALAXY, 127.3, 121.6, sky=100, r0=3, r1=90,
                        nr=30, model=True, output_dir=tmp_path)
     assert res.ok and len(res.profile) == 30
     assert list(res.profile.columns)[:3] == ["Rmaj", "x0", "y0"]
@@ -174,3 +169,21 @@ def test_paths_with_spaces_and_unicode(tmp_path):
     if sys.platform == "win32" and p.returncode != 0:
         pytest.xfail("non-ASCII paths are not supported on Windows yet")
     assert p.returncode == 0, p.stderr
+
+
+def test_runs_without_astropy(tmp_path):
+    """astropy is only a test/notebook dependency: a full fit works with
+    it blocked from import."""
+    code = f"""
+import sys
+sys.modules["astropy"] = None
+from elliprof import run_elliprof
+res = run_elliprof({str(GALAXY)!r}, 127.3, 121.6, sky=100, r0=3, r1=90,
+                   nr=30, output_dir={str(tmp_path)!r})
+assert res.ok and len(res.profile) == 30
+print("ok")
+"""
+    proc = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                          text=True)
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == "ok"

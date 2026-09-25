@@ -23,11 +23,32 @@ from elliprof.profile import COLUMNS, read_profile  # noqa: E402
 FILES = ("profile.prf", "profile.csv", "profile.reg", "stdout.txt")
 
 
+def binary_arch(path) -> str:
+    """CPU architecture of an executable, from its Mach-O / ELF / PE
+    header (the backend may differ from the running Python, e.g. an
+    x86_64 backend under Rosetta)."""
+    import struct
+    with open(path, "rb") as f:
+        head = f.read(4096)
+    magic = head[:4]
+    if magic in (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe"):   # Mach-O
+        cpu = struct.unpack("<i", head[4:8])[0]
+        return {0x01000007: "x86_64", 0x0100000C: "arm64"}.get(cpu, hex(cpu))
+    if magic == b"\x7fELF":
+        machine = struct.unpack("<H", head[18:20])[0]
+        return {0x3E: "x86_64", 0xB7: "aarch64"}.get(machine, hex(machine))
+    if magic[:2] == b"MZ":                                       # PE
+        pe = struct.unpack("<I", head[0x3C:0x40])[0]
+        machine = struct.unpack("<H", head[pe + 4:pe + 6])[0]
+        return {0x8664: "AMD64", 0xAA64: "ARM64"}.get(machine, hex(machine))
+    return platform.machine()
+
+
 def platform_id() -> dict:
     exe = find_backend()
     version = subprocess.run([str(exe), "--version"], capture_output=True,
                              text=True).stdout.strip()
-    return {"system": platform.system(), "machine": platform.machine(),
+    return {"system": platform.system(), "machine": binary_arch(exe),
             "backend": version}
 
 
@@ -51,11 +72,12 @@ def run_case(name, image, kwargs, outdir: Path):
     csv.write_text("".join(scrub(l) if l.startswith("#") else l
                            for l in open(csv)))
     meta = dict(platform_id(), case=name, center=list(res.center),
-                center_source=res.center_source,
                 dvfit=parse_dvfit(res.stdout))
     if model:
-        meta["model_sha256"] = hashlib.sha256(
-            (outdir / "model.fits").read_bytes()).hexdigest()
+        # the pixel values only; header text may change between versions
+        from astropy.io import fits
+        data = fits.getdata(outdir / "model.fits").astype(">f4")
+        meta["model_sha256"] = hashlib.sha256(data.tobytes()).hexdigest()
     (outdir / "meta.json").write_text(json.dumps(meta, indent=1) + "\n")
     return res
 

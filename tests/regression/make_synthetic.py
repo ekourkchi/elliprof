@@ -38,19 +38,6 @@ def star(x, y, pos, amp=5000.0, sigma=1.5):
                         (2 * sigma ** 2))
 
 
-def wcs_header(truth):
-    from astropy.io import fits
-    h = fits.Header()
-    h["CTYPE1"], h["CTYPE2"] = "RA---TAN", "DEC--TAN"
-    # FITS pixel (1-based) of the galaxy centre = ELLIPROF x0 + 0.5
-    h["CRPIX1"], h["CRPIX2"] = truth["x0"] + 0.5, truth["y0"] + 0.5
-    h["CRVAL1"], h["CRVAL2"] = 188.73658, -12.58242
-    scale = 0.2 / 3600
-    h["CD1_1"], h["CD1_2"], h["CD2_1"], h["CD2_2"] = -scale, 0.0, 0.0, scale
-    h["RADESYS"] = "ICRS"
-    return h
-
-
 def write(path, data, header=None):
     from astropy.io import fits
     hdu = fits.PrimaryHDU(data.astype(np.float32), header=header)
@@ -84,7 +71,7 @@ def main(force=False):
         if "noise" in truth:
             img = img + np.random.default_rng(1).normal(0, truth["noise"],
                                                         img.shape)
-        write(path, img, wcs_header(truth) if case.get("wcs") else None)
+        write(path, img)
         print("wrote", path)
 
 

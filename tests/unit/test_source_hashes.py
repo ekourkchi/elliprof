@@ -1,4 +1,4 @@
-"""The copied MONSTA/VISTA sources are the reference implementation and
+"""The original ELLIPROF sources are the reference implementation and
 must stay byte-identical.  tests/original_source_hashes.txt is edited
 by hand only, never regenerated automatically."""
 
@@ -35,4 +35,4 @@ def test_original_file_unchanged(name, digest):
     # would also fail here (see .gitattributes).
     data = (ROOT / name).read_bytes()
     assert hashlib.sha256(data).hexdigest() == digest, (
-        f"{name} differs from the original MONSTA source")
+        f"{name} differs from the original source")

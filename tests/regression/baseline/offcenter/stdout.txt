@@ -1,5 +1,4 @@
  <ROOT>/tests/data/regression/offcenter.fits:    200 cols x   200 rows, origin (col,row) = (     0,     0)
- Center source: explicit image coordinates
    r      x0      y0      I0    alpha  ellip I(3x)  A(3x)  I(4x)  A(4x) slope
    3.0   70.41  120.90   3829. 119.91 0.285 0.0098  95.55 0.0139  76.88 -1.08
    3.6   70.39  120.89   3003. 120.03 0.282 0.0062  85.92 0.0045  36.71 -1.38

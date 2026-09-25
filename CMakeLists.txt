@@ -97,7 +97,7 @@ target_link_libraries(elliprof_native PRIVATE ${CFITSIO_LIBRARY}
 install(TARGETS elliprof_native RUNTIME DESTINATION elliprof/_bin)
 
 # Notices travel with every wheel
-install(FILES LICENSING_STATUS.md THIRD_PARTY_NOTICES.md
+install(FILES LICENSE THIRD_PARTY_NOTICES.md
         DESTINATION elliprof/_notices)
 if(CFITSIO_LIBRARY MATCHES "\\.a$")
   get_filename_component(_cfitsio_prefix "${CFITSIO_LIBRARY}" DIRECTORY)

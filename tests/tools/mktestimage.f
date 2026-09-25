@@ -1,6 +1,6 @@
 C     Write a noiseless synthetic r^(1/4) elliptical galaxy as a FITS
 C     image, for checking that the standalone ELLIPROF runs.  This is
-C     a smoke test only, not evidence of equivalence with MONSTA.
+C     a smoke test only, not evidence of scientific equivalence.
 C
 C     Coordinates follow ELLIPROF: the centre of pixel DATA(IX,IY) is
 C     at (x,y) = (IX-0.5, IY-0.5), and the position angle ALPHA is

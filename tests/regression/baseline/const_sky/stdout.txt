@@ -1,5 +1,4 @@
  <ROOT>/tests/data/regression/const_sky.fits:    200 cols x   200 rows, origin (col,row) = (     0,     0)
- Center source: explicit image coordinates
  Sky: subtracted scalar   250.00000    
    r      x0      y0      I0    alpha  ellip I(3x)  A(3x)  I(4x)  A(4x) slope
    3.0  100.30   99.63   3824. 120.04 0.288 0.0106  32.68 0.0078  70.15 -1.06

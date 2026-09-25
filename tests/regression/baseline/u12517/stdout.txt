@@ -1,5 +1,4 @@
  <ROOT>/examples/u12517/u12517j.fits:   1025 cols x  1022 rows, origin (col,row) = (     0,     0)
- Center source: explicit image coordinates
  Sky: subtracted scalar   3246.0000    
  Mask: <ROOT>/examples/u12517/u12517j.dmask (BITPIX 1): 103402 pixels masked ( 9.871%)
  FITCONTOUR: quitting, nused =            0

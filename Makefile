@@ -1,4 +1,4 @@
-# elliprof: MONSTA's ELLIPROF as a standalone program and Python package.
+# elliprof: ELLIPROF as a standalone program and Python package.
 #
 # Native development build (release wheels are built by CMake through
 # scikit-build-core, see pyproject.toml and CMakeLists.txt):
@@ -18,7 +18,7 @@
 #   make clean
 
 FC      = gfortran
-# Numerical flags, as MONSTA's Make.Common plus -ffp-contract=off so
+# Numerical flags, as in the original build plus -ffp-contract=off so
 # that multiply-adds are never fused (keeps REAL*4 results
 # reproducible).  CMakeLists.txt must use the same list; a test checks.
 # Never add bounds checking, -O2/-O3, -ffast-math or -march: the F77
@@ -97,7 +97,8 @@ check: all tools
 	$(PYTHON) -m pytest tests/unit tests/integration tests/regression
 
 update-baselines: all tools
-	$(PYTHON) tests/regression/update_baselines.py
+	ELLIPROF_NATIVE=$(CURDIR)/elliprof_native \
+	    $(PYTHON) tests/regression/update_baselines.py
 
 DOCKER ?= docker
 docker-test:

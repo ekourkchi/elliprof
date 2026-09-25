@@ -1,18 +1,17 @@
-C     Image preparation done before ELLIPROF, reproducing the MONSTA
-C     commands the SBF pipeline ran on the image buffer:
+C     Image preparation before ELLIPROF:
 C
-C        --sky V        SC 1 V      A = A + (-V)      (arith.f ARITHCON)
-C        --sky-image F  RD 2 F; SI 1 2   A = A - B    (arith2im.f)
-C        --mask F       RD 2 F; MI 1 2   A = A * B    (arith2im.f)
+C        --sky V        A = A + (-V)
+C        --sky-image F  A = A - B
+C        --mask F       A = A * M      (0 = masked, 1 = good)
 C
-C     All arithmetic is REAL*4, element by element, as in MONSTA.  The
-C     sky must be removed before the mask so that masked pixels end up
-C     exactly 0, which is what ELLIPROF treats as missing data.
-C     Unlike MONSTA's SI/MI, which silently work on the overlap of two
-C     images, the second image must have the same size and origin.
+C     All arithmetic is REAL*4, element by element.  The sky must be
+C     removed before the mask so that masked pixels end up exactly 0,
+C     which is what ELLIPROF treats as missing data.  A sky image or
+C     mask must have exactly the size and origin of the science image;
+C     it is never resized, cropped, shifted or resampled.
 
-C     Parse a number the way VISTA parses "SC 1 value": DISSECT, then a
-C     float via CONST (REAL*4) or an integer via FLOAT(IBUF).
+C     Parse one number with the original parser (DISSECT): a float via
+C     its REAL*4 value, an integer via FLOAT.  Non-finite values fail.
       SUBROUTINE PARSENUM(STR, VAL, IERR)
       CHARACTER*(*) STR
       REAL VAL
@@ -38,11 +37,12 @@ C     float via CONST (REAL*4) or an integer via FLOAT(IBUF).
       ELSE
          VAL = FNUM
       END IF
+      IF (VAL .NE. VAL .OR. ABS(VAL) .GT. HUGE(VAL)) RETURN
       IERR = 0
       RETURN
       END
 
-C     SC 1 V
+C     --sky V
       SUBROUTINE SUBSKY(PIX, NCOL, NROW, SKY)
       INTEGER NCOL, NROW, I, J
       REAL PIX(NCOL,NROW), SKY, F
@@ -55,8 +55,35 @@ C     SC 1 V
       RETURN
       END
 
-C     RD 2 F; SI 1 2.  The sky image goes through the same CFITSIO
-C     reader as the science image.
+C     Check a sky image's size and origin without reading its pixels.
+      SUBROUTINE CHKSKYIMG(FNAME, NCOL, NROW, ISC, ISR, IERR)
+      CHARACTER*(*) FNAME
+      INTEGER NCOL, NROW, ISC, ISR, IERR
+      INTEGER IUNIT, BCOL, BROW, BSC, BSR
+      CHARACTER*81840 HTMP
+
+      CALL FITSOPENIM(FNAME, IUNIT, BCOL, BROW, BSC, BSR, HTMP, IERR)
+      IF (IERR .NE. 0) RETURN
+      CALL FITSCLOSE(IUNIT)
+      CALL CHKGEOM('sky image', BCOL, BROW, BSC, BSR,
+     $     NCOL, NROW, ISC, ISR, IERR)
+      RETURN
+      END
+
+C     Check a mask's size and origin without reading its pixels.
+      SUBROUTINE CHKMASK(FNAME, NCOL, NROW, ISC, ISR, IERR)
+      CHARACTER*(*) FNAME
+      INTEGER NCOL, NROW, ISC, ISR, IERR
+      INTEGER MBITPIX, MCOL, MROW, MSC, MSR, IOFF
+
+      CALL MASKHEAD(FNAME, MBITPIX, MCOL, MROW, MSC, MSR, IOFF, IERR)
+      IF (IERR .NE. 0) RETURN
+      CALL CHKGEOM('mask', MCOL, MROW, MSC, MSR,
+     $     NCOL, NROW, ISC, ISR, IERR)
+      RETURN
+      END
+
+C     --sky-image F: subtract it pixel by pixel.
       SUBROUTINE SUBSKYIMG(FNAME, PIX, NCOL, NROW, ISC, ISR, IERR)
       CHARACTER*(*) FNAME
       INTEGER NCOL, NROW, ISC, ISR, IERR
@@ -67,7 +94,7 @@ C     reader as the science image.
 
       CALL FITSOPENIM(FNAME, IUNIT, BCOL, BROW, BSC, BSR, HTMP, IERR)
       IF (IERR .NE. 0) RETURN
-      CALL CHKGEOM('sky image', FNAME, BCOL, BROW, BSC, BSR,
+      CALL CHKGEOM('sky image', BCOL, BROW, BSC, BSR,
      $     NCOL, NROW, ISC, ISR, IERR)
       IF (IERR .NE. 0) THEN
          CALL FITSCLOSE(IUNIT)
@@ -86,8 +113,8 @@ C     reader as the science image.
       RETURN
       END
 
-C     RD 2 F; MI 1 2.  Returns the mask BITPIX, the number of zero
-C     (masked) pixels and of values other than 0 or 1.
+C     --mask F: multiply by it.  Returns the mask BITPIX, the number of
+C     zero (masked) pixels and of values other than 0 or 1.
       SUBROUTINE APPLYMASK(FNAME, PIX, NCOL, NROW, ISC, ISR,
      $     MBITPIX, NZERO, NOTHER, IERR)
       CHARACTER*(*) FNAME
@@ -98,7 +125,7 @@ C     (masked) pixels and of values other than 0 or 1.
 
       CALL MASKHEAD(FNAME, MBITPIX, MCOL, MROW, MSC, MSR, IOFF, IERR)
       IF (IERR .NE. 0) RETURN
-      CALL CHKGEOM('mask', FNAME, MCOL, MROW, MSC, MSR,
+      CALL CHKGEOM('mask', MCOL, MROW, MSC, MSR,
      $     NCOL, NROW, ISC, ISR, IERR)
       IF (IERR .NE. 0) RETURN
       ALLOCATE (M(NCOL,NROW))
@@ -122,23 +149,22 @@ C     (masked) pixels and of values other than 0 or 1.
       END
 
 C     The second image must match the science image exactly.
-      SUBROUTINE CHKGEOM(WHAT, FNAME, BCOL, BROW, BSC, BSR,
+      SUBROUTINE CHKGEOM(WHAT, BCOL, BROW, BSC, BSR,
      $     NCOL, NROW, ISC, ISR, IERR)
-      CHARACTER*(*) WHAT, FNAME
+      CHARACTER*(*) WHAT
       INTEGER BCOL, BROW, BSC, BSR, NCOL, NROW, ISC, ISR, IERR
       IERR = 0
       IF (BCOL .NE. NCOL .OR. BROW .NE. NROW) THEN
-         WRITE (0,1000) WHAT, FNAME(1:LEN_TRIM(FNAME)), BCOL, BROW,
-     $        NCOL, NROW
- 1000    FORMAT (' elliprof: ',A,' ',A,' is ',I0,' x ',I0,
-     $        ' pixels but the image is ',I0,' x ',I0)
+         WRITE (0,1000) WHAT, BCOL, BROW, NCOL, NROW
+ 1000    FORMAT ('elliprof: error: ',A,' dimensions (',I0,' x ',I0,
+     $        ') do not match science image dimensions (',I0,' x ',
+     $        I0,')')
          IERR = 1
       ELSE IF (BSC .NE. ISC .OR. BSR .NE. ISR) THEN
-         WRITE (0,1001) WHAT, FNAME(1:LEN_TRIM(FNAME)), BSC, BSR,
-     $        ISC, ISR
- 1001    FORMAT (' elliprof: ',A,' ',A,
-     $        ' has origin (CNPIX1,CNPIX2) = (',I0,',',I0,
-     $        ') but the image has (',I0,',',I0,')')
+         WRITE (0,1001) WHAT, BSC, BSR, ISC, ISR
+ 1001    FORMAT ('elliprof: error: ',A,' origin (CNPIX1,CNPIX2) = (',
+     $        I0,',',I0,') does not match science image origin (',
+     $        I0,',',I0,')')
          IERR = 1
       END IF
       RETURN

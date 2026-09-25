@@ -1,19 +1,18 @@
-C     Replacements for the MONSTA routines ELLIPROF calls that need
-C     the Mongo terminal layer or the X11 image display.
+C     Replacements for routines ELLIPROF calls that belonged to the
+C     original interactive environment (terminal input, image display).
+C     The routine names are fixed by the unchanged elliprof.f.
 
-C     INVISTA: one line of terminal input (sysdepG77.f uses Mongo's
-C     readline input).  Returns 1 for text, 0 at end of file.
+C     INVISTA: terminal input.  elliprof never reads the terminal: this
+C     always reports end of input (0).  ELLIPROF only asks for input
+C     with EDIT or TV, which the driver refuses.
       FUNCTION INVISTA(LINE)
       CHARACTER*(*) LINE
-      READ (5,'(A)',END=10,ERR=10) LINE
-      INVISTA = 1
-      RETURN
- 10   LINE = ' '
+      LINE = ' '
       INVISTA = 0
       RETURN
       END
 
-C     MARK: cursor position from the TV display (zimvista.c).  There
+C     MARK: cursor position from the image display.  There
 C     is no display, so stop rather than hand back a made-up position.
 C     ELLIPROF only calls it with TV when X0/Y0 or R0/R1/NR are missing.
       SUBROUTINE MARK(IROW, ICOL, KEY)

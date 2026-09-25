@@ -1,5 +1,5 @@
-# SHA-256 of the original MONSTA/VISTA files copied unchanged from
-# monsta/libvista/fcode/ (mongo.par = libmongo/include/mongo.par).
+# SHA-256 of the original ELLIPROF source and include files, copied
+# unchanged from the original distribution.
 # These must never change. Do not regenerate this file automatically.
 a4f3a964dedef3b9229e1277a4731c80ed5ea33d56248268316ab634639cd972  src/original/assign.f
 590c8e4c0ce43483481bc43b0c90fbfcee89dd03bfc74f57d27cae3dfba6e1b5  src/original/dissect.f

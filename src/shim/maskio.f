@@ -1,11 +1,8 @@
-C     Mask input, reproducing how MONSTA's RD reads a mask image.
-C
-C     MONSTA masks are ordinary images multiplied into the science
-C     image (MI), so masked pixels become 0 and ELLIPROF skips them.
-C     Pipeline masks (e.g. *.dmask) use MONSTA's non-standard FITS
-C     BITPIX = 1 bitmap, which CFITSIO rejects, so it is decoded here
-C     exactly as RD does it (disk.f -> bitfp_ / FITSorder in
-C     libvista/ccode/fitsdisk.c):
+C     Mask input.  A mask is an image multiplied into the science
+C     image, so masked pixels become 0 and ELLIPROF skips them.
+C     Legacy masks (e.g. *.dmask) use a non-standard FITS BITPIX = 1
+C     bitmap, which CFITSIO rejects, so it is decoded here exactly as
+C     the original reader did (its routines bitfp_ and FITSorder):
 C       - data start at the first 2880-byte block after END,
 C         2*((NPIX+15)/16) bytes, bits packed continuously across rows
 C       - each byte pair is swapped (swab), then pixel i (0-based) is
@@ -83,8 +80,8 @@ C     since CFITSIO cannot open BITPIX = 1 files.
       RETURN
       END
 
-C     Integer value of a header card (MONSTA's headchunk uses atoi on
-C     column 11 onwards; a '/' ends list-directed input).
+C     Integer value of a header card (the original reader used atoi
+C     on column 11 onwards; a '/' ends list-directed input).
       SUBROUTINE CARDINT(CARD, IVAL)
       CHARACTER*(*) CARD
       INTEGER IVAL, IOS
@@ -97,7 +94,8 @@ C     column 11 onwards; a '/' ends list-directed input).
       RETURN
       END
 
-C     Read the mask pixels as REAL*4, the values RD would put in the
+C     Read the mask pixels as REAL*4, the values the original reader
+C     would put in the
 C     image buffer.  MCOL x MROW must come from MASKHEAD.
       SUBROUTINE MASKREAD(FNAME, MBITPIX, IOFF, MCOL, MROW, PIX, IERR)
       CHARACTER*(*) FNAME
@@ -122,8 +120,8 @@ C     image buffer.  MCOL x MROW must come from MASKHEAD.
       RETURN
       END
 
-C     BITPIX = 1 data -> 0.0/1.0, a transcription of bitfp_ and
-C     FITSorder(1, ...) from libvista/ccode/fitsdisk.c.
+C     BITPIX = 1 data -> 0.0/1.0, a transcription of the original
+C     bitfp_ and FITSorder(1, ...).
       SUBROUTINE READBITMAP(FNAME, IOFF, NPIX, PIX, IERR)
       CHARACTER*(*) FNAME
       INTEGER IOFF, NPIX, IERR

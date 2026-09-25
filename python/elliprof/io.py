@@ -1,109 +1,103 @@
-"""FITS helpers: headers, image geometry checks, sky and mask arithmetic.
+"""FITS headers, geometry checks, and the sky/mask arithmetic.
 
-The fit itself always runs in the native backend.  The array helpers
+The fit itself always runs in the compiled backend.  The array helpers
 here (:func:`subtract_sky`, :func:`apply_mask`) reproduce the backend's
-REAL*4 preprocessing for inspection and plotting; the backend's own
-result can be obtained exactly with ``run_elliprof(..., prepared=...)``.
+REAL*4 preparation for inspection and plotting; the exact image the
+backend fits can be saved with ``run_elliprof(..., prepared=...)``.
 """
 
 from __future__ import annotations
 
 import os
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 import numpy as np
 
-from .masks import mask_info
+from .masks import _raw_header
 
-# Keywords that define where an image's pixels sit.  CNPIX is MONSTA's
-# image origin; LTV/LTM define IRAF/DS9 physical coordinates.
-_GEOMETRY_DEFAULTS = {"CNPIX1": 0, "CNPIX2": 0, "LTV1": 0.0, "LTV2": 0.0,
-                      "LTM1_1": 1.0, "LTM2_2": 1.0, "LTM1_2": 0.0,
-                      "LTM2_1": 0.0}
+# Keywords that define where an image's pixels sit: the image origin
+# (CNPIX) and IRAF/DS9 physical-coordinate offsets (LTV/LTM).
+_ORIGIN_KEYS = ("CNPIX1", "CNPIX2", "LTV1", "LTV2", "LTM1_1", "LTM2_2",
+                "LTM1_2", "LTM2_1")
 
 
 class GeometryError(ValueError):
     """A mask or sky image does not line up with the science image."""
 
 
-def read_header(path: str):
-    """Primary header of a FITS image, which must hold a 2-D image."""
-    from astropy.io import fits
+def image_info(path: str) -> Tuple[Tuple[int, int], Dict[str, float]]:
+    """``((ncol, nrow), origin keywords)`` of a FITS image or mask,
+    read from its primary header (any BITPIX, including 1)."""
     if not os.path.exists(path):
-        raise FileNotFoundError(f"image not found: {path}")
+        raise FileNotFoundError(f"file not found: {path}")
     try:
-        header = fits.getheader(path, 0)
-    except OSError as exc:
-        raise ValueError(f"{path} is not a readable FITS file: {exc}") from exc
-    naxis = header.get("NAXIS", 0)
-    if naxis < 2 or (naxis > 2 and header.get("NAXIS3", 1) > 1):
-        raise ValueError(f"{path} has no 2-D image in its primary HDU "
-                         f"(NAXIS = {naxis})")
-    return header
-
-
-def image_shape(header) -> Tuple[int, int]:
-    """(ncol, nrow) of an image header."""
-    return int(header["NAXIS1"]), int(header["NAXIS2"])
-
-
-def _geometry_cards(path: str) -> Tuple[Tuple[int, int], Dict[str, float]]:
-    """Size and origin keywords of an image or mask file (any BITPIX)."""
-    info = mask_info(path)
-    from .masks import _raw_header
-    cards, _ = _raw_header(path)
-    present = {}
-    for key in _GEOMETRY_DEFAULTS:
+        cards, _ = _raw_header(path)
+    except ValueError as exc:
+        raise ValueError(f"{path} is not a readable FITS file: {exc}") \
+            from None
+    try:
+        naxis = int(float(cards.get("NAXIS", "0")))
+        ncol = int(float(cards["NAXIS1"]))
+        nrow = int(float(cards["NAXIS2"]))
+        n3 = int(float(cards.get("NAXIS3", "1")))
+    except (KeyError, ValueError):
+        naxis, ncol, nrow, n3 = 0, 0, 0, 1
+    if naxis < 2 or ncol <= 0 or nrow <= 0 or (naxis > 2 and n3 > 1):
+        raise ValueError(f"{path} has no 2-D image in its primary HDU")
+    origin = {}
+    for key in _ORIGIN_KEYS:
         if key in cards:
             try:
-                present[key] = float(cards[key])
+                origin[key] = float(cards[key])
             except ValueError:
                 pass
-    return (info["ncol"], info["nrow"]), present
+    return (ncol, nrow), origin
 
 
 def check_same_geometry(image: str, other: str, what: str) -> None:
-    """Require the same size and origin (CNPIX, and LTV/LTM where both
-    files define them).  MONSTA would silently use the overlap; this
-    package refuses instead."""
-    if not os.path.exists(other):
-        raise FileNotFoundError(f"{what} not found: {other}")
-    size_a, cards_a = _geometry_cards(image)
-    size_b, cards_b = _geometry_cards(other)
-    if size_a != size_b:
+    """Require exactly the science image's dimensions (and origin: CNPIX,
+    and LTV/LTM where both files define them).  Nothing is ever resized,
+    cropped, padded, shifted or resampled."""
+    (nx, ny), origin_a = image_info(image)
+    (mx, my), origin_b = image_info(other)
+    if (mx, my) != (nx, ny):
         raise GeometryError(
-            f"{what} {other} is {size_b[0]} x {size_b[1]} pixels but the "
-            f"image is {size_a[0]} x {size_a[1]}")
+            f"{what} dimensions ({mx} x {my}) do not match science image "
+            f"dimensions ({nx} x {ny})")
     for key in ("CNPIX1", "CNPIX2"):
-        a = cards_a.get(key, 0.0)
-        b = cards_b.get(key, 0.0)
+        a, b = origin_a.get(key, 0.0), origin_b.get(key, 0.0)
         if a != b:
+            raise GeometryError(f"{what} {key} = {b:g} does not match "
+                                f"science image {key} = {a:g}")
+    for key in _ORIGIN_KEYS[2:]:
+        if key in origin_a and key in origin_b and \
+                origin_a[key] != origin_b[key]:
             raise GeometryError(
-                f"{what} {other} has {key} = {b:g} but the image has {a:g}")
-    for key in ("LTV1", "LTV2", "LTM1_1", "LTM2_2", "LTM1_2", "LTM2_1"):
-        if key in cards_a and key in cards_b and cards_a[key] != cards_b[key]:
-            raise GeometryError(
-                f"{what} {other} has {key} = {cards_b[key]:g} but the image "
-                f"has {cards_a[key]:g}")
+                f"{what} {key} = {origin_b[key]:g} does not match science "
+                f"image {key} = {origin_a[key]:g}")
 
 
-def subtract_sky(data: np.ndarray, sky: Optional[float] = None,
-                 sky_image: Optional[np.ndarray] = None) -> np.ndarray:
-    """``data - sky`` in float32, as the backend (MONSTA SC / SI) does."""
+def subtract_sky(data: np.ndarray, sky=None, sky_image=None) -> np.ndarray:
+    """``data - sky`` in float32, as the backend does it."""
     out = np.asarray(data, dtype=np.float32)
     if sky is not None and sky_image is not None:
-        raise ValueError("give either sky or sky_image, not both")
+        raise ValueError("--sky and --sky-image cannot be used together")
     if sky is not None:
         return out + np.float32(-np.float32(sky))
     if sky_image is not None:
-        return out - np.asarray(sky_image, dtype=np.float32)
+        sky_image = np.asarray(sky_image, dtype=np.float32)
+        if sky_image.shape != out.shape:
+            raise GeometryError(f"sky image shape {sky_image.shape} != "
+                                f"image shape {out.shape}")
+        return out - sky_image
     return out.copy()
 
 
 def apply_mask(data: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    """``data * mask`` in float32 (MONSTA MI): masked pixels become 0."""
+    """``data * mask`` in float32: masked (0) pixels become 0."""
     data = np.asarray(data, dtype=np.float32)
     mask = np.asarray(mask, dtype=np.float32)
     if data.shape != mask.shape:
-        raise GeometryError(f"mask shape {mask.shape} != image {data.shape}")
+        raise GeometryError(f"mask shape {mask.shape} != image "
+                            f"shape {data.shape}")
     return data * mask

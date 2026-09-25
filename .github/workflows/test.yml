@@ -44,7 +44,7 @@ jobs:
       - name: Python dependencies
         run: python -m pip install numpy pandas astropy pytest
 
-      - name: Source checksums of the original MONSTA files
+      - name: Source checksums of the protected original files
         run: python -m pytest tests/unit/test_source_hashes.py
 
       - name: Build and run all tests

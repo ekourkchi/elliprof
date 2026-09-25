@@ -1,7 +1,7 @@
 """Reading ELLIPROF profiles (.prf and CSV).
 
 Column meanings, as ELLIPROF stores them in ``PARAM_PRF(J,K)`` at the
-end of the fit and as MONSTA's ``PRINT EPROF`` prints them (the comments
+end of the fit and as the original profile printout shows them (the comments
 in the legacy ``profile.inc`` describe an older layout and are wrong):
 
 ====  =====  =============================================================
@@ -11,7 +11,7 @@ J     name   meaning
 2     x0     isophote centre x, ELLIPROF convention + CNPIX1 [pixels]
 3     y0     isophote centre y, ELLIPROF convention + CNPIX2 [pixels]
 4     I0     mean surface brightness on the isophote [image units]
-5     alpha  position angle as MONSTA stores it [deg]; the major axis
+5     alpha  position angle as ELLIPROF stores it [deg]; the major axis
              lies at ``alpha + 90`` degrees counter-clockwise from +x
 6     ellip  ellipticity ``1 - b/a``
 7     I3     cos/sin 3x amplitude relative to I0 (6x if COS3X < 0)
@@ -42,7 +42,7 @@ NPROFILE = 250  # PARAMETER NPROFILE in profile.inc
 
 
 def read_prf(path: str) -> Dict[str, object]:
-    """Read a MONSTA ``SAVE ELLIPROF=file ASCII`` profile.
+    """Read a ``.prf`` profile (``-o``), the original profile file format.
 
     The file holds, list-directed: ``N_PRF, PRF_SC, PARAM_PRF(12,250)``
     (Fortran column order) and the FITS header text.  Returns ``n``,

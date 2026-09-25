@@ -46,11 +46,6 @@ CASES = {
     "star_mask": dict(truth=dict(BASE, star=(150.0, 60.0)),
                       run=dict(center=(100.3, 99.6), mask="MASK"),
                       image="star"),
-    "auto_center": dict(truth=dict(BASE, x0=100.0, y0=100.0),
-                        run=dict()),
-    "radec_center": dict(truth=dict(BASE, x0=100.0, y0=100.0),
-                         run=dict(center_radec=(188.73658, -12.58242)),
-                         wcs=True),
     "noisy": dict(truth=dict(BASE, sky=50.0, noise=2.0),
                   run=dict(center=(100.3, 99.6), sky=50.0)),
     "model": dict(truth=BASE, run=dict(center=(100.3, 99.6), model=True)),
@@ -58,7 +53,7 @@ CASES = {
 
 # The real example (not a truth test; structure + baseline only)
 U12517 = dict(image=EXAMPLE / "u12517j.fits",
-              run=dict(center=(567, 562), sky=3246.0,
+              run=dict(x0=567, y0=562, sky=3246.0,
                        mask=EXAMPLE / "u12517j.dmask", r0=9, r1=347, nr=23,
                        niter=10, rmstar=True))
 
@@ -72,6 +67,7 @@ def run_kwargs(name: str) -> dict:
     case = CASES[name]
     kw = dict(FIT)
     kw.update(case["run"])
+    kw["x0"], kw["y0"] = kw.pop("center")
     if kw.get("sky_image") == "SKY":
         kw["sky_image"] = DATA / f"{name}_sky.fits"
     if kw.get("mask") == "MASK":

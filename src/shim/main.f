@@ -1,17 +1,14 @@
 C     elliprof_native: the compiled backend of the elliprof package.
 C
-C     Runs MONSTA/VISTA's ELLIPROF, compiled unchanged from
-C     src/original, on one FITS image.  This program replaces only the
-C     parts of VISTA that normally surround ELLIPROF: reading the image
-C     (RD), preparing it (SC/SI/MI, see prep.f), splitting the command
-C     line into WORD() the way vista.f does, setting GO/XERR/NOGO and
-C     the image origin ISR/ISC, and writing the result the way
-C     PRINT EPROF and SAVE ELLIPROF=file ASCII do.
+C     Runs ELLIPROF, compiled unchanged from src/original, on one FITS
+C     image.  This program supplies what the original interactive
+C     environment provided around ELLIPROF: reading the image,
+C     subtracting the sky and applying the mask (prep.f), splitting the
+C     command line into WORD() with the original parser, setting the
+C     control flags and image origin, and writing the profile.
 C
-C     The centre must be given as X0= Y0= in ELLIPROF's own
-C     coordinates.  Automatic, physical and RA/DEC centres are
-C     handled by the Python `elliprof` command, which converts them to
-C     X0/Y0 before calling this program.
+C     The initial centre must be given as X0= Y0= (ELLIPROF image
+C     coordinates); ELLIPROF refines it during the fit.
 
       PROGRAM ELLIPROFMAIN
       USE, INTRINSIC :: ISO_FORTRAN_ENV, ONLY: COMPILER_VERSION
@@ -22,15 +19,15 @@ C     X0/Y0 before calling this program.
 
       REAL, ALLOCATABLE :: PIX(:,:)
       CHARACTER*1024 ARG, FITSFILE, PRFFILE, MODFILE, CSVFILE, REGFILE
-      CHARACTER*1024 MASKFILE, SKYIMG, SKYSTR, CTRSRC, SKYDESC, MSKDESC
+      CHARACTER*1024 MASKFILE, SKYIMG, SKYSTR, SKYDESC, MSKDESC
       CHARACTER*1024 PREPFILE
       CHARACTER*289 OSTRNG, LCSTRNG
       LOGICAL ERR, DOMODEL, DOGC, HASX0, HASY0, HASR0, HASR1, HASNR
-      LOGICAL PREPONLY
+      LOGICAL PREPONLY, HASNIT
       INTEGER UPPER, NARGS, IARG, IWORD, JCHAR, IB, ICON, NSKYOPT
       INTEGER NTYPE, NUM, NCHAR, NCOL, NROW, IUNIT, IERR, L, I, J
       INTEGER ICOS3X, MBITPIX, NZERO, NOTHER
-      REAL FNUM, SKYVAL, CFV
+      REAL FNUM, SKYVAL, CFV, VX0, VY0, VR0, VR1, VNR, VNIT
 
 C     ---- Command line: image file, options, ELLIPROF words
 
@@ -43,7 +40,6 @@ C     ---- Command line: image file, options, ELLIPROF words
       MASKFILE = ' '
       SKYSTR = ' '
       SKYIMG = ' '
-      CTRSRC = 'explicit X0/Y0'
       PREPFILE = ' '
       PREPONLY = .FALSE.
       NSKYOPT = 0
@@ -68,10 +64,9 @@ C     CFITSIO reports its version as major + minor/100
      $        ARG .EQ. '--csv' .OR. ARG .EQ. '--reg' .OR.
      $        ARG .EQ. '--mask' .OR. ARG .EQ. '--sky' .OR.
      $        ARG .EQ. '--sc' .OR. ARG .EQ. '--sky-image' .OR.
-     $        ARG .EQ. '--center-source' .OR.
      $        ARG .EQ. '--prepared') THEN
          IF (IARG .EQ. NARGS) THEN
-            WRITE (0,*) 'elliprof: ', ARG(1:LEN_TRIM(ARG)),
+            WRITE (0,'(3A)') 'elliprof: error: ', ARG(1:LEN_TRIM(ARG)),
      $           ' needs a value'
             CALL EXIT(1)
          END IF
@@ -89,26 +84,25 @@ C     CFITSIO reports its version as major + minor/100
          ELSE IF (ARG .EQ. '--sky-image') THEN
             CALL GET_COMMAND_ARGUMENT(IARG, SKYIMG)
             NSKYOPT = NSKYOPT + 1
-         ELSE IF (ARG .EQ. '--center-source') THEN
-            CALL GET_COMMAND_ARGUMENT(IARG, CTRSRC)
          ELSE IF (ARG .EQ. '--prepared') THEN
             CALL GET_COMMAND_ARGUMENT(IARG, PREPFILE)
          ELSE
             IF (ARG .EQ. '--sc') WRITE (0,'(A)')
-     $           ' elliprof: --sc is deprecated, use --sky'
+     $           'elliprof: --sc is deprecated, use --sky'
             CALL GET_COMMAND_ARGUMENT(IARG, SKYSTR)
             NSKYOPT = NSKYOPT + 1
          END IF
       ELSE IF (ARG(1:1) .EQ. '-') THEN
-         WRITE (0,*) 'elliprof: unknown option ', ARG(1:LEN_TRIM(ARG))
+         WRITE (0,'(2A)') 'elliprof: error: unknown option ',
+     $        ARG(1:LEN_TRIM(ARG))
          CALL EXIT(1)
       ELSE IF (FITSFILE .EQ. ' ') THEN
          FITSFILE = ARG
       ELSE
          L = LEN_TRIM(COMMAND)
          IF (L + 1 + LEN_TRIM(ARG) .GT. LEN(COMMAND)) THEN
-            WRITE (0,*) 'elliprof: command line longer than',
-     $           LEN(COMMAND), ' characters'
+            WRITE (0,'(A,I0,A)') 'elliprof: error: command line '
+     $           //'longer than ', LEN(COMMAND), ' characters'
             CALL EXIT(1)
          END IF
          COMMAND = COMMAND(1:L) // ' ' // ARG
@@ -120,14 +114,14 @@ C     CFITSIO reports its version as major + minor/100
          CALL EXIT(1)
       END IF
       IF (NSKYOPT .GT. 1) THEN
-         WRITE (0,'(A)') ' elliprof: give only one of --sky (or --sc)'
-     $        //' and --sky-image'
+         WRITE (0,'(A)') 'elliprof: error: --sky and --sky-image '
+     $        //'cannot be used together'
          CALL EXIT(1)
       END IF
 
-C     ---- Tokenise exactly as vista.f does: UPPER, then DISSECT each
-C     word.  Integers and floats go to IBUF/CONST (in MONSTA the
-C     first integer is the image buffer number), strings to WORD.
+C     ---- Tokenise with the original parser: UPPER, then DISSECT each
+C     word.  Integers and floats go to IBUF/CONST (the original
+C     command took the image buffer number there), strings to WORD.
 
       ORIGCOMMAND = COMMAND
       L = UPPER(COMMAND)
@@ -185,6 +179,7 @@ C     first integer is the image buffer number), strings to WORD.
       HASR0 = .FALSE.
       HASR1 = .FALSE.
       HASNR = .FALSE.
+      HASNIT = .FALSE.
       DO 45 I = 1, NCON
          IF (WORD(I) .EQ. 'MODEL') DOMODEL = .TRUE.
          IF (WORD(I) .EQ. 'GC') DOGC = .TRUE.
@@ -193,51 +188,76 @@ C     first integer is the image buffer number), strings to WORD.
          IF (WORD(I)(1:3) .EQ. 'R0=') HASR0 = .TRUE.
          IF (WORD(I)(1:3) .EQ. 'R1=') HASR1 = .TRUE.
          IF (WORD(I)(1:3) .EQ. 'NR=') HASNR = .TRUE.
+         IF (WORD(I)(1:6) .EQ. 'NITER=') HASNIT = .TRUE.
  45   CONTINUE
 
-C     ---- Checks that ELLIPROF itself would only report after the
-C     image had been read, or not clearly
+C     ---- Fail fast: everything ELLIPROF would otherwise report late,
+C     unclearly, or not at all.  Nothing may ever wait for input.
 
-      IF (PREPONLY) THEN
-         IF (PREPFILE .EQ. ' ') THEN
-            WRITE (0,'(A)') ' elliprof: --prepare-only needs --prepared'
-            CALL EXIT(1)
-         END IF
-      ELSE IF (.NOT. HASX0 .AND. .NOT. HASY0) THEN
-         WRITE (0,'(A)') ' X0 and Y0 are required by elliprof_native.'
-         WRITE (0,'(A)') ' Use the Python `elliprof` command for'
-     $        //' automatic image-center, physical-coordinate, or'
-     $        //' RA/DEC handling.'
-         CALL EXIT(1)
-      ELSE IF (.NOT. HASX0 .OR. .NOT. HASY0) THEN
-         WRITE (0,'(A)') ' elliprof: X0= and Y0= must be given'
-     $        //' together'
-         CALL EXIT(1)
-      END IF
       DO 46 I = 1, NCON
-         IF (WORD(I) .EQ. 'OLD' .OR. WORD(I) .EQ. 'EDIT') THEN
+         IF (WORD(I) .EQ. 'OLD' .OR. WORD(I) .EQ. 'EDIT' .OR.
+     $        WORD(I) .EQ. 'TV') THEN
             L = LEN_TRIM(WORD(I))
-            WRITE (0,'(3A)') ' elliprof: ', WORD(I)(1:L),
-     $           ' needs a previous profile in memory, which this'
-     $           //' program cannot load yet (not supported)'
+            WRITE (0,'(3A)') 'elliprof: error: ', WORD(I)(1:L),
+     $           ' is not supported (interactive or stateful option)'
             CALL EXIT(1)
          END IF
  46   CONTINUE
       IF (PREPONLY) THEN
-         CONTINUE
-      ELSE IF (DOGC .AND. .NOT. HASNR) THEN
-         WRITE (0,'(A)') ' elliprof: GC needs NR='
-         CALL EXIT(1)
-      ELSE IF (.NOT. DOGC .AND.
-     $        (.NOT. HASR0 .OR. .NOT. HASR1 .OR. .NOT. HASNR)) THEN
-         WRITE (0,'(A)') ' elliprof: R0=, R1= and NR= are required'
-         CALL EXIT(1)
+         IF (PREPFILE .EQ. ' ') THEN
+            WRITE (0,'(A)') 'elliprof: error: --prepare-only needs '
+     $           //'--prepared'
+            CALL EXIT(1)
+         END IF
+      ELSE
+         IF (.NOT. HASX0 .OR. .NOT. HASY0) THEN
+            WRITE (0,'(A)') 'elliprof: error: X0 and Y0 are required'
+            CALL EXIT(1)
+         END IF
+         CALL KEYNUM('X0', VX0, IERR)
+         IF (IERR .EQ. 0) CALL KEYNUM('Y0', VY0, IERR)
+         IF (IERR .NE. 0) CALL EXIT(1)
+         IF (.NOT. HASNR .OR. (.NOT. DOGC .AND.
+     $        (.NOT. HASR0 .OR. .NOT. HASR1))) THEN
+            WRITE (0,'(A)') 'elliprof: error: R0, R1 and NR are '
+     $           //'required'
+            CALL EXIT(1)
+         END IF
+C     NR: ELLIPROF needs at least 2 isophotes (it divides by NR-1) and
+C     its fitting arrays hold at most 100
+         CALL KEYNUM('NR', VNR, IERR)
+         IF (IERR .NE. 0) CALL EXIT(1)
+         IF (VNR .NE. AINT(VNR) .OR. VNR .LT. 2 .OR. VNR .GT. 100) THEN
+            WRITE (0,'(A)') 'elliprof: error: NR must be an integer '
+     $           //'between 2 and 100'
+            CALL EXIT(1)
+         END IF
+         IF (.NOT. DOGC) THEN
+            CALL KEYNUM('R0', VR0, IERR)
+            IF (IERR .EQ. 0) CALL KEYNUM('R1', VR1, IERR)
+            IF (IERR .NE. 0) CALL EXIT(1)
+            IF (VR0 .LE. 0 .OR. VR1 .LE. VR0) THEN
+               WRITE (0,'(A)') 'elliprof: error: radii must satisfy '
+     $              //'0 < R0 < R1'
+               CALL EXIT(1)
+            END IF
+         END IF
+         IF (HASNIT) THEN
+            CALL KEYNUM('NITER', VNIT, IERR)
+            IF (IERR .NE. 0) CALL EXIT(1)
+            IF (VNIT .NE. AINT(VNIT) .OR. VNIT .LT. 1 .OR.
+     $           VNIT .GT. 1000) THEN
+               WRITE (0,'(A)') 'elliprof: error: NITER must be an '
+     $              //'integer between 1 and 1000'
+               CALL EXIT(1)
+            END IF
+         END IF
       END IF
       IF (SKYSTR .NE. ' ') THEN
          CALL PARSENUM(SKYSTR, SKYVAL, IERR)
          IF (IERR .NE. 0) THEN
-            WRITE (0,*) 'elliprof: --sky needs one number, got ',
-     $           SKYSTR(1:LEN_TRIM(SKYSTR))
+            WRITE (0,'(2A)') 'elliprof: error: --sky needs one '
+     $           //'finite number, got ', SKYSTR(1:LEN_TRIM(SKYSTR))
             CALL EXIT(1)
          END IF
       END IF
@@ -248,7 +268,8 @@ C     image had been read, or not clearly
       IF (IERR .EQ. 0) CALL CHKOUT(PREPFILE, IERR)
       IF (IERR .NE. 0) CALL EXIT(1)
 
-C     ---- VISTA control flags
+C     ---- Control flags of the original environment (the COMMON
+C     variable names come from the unchanged include files)
 
       GO = .TRUE.
       CHECK = .TRUE.
@@ -282,8 +303,17 @@ C     ---- Read the image into buffer 1 (what RD 1 file does)
      $     ISC, ISR
  1000 FORMAT (1X,A,': ',I6,' cols x',I6,' rows, origin (col,row) = (',
      $     I6,',',I6,')')
-      IF (.NOT. PREPONLY) WRITE (6,'(2A)') ' Center source: ',
-     $     CTRSRC(1:LEN_TRIM(CTRSRC))
+
+C     ---- Check every other image before the science image changes
+
+      IF (SKYIMG .NE. ' ') THEN
+         CALL CHKSKYIMG(SKYIMG, NCOL, NROW, ISC, ISR, IERR)
+         IF (IERR .NE. 0) CALL EXIT(1)
+      END IF
+      IF (MASKFILE .NE. ' ') THEN
+         CALL CHKMASK(MASKFILE, NCOL, NROW, ISC, ISR, IERR)
+         IF (IERR .NE. 0) CALL EXIT(1)
+      END IF
 
 C     ---- Sky, then mask (prep.f): the order matters
 
@@ -383,8 +413,9 @@ C     ---- Optional CSV table and DS9 regions from the final /PRF/
       IF (CSVFILE .NE. ' ' .OR. REGFILE .NE. ' ') THEN
          IF (N_PRF .GT. 0) THEN
             IF (CSVFILE .NE. ' ') THEN
+               L = LEN_TRIM(ORIGCOMMAND)
                CALL WRITECSV(CSVFILE, FITSFILE, MSKDESC, SKYDESC,
-     $              CTRSRC, ISC, ISR, IERR)
+     $              ORIGCOMMAND(10:MAX(10,L)), ISC, ISR, IERR)
                IF (IERR .NE. 0) CALL EXIT(1)
             END IF
             IF (REGFILE .NE. ' ') THEN
@@ -402,7 +433,7 @@ C     ---- Write the model image, which ELLIPROF left in PIX
       IF (MODFILE .NE. ' ') THEN
          IF (DOMODEL) THEN
             CALL FITSWRITEIM(MODFILE, NCOL, NROW, PIX, ISC, ISR,
-     $           'Model image from standalone ELLIPROF', IERR)
+     $           'Model image from elliprof', IERR)
             IF (IERR .NE. 0) CALL EXIT(1)
          ELSE
             WRITE (0,*) 'elliprof: -m ignored, MODEL was not given'
@@ -412,6 +443,26 @@ C     ---- Write the model image, which ELLIPROF left in PIX
      $        ' model image not saved'
       END IF
 
+      END
+
+C     The numeric value of keyword KEY= (a plain, finite number).
+      SUBROUTINE KEYNUM(KEY, VAL, IERR)
+      INCLUDE 'vistalink.inc'
+      CHARACTER*(*) KEY
+      REAL VAL
+      INTEGER IERR, I, L
+      L = LEN(KEY)
+      DO 10 I = 1, NCON
+         IF (WORD(I)(1:L+1) .EQ. KEY//'=') THEN
+            CALL PARSENUM(WORD(I)(L+2:), VAL, IERR)
+            IF (IERR .NE. 0) WRITE (0,'(5A)') 'elliprof: error: ', KEY,
+     $           ' must be a finite number, got "',
+     $           WORD(I)(L+2:LEN_TRIM(WORD(I))), '"'
+            RETURN
+         END IF
+ 10   CONTINUE
+      IERR = 1
+      RETURN
       END
 
 C     Fail early if an output file cannot be written.  A file created
@@ -426,7 +477,7 @@ C     only for the test is removed again; an existing one is kept.
       OPEN (9, FILE=FNAME, FORM='FORMATTED', STATUS='UNKNOWN',
      $     IOSTAT=IERR)
       IF (IERR .NE. 0) THEN
-         WRITE (0,*) 'elliprof: cannot write output file ',
+         WRITE (0,'(2A)') 'elliprof: error: cannot write output file ',
      $        FNAME(1:LEN_TRIM(FNAME))
          RETURN
       END IF
@@ -446,29 +497,25 @@ C     only for the test is removed again; an existing one is kept.
      $ '         [--mask file] [-o out.prf] [--csv out.csv]',
      $ '         [--reg out.reg] [-m model.fits]',
      $ ' ',
-     $ '  The compiled backend of the elliprof package.  Most users',
-     $ '  should run the Python `elliprof` command instead, which also',
-     $ '  finds the centre automatically or from physical or RA/DEC',
-     $ '  coordinates.',
+     $ '  The compiled backend of the elliprof package; most users',
+     $ '  should run the Python `elliprof` command instead.',
      $ ' ',
-     $ '  Keywords are the MONSTA ELLIPROF keywords, e.g.',
-     $ '    X0= Y0= R0= R1= NR= RLAW= LINEAR FIXCTR= ELLIP= NITER=',
+     $ '  ELLIPROF keywords:',
+     $ '    X0= Y0= R0= R1= NR= NITER= RLAW= LINEAR FIXCTR= ELLIP=',
      $ '    SCALE= SKY= MODEL RMSTAR COS3X= COS4X= TIE= AVG= GAIN=',
      $ '    GC VERBOSE TEST DUMP=',
-     $ '  --sky value       subtract a constant sky first (MONSTA SC);',
-     $ '                    not the same as the SKY= keyword',
-     $ '  --sc value        deprecated alias for --sky',
-     $ '  --sky-image file  subtract a sky image first (MONSTA SI)',
-     $ '  --mask file       then multiply by a mask (MONSTA MI);',
+     $ '  --sky value       subtract a constant sky first',
+     $ '                    (not the same as the SKY= keyword)',
+     $ '  --sky-image file  subtract a sky image first',
+     $ '  --mask file       then multiply by a mask:',
      $ '                    0 = masked, 1 = good; BITPIX=1 supported',
-     $ '  -o out.prf        profile as SAVE ELLIPROF=file ASCII',
+     $ '  -o out.prf        profile, full precision',
      $ '  --csv out.csv     profile as commented fixed-width CSV',
      $ '  --reg out.reg     fitted ellipses as DS9 regions',
      $ '  -m model.fits     the MODEL (or GC model) image',
      $ '  --prepared file   write the image as passed to ELLIPROF',
      $ '                    (after sky and mask), for diagnostics',
-     $ '  --prepare-only    stop after writing --prepared (no fit;',
-     $ '                    X0/Y0/R0/R1/NR not needed)',
+     $ '  --prepare-only    stop after writing --prepared (no fit)',
      $ '  --version         print the backend version'
       RETURN
       END

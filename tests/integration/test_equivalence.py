@@ -12,10 +12,10 @@ import sys
 import numpy as np
 import pytest
 
-from helpers import EXAMPLE, ROOT, write_fits
+from helpers import ROOT, write_fits
 from elliprof import cli, run_elliprof
 from elliprof.masks import write_bitmap_mask
-from elliprof.profile import parse_elliprof_csv, read_profile
+from elliprof.profile import parse_elliprof_csv
 
 pytestmark = pytest.mark.native
 
@@ -75,25 +75,12 @@ def test_explicit_center_scalar_sky(tmp_path, native, galaxy_fits):
     out, res = three_ways(
         tmp_path, native, galaxy_fits,
         ["X0=127.3", "Y0=121.6", *FIT, "--sky", "100"],
-        dict(center=(127.3, 121.6), r0=3, r1=90, nr=30, sky="100"),
+        dict(x0=127.3, y0=121.6, r0=3, r1=90, nr=30, sky="100"),
         ["X0=127.3", "Y0=121.6", *FIT, "--sky", "100"])
     assert_same(out)
     assert res.center == (127.3, 121.6)
-    assert "Center source: explicit image coordinates" in \
-        out["cli"][3]
 
 
-def test_automatic_center(tmp_path, native, galaxy_fits):
-    # 256 x 256 image -> X0 = Y0 = 128
-    out, res = three_ways(
-        tmp_path, native, galaxy_fits,
-        ["X0=128.0", "Y0=128.0", *FIT, "--sky", "100"],
-        dict(r0=3, r1=90, nr=30, sky=100),
-        [*FIT, "--sky", "100"])
-    assert_same(out)
-    assert res.center == (128.0, 128.0)
-    assert res.center_source == "image center"
-    assert "Center: X0=128.0000 Y0=128.0000" in out["cli"][3]
 
 
 def test_mask_and_sky_image(tmp_path, native, galaxy_fits):
@@ -109,7 +96,7 @@ def test_mask_and_sky_image(tmp_path, native, galaxy_fits):
         tmp_path, native, galaxy_fits,
         ["X0=127.3", "Y0=121.6", *FIT, "--sky-image", sky, "--mask",
          tmp_path / "m.dmask"],
-        dict(center=(127.3, 121.6), r0=3, r1=90, nr=30, sky_image=sky,
+        dict(x0=127.3, y0=121.6, r0=3, r1=90, nr=30, sky_image=sky,
              mask=tmp_path / "m.dmask"),
         ["X0=127.3", "Y0=121.6", *FIT, "--sky-image", sky, "--mask",
          tmp_path / "m.dmask"])
@@ -120,13 +107,13 @@ def test_in_process_cli_equals_api(tmp_path, galaxy_fits, capsys):
     code = cli.main([str(galaxy_fits), "X0=127.3", "Y0=121.6", *FIT,
                      "--sky", "100", "-o", str(tmp_path / "c.prf")])
     assert code == 0
-    res = run_elliprof(galaxy_fits, center=(127.3, 121.6), r0=3, r1=90,
+    res = run_elliprof(galaxy_fits, x0=127.3, y0=121.6, r0=3, r1=90,
                        nr=30, sky="100", output_dir=tmp_path / "a")
     assert (tmp_path / "c.prf").read_bytes() == res.prf_path.read_bytes()
 
 
 def test_result_object(tmp_path, galaxy_fits):
-    res = run_elliprof(galaxy_fits, center=(127.3, 121.6), r0=3, r1=90,
+    res = run_elliprof(galaxy_fits, x0=127.3, y0=121.6, r0=3, r1=90,
                        nr=30, sky=100, model=True, output_dir=tmp_path)
     assert res.ok and res.returncode == 0
     assert list(res.profile.columns) == ["Rmaj", "x0", "y0", "I0", "alpha",
@@ -139,7 +126,8 @@ def test_result_object(tmp_path, galaxy_fits):
     assert res.command[0] == str(res.backend_path)
     df, meta = parse_elliprof_csv(res.csv_path)
     np.testing.assert_allclose(df["x0"], res.profile["x0"], atol=5.1e-5)
-    assert meta["Center source"] == "explicit image coordinates"
+    assert meta["Parameters"].startswith("X0=127.3 Y0=121.6 R0=3 R1=90")
+    assert meta["elliprof version"] == res.version
 
 
 def test_failure_raises_with_output(tmp_path, galaxy_fits):
@@ -147,11 +135,11 @@ def test_failure_raises_with_output(tmp_path, galaxy_fits):
     from elliprof import ElliprofError
     bad = tmp_path / "no" / "dir" / "x.csv"
     with pytest.raises(ElliprofError, match="cannot write output") as info:
-        run_elliprof(galaxy_fits, r0=3, r1=10, nr=4, csv_path=bad,
-                     output_dir=tmp_path)
+        run_elliprof(galaxy_fits, 128, 128, r0=3, r1=10, nr=4,
+                     csv_path=bad, output_dir=tmp_path)
     assert info.value.result.returncode == 1
-    res = run_elliprof(galaxy_fits, r0=3, r1=10, nr=4, csv_path=bad,
-                       output_dir=tmp_path, check=False)
+    res = run_elliprof(galaxy_fits, 128, 128, r0=3, r1=10, nr=4,
+                       csv_path=bad, output_dir=tmp_path, check=False)
     assert not res.ok and res.profile is None
 
 
@@ -161,7 +149,7 @@ def test_prepared_image_matches_python_helpers(tmp_path, galaxy_fits):
     m = np.ones((256, 256))
     m[10:20, 30:50] = 0
     write_bitmap_mask(tmp_path / "m.dmask", m)
-    res = run_elliprof(galaxy_fits, center=(127.3, 121.6), r0=3, r1=90,
+    res = run_elliprof(galaxy_fits, x0=127.3, y0=121.6, r0=3, r1=90,
                        nr=30, sky=100.5, mask=tmp_path / "m.dmask",
                        prepared=tmp_path / "prep.fits",
                        output_dir=tmp_path)
@@ -170,28 +158,3 @@ def test_prepared_image_matches_python_helpers(tmp_path, galaxy_fits):
     np.testing.assert_array_equal(fits.getdata(res.prepared_path), expect)
 
 
-@pytest.mark.slow
-@pytest.mark.skipif(not (EXAMPLE / "u12517j.fits").is_file(),
-                    reason="example data missing")
-def test_u12517_radec_center(tmp_path, native):
-    """RA/DEC centre -> X0/Y0 in Python, then the same fit as passing
-    those X0/Y0 to the backend directly."""
-    from astropy.io import fits
-    h = fits.getheader(EXAMPLE / "u12517j.fits")
-    res = run_elliprof(EXAMPLE / "u12517j.fits",
-                       center_radec=(h["CRVAL1"], h["CRVAL2"]),
-                       sky=3246.0, mask=EXAMPLE / "u12517j.dmask", r0=9,
-                       r1=100, nr=12, niter=10, rmstar=True,
-                       output_dir=tmp_path / "api")
-    assert res.center == pytest.approx((556.5, 556.5), abs=1e-6)
-    assert res.center_source == "RA/DEC"
-    x0, y0 = (repr(v) for v in res.center)
-    d = tmp_path / "native"
-    d.mkdir()
-    subprocess.run([str(native), EXAMPLE / "u12517j.fits", f"X0={x0}",
-                    f"Y0={y0}", "R0=9", "R1=100", "NR=12", "NITER=10",
-                    "RMSTAR", "--sky", "3246.0", "--mask",
-                    EXAMPLE / "u12517j.dmask", "-o", d / "r.prf"],
-                   check=True, capture_output=True)
-    assert (d / "r.prf").read_bytes() == res.prf_path.read_bytes()
-    assert len(read_profile(str(res.prf_path))) == 12

@@ -61,7 +61,10 @@ def test_csv_matches_prf(outputs):
     assert meta["Input"].endswith("synthetic_galaxy.fits")
     assert meta["Sky"].startswith("scalar 100")
     assert meta["Mask"] == "none"
-    assert meta["Center source"] == "explicit X0/Y0"
+    assert meta["Parameters"] == "X0=127.3 Y0=121.6 R0=3 R1=90 NR=30"
+    assert "Center source" not in meta
+    from elliprof import __version__
+    assert meta["elliprof version"] == __version__
 
 
 def test_csv_is_aligned_and_commented(outputs):

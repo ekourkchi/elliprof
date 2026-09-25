@@ -2,13 +2,14 @@
 # Input: <ROOT>/tests/data/regression/offcenter.fits
 # Mask: none
 # Sky: none
-# Center source: explicit image coordinates
+# Parameters: X0=70.4 Y0=120.9 R0=3 R1=60 NR=25 NITER=5
+# elliprof version: 0.1.0
 # Contours: 25   SCALE: 1.00000000   Image origin (CNPIX1,CNPIX2): 0,0
 # Columns:
 # Rmaj, x0, y0, I0, alpha, ellip, I3, A3, I4, A4, slope
 # Units: Rmaj,x0,y0=pixels; alpha,A3,A4=degrees; I0=image units; I3,I4=amplitude relative to I0; slope=dlogI/dlogr
-# x0,y0: MONSTA convention, centre of pixel ix at ix-0.5, plus image origin (DS9 image x = x0 - CNPIX1 + 0.5)
-# alpha: MONSTA PA; major axis at alpha+90 deg CCW from +x
+# x0,y0: ELLIPROF image coordinates, centre of pixel ix at ix-0.5, plus image origin (DS9 image x = x0 - CNPIX1 + 0.5)
+# alpha: position angle; major axis at alpha+90 deg CCW from +x
 #
 #     Rmaj,         x0,         y0,              I0,      alpha,      ellip,              I3,         A3,              I4,         A4,      slope
     3.0000,    70.4120,   120.9035,   3.8292004E+03,   119.9130,   0.285252,   9.7500086E-03,    95.5521,   1.3882279E-02,    76.8838,  -1.083090

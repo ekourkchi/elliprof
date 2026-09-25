@@ -1,5 +1,4 @@
  <ROOT>/tests/data/regression/rotated.fits:    200 cols x   200 rows, origin (col,row) = (     0,     0)
- Center source: explicit image coordinates
    r      x0      y0      I0    alpha  ellip I(3x)  A(3x)  I(4x)  A(4x) slope
    3.0  100.29   99.59   3832. 145.41 0.391 0.0128  81.68 0.0118  55.10 -1.07
    3.7  100.32   99.60   2893. 145.21 0.380 0.0006  87.41 0.0050  52.77 -1.40

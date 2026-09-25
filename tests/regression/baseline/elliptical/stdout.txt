@@ -1,5 +1,4 @@
  <ROOT>/tests/data/regression/elliptical.fits:    200 cols x   200 rows, origin (col,row) = (     0,     0)
- Center source: explicit image coordinates
    r      x0      y0      I0    alpha  ellip I(3x)  A(3x)  I(4x)  A(4x) slope
    3.0  100.30   99.58   3808.  90.09 0.378 0.0192 105.70 0.0137  53.46 -1.03
    3.7  100.29   99.60   2910.  89.96 0.390 0.0059  40.95 0.0062   0.34 -1.36

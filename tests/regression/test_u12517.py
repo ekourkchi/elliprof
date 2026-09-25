@@ -11,7 +11,7 @@ import pytest
 
 from cases import BASELINE, U12517
 from elliprof import load_mask
-from elliprof.io import read_header
+from elliprof.io import image_info
 from elliprof.masks import mask_info
 from elliprof.profile import parse_elliprof_csv, read_profile
 from elliprof.regions import read_ds9_regions
@@ -33,8 +33,7 @@ def run(tmp_path_factory):
 
 
 def test_inputs():
-    h = read_header(str(IMAGE))
-    assert (h["NAXIS1"], h["NAXIS2"]) == (1025, 1022)
+    assert image_info(str(IMAGE))[0] == (1025, 1022)
     info = mask_info(str(MASK))
     assert (info["bitpix"], info["ncol"], info["nrow"]) == (1, 1025, 1022)
     m = load_mask(str(MASK))
@@ -46,7 +45,6 @@ def test_fit_completes(run):
     res, out = run
     assert res.returncode == 0
     assert res.center == (567.0, 562.0)
-    assert res.center_source == "explicit image coordinates"
     assert "Sky: subtracted scalar" in res.stdout
     assert "103402 pixels masked" in res.stdout
     for name in ("profile.prf", "profile.csv", "profile.reg"):
