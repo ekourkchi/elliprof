@@ -1,0 +1,79 @@
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC                  Mongo Interactive Graphics Software                    CC
+CC                 Copyright (c) 1987, 1994 - John Tonry.                  CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+      IMPLICIT REAL*8 (A-H,O-Z)
+      PARAMETER (MAXUSER=100)
+      REAL*8 X1, X2, Y1, Y2, GX1, GX2, GY1, GY2
+      INTEGER LX1,LX2,LY1,LY2
+      REAL*8 XP, YP, CXP, CYP
+      REAL*8 EXPAND, ANGLE, PTYPE, EXPX, EXPY
+      INTEGER LTYPE, LWEIGHT, ICOLOR, FILLMODE, INMODE
+      REAL*8 CHEIGHT, CWIDTH
+      REAL*8 CXDEF, CYDEF, PXDEF, PYDEF, COFF
+      LOGICAL TERMOUT, TERMOPEN, XYSWAPPED
+      LOGICAL AUTODOT, AUTOWEIGHT, AUTOCHAR
+      INTEGER NUMDEV
+      INTEGER XHSIZE, XVSIZE
+      REAL*8 PI
+      REAL*8 USERVAR(MAXUSER)
+      REAL*8 perfudge, parfudge, xfudge, yfudge
+C Original order, before REAL*8
+C      COMMON /MONGOPAR/
+C     1 X1,X2,Y1,Y2, GX1,GX2,GY1,GY2, LX1,LX2,LY1,LY2,
+C     1 XP,YP, CXP,CYP,
+C     1 EXPAND,ANGLE, LTYPE,LWEIGHT,PTYPE,
+C     1 CHEIGHT,CWIDTH,CXDEF,CYDEF,PXDEF,PYDEF,COFF,
+C     1 TERMOUT,TERMOPEN,XYSWAPPED,NUMDEV,ICOLOR,FILLMODE,
+C     1 PI, USERVAR, AUTODOT, AUTOWEIGHT, AUTOCHAR, EXPX, EXPY,
+C     1 INMODE, PERFUDGE, PARFUDGE, XFUDGE, YFUDGE, XHSIZE, XVSIZE
+C New order, accomodating REAL*8
+      COMMON /MONGOPAR/
+     1 X1,X2,Y1,Y2, GX1,GX2,GY1,GY2, XP,YP, CXP,CYP,
+     1 EXPAND,ANGLE, PTYPE, CHEIGHT,CWIDTH,CXDEF,CYDEF,PXDEF,PYDEF,COFF,
+     1 EXPX, EXPY, PERFUDGE, PARFUDGE, XFUDGE, YFUDGE, XHSIZE, XVSIZE,
+     1 PI, USERVAR, AUTODOT, AUTOWEIGHT, AUTOCHAR, 
+     1 LX1,LX2,LY1,LY2, LTYPE,LWEIGHT,
+     1 TERMOUT,TERMOPEN,XYSWAPPED,NUMDEV,ICOLOR,FILLMODE, INMODE
+      SAVE /MONGOPAR/
+
+      PARAMETER (MAXPALETTE=32)
+      INTEGER*2 PALETTE(3,0:MAXPALETTE-1)
+      COMMON /MGOPAL/ PALETTE
+
+C X1,X2,Y1,Y2     = User coordinates of plot region
+C GX1,GX2,GY1,GY2 = Physical coordinates of user plot region, GX1<GX2,GY1<GY2
+C LX1,LX2,LY1,LY2 = Limit physical coordinates of device
+C XP, YP          = Present plot position (physical coordinates)
+C CXP, CYP        = Present cursor position (user coordinates)
+C EXPAND          = Expansion factor of characters and points
+C EXPX, EXPY      = X and Y differential expansion factors
+C ANGLE           = Rotation of characters (etc) (counterclockwise)
+C LWEIGHT         = weight: 0,1 for single, 2 for double, etc
+C LTYPE           = Type of output lines
+C                  0 = solid            3 = long dash
+C                  1 = dot             4 = dot - short dash
+C                  2 = short dash            5 = dot - long dash
+C                  6 = short dash - long dash
+C PTYPE           = Style of output points: 10*nside + style
+C CHEIGHT         = Expand 1.0 height of characters (physical units)
+C CWIDTH          = Expand 1.0 width of characters (physical units)
+C CXDEF           = Expand 1.0 expansion of characters drawn by vector (X dir)
+C PXDEF           = Expand 1.0 radius of points, (X dir)
+C COFF            = Terminal vertical offset of characters (physical)
+C TERMOUT         = True for a terminal, false for hardcopy
+C TERMOPEN        = True if a terminal has been opened
+C XYSWAPPED       = True for an inverted picture x <-> y
+C NUMDEV          = Device number
+C ICOLOR          = Palette entry of current color
+C FILLMODE        = Fill type or 0 for no fill
+C USERVAR         = Array of user set-able variables
+C AUTODOT         = True if device has automatic dotted/dashed line generation
+C AUTOWEIGHT      = True if device has automatic line weight
+C AUTOCHAR        = True if device can generate characters
+C PERFUDGE        = Fraction to budge perp ticks from the axis (0.5)
+C PARFUDGE        = Fraction to budge parallel ticks from the axis (0.65)
+C XFUDGE          = Fraction to budge xlabels from the axis (2)
+C YFUDGE          = Fraction to budge ylabels from the axis (6)
+C XHSIZE          = X window initial horizontal size (800)
+C XVSIZE          = X window initial vertical size (600)
