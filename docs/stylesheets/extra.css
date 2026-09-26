@@ -1,0 +1,30 @@
+/* Audience callouts:  !!! beginner / !!! researcher / !!! advanced */
+:root {
+  --md-admonition-icon--beginner: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 3 1 9l11 6 9-4.91V17h2V9M5 13.18v4L12 21l7-3.82v-4L12 17z"/></svg>');
+  --md-admonition-icon--researcher: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>');
+  --md-admonition-icon--advanced: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97s-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1s.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64z"/></svg>');
+}
+.md-typeset .admonition.beginner, .md-typeset details.beginner { border-color: #2a9d8f; }
+.md-typeset .beginner > .admonition-title, .md-typeset .beginner > summary { background-color: rgba(42, 157, 143, .1); }
+.md-typeset .beginner > .admonition-title::before, .md-typeset .beginner > summary::before {
+  background-color: #2a9d8f; -webkit-mask-image: var(--md-admonition-icon--beginner); mask-image: var(--md-admonition-icon--beginner);
+}
+.md-typeset .admonition.researcher, .md-typeset details.researcher { border-color: #3f51b5; }
+.md-typeset .researcher > .admonition-title, .md-typeset .researcher > summary { background-color: rgba(63, 81, 181, .1); }
+.md-typeset .researcher > .admonition-title::before, .md-typeset .researcher > summary::before {
+  background-color: #3f51b5; -webkit-mask-image: var(--md-admonition-icon--researcher); mask-image: var(--md-admonition-icon--researcher);
+}
+.md-typeset .admonition.advanced, .md-typeset details.advanced { border-color: #8e44ad; }
+.md-typeset .advanced > .admonition-title, .md-typeset .advanced > summary { background-color: rgba(142, 68, 173, .1); }
+.md-typeset .advanced > .admonition-title::before, .md-typeset .advanced > summary::before {
+  background-color: #8e44ad; -webkit-mask-image: var(--md-admonition-icon--advanced); mask-image: var(--md-admonition-icon--advanced);
+}
+
+/* Figures: captions and a light frame that works in both schemes */
+.md-typeset figure { margin: 1.2em auto; }
+.md-typeset figure img { background: #fff; border-radius: 4px; padding: 4px; }
+.md-typeset figcaption { font-size: .78rem; max-width: 46rem; margin: .4em auto 0; }
+
+/* Hero on the home page */
+.hero-tagline { font-size: 1.15rem; line-height: 1.5; }
+.scope-box { border-left: 4px solid #e76f51; padding: .2em 1em; background: rgba(231, 111, 81, .07); }
