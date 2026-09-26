@@ -382,3 +382,49 @@ def test_errors_are_never_hidden(tmp_path, capsys):
                      str(U12517 / "u12517j.fits") + "[3]"])
     err = capsys.readouterr().err
     assert code == 1 and "cannot open" in err
+
+
+# ---- tile-compressed science image
+
+@pytest.mark.parametrize("ctype", ["RICE_1", "GZIP_1"])
+def test_tile_compressed_science_image(native, tmp_path, ctype):
+    """A tile-compressed image HDU (lossless: integer data) is read by
+    CFITSIO like any image: same profile as the same pixels uncompressed,
+    and the products carry its WCS but none of the compression-table
+    cards."""
+    img = np.round(galaxy(70.3, 60.6, 300.0)).astype(np.int32)
+    h = wcs_header(150.1, 2.2, (70, 60))
+    fits.HDUList([fits.PrimaryHDU(header=wcs_header(10.0, -5.0, (1, 1))),
+                  fits.CompImageHDU(img, header=fits.ImageHDU(img, h).header,
+                                    name="SCI", compression_type=ctype)
+                  ]).writeto(
+        tmp_path / "comp.fits")
+    fits.PrimaryHDU(img, header=h).writeto(tmp_path / "plain.fits")
+    with fits.open(tmp_path / "comp.fits", disable_image_compression=True) \
+            as raw:
+        assert raw[1].header["ZIMAGE"] and raw[1].header["ZCMPTYPE"] == ctype
+    p = run(native, f"{tmp_path}/comp.fits[SCI]", *FIT, "MODEL",
+            "-m", tmp_path / "m.fits", "--residual", tmp_path / "r.fits",
+            "--prepared", tmp_path / "p.fits", "-o", tmp_path / "c.prf")
+    assert p.returncode == 0, p.stderr
+    assert "140 cols x   120 rows" in p.stdout
+    q = run(native, tmp_path / "plain.fits", *FIT, "MODEL",
+            "-m", tmp_path / "m0.fits", "-o", tmp_path / "u.prf")
+    assert q.returncode == 0, q.stderr
+    assert np.array_equal(profile(tmp_path / "c.prf")[1],
+                          profile(tmp_path / "u.prf")[1])
+    assert np.array_equal(fits.getdata(tmp_path / "m.fits"),
+                          fits.getdata(tmp_path / "m0.fits"))
+    assert np.array_equal(fits.getdata(tmp_path / "p.fits"),
+                          img.astype(np.float32))
+    for name in ("m", "p", "r"):
+        with fits.open(tmp_path / f"{name}.fits") as hdul:
+            hdul.verify("exception")
+            out = hdul[0].header
+        assert out["BITPIX"] == -32 and out["NAXIS"] == 2
+        assert (out["NAXIS1"], out["NAXIS2"]) == (140, 120)
+        assert not [k for k in out if k.startswith("Z") or
+                    k in ("TFIELDS", "THEAP") or k.startswith(("TTYPE",
+                                                                "TFORM"))]
+        assert out["CRVAL1"] == 150.1 and out["BUNIT"] == "electrons/s"
+        assert np.array_equal(sky(out, PTS), sky(h, PTS))
