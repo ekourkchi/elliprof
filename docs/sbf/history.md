@@ -38,7 +38,8 @@ connecting $\bar M$ to age and metallicity.
 
 **HST/ACS (2005–2010).** John Blakeslee and collaborators brought SBF to
 the Advanced Camera for Surveys. They set out the reduction procedures
-and calibration (Mei et al. 2005a, 2005b), mapped the 3-D structure of the
+(Jordán et al. 2004; Mei et al. 2005a) and calibration (Mei et al.
+2005b), mapped the 3-D structure of the
 Virgo cluster (Mei et al. 2007), measured the Fornax–Virgo relative
 distance precisely (Blakeslee et al. 2009), and calibrated the F814W
 bandpass (Blakeslee et al. 2010).
@@ -59,12 +60,36 @@ distances for bright galaxies in Virgo and beyond (Cantiello et al.
 describe an approved JWST program to tie the SBF zeropoint to
 tip-of-the-red-giant-branch distances.
 
-!!! note "ELLIPROF history is separate"
-    ELLIPROF was originally developed by John Tonry as part of MONSTA, an
-    image-analysis package. This page is the history of the SBF
-    *method*. It does not imply that any particular study above used
-    ELLIPROF. See [About and credits](../about.md) for ELLIPROF's own
-    history.
+## ELLIPROF in SBF analyses
+
+ELLIPROF, originally developed by John Tonry as part of MONSTA, has been
+used as the galaxy-modelling component of SBF analyses. It fits and
+subtracts the smooth galaxy light, producing the galaxy-subtracted image
+that the SBF processing then works on. It does not itself measure the
+fluctuations or the distance. The evidence, in the papers' own words:
+
+- Tonry et al. (1997), the I-band SBF Survey, describe the step without
+  naming the program: "we fit a galaxy model to the summed, cleaned,
+  sky-subtracted galaxy image and subtract it".
+- Jordán et al. (2004), ACS Virgo Cluster Survey II: "Galaxies were
+  modeled using the ELLIPROF program described in the SBF survey of
+  Tonry et al. (1997)."
+- Mei et al. (2005a), ACS Virgo Cluster Survey IV: "We fit a smooth model
+  for each galaxy in both filters using ELLIPROF (the isophotal fitting
+  software that has been used for the SBF survey by Tonry et al. 1997)
+  and then subtract the models from the original images."
+- Jensen et al. (2021), infrared SBF distances with HST/WFC3: "We made an
+  elliptical model of each galaxy using the ELLIPROF routine"; after
+  background subtraction the galaxies were fitted "using the ELLIPROF
+  isophotal fitting routine a second time", and the models were saved
+  "to normalize the SBF power spectrum". The paper lists ELLIPROF among
+  its software.
+
+Quotations are from the arXiv versions of these papers
+(astro-ph/9609113, astro-ph/0406433, astro-ph/0501325, 2105.08299).
+Other papers on this page are not claimed to have used ELLIPROF unless
+listed here. See [ELLIPROF's role in SBF](elliprof-role.md) and
+[About and credits](../about.md).
 
 ## References
 
@@ -82,7 +107,7 @@ records.
 - Tonry, J. L., Ajhar, E. A. & Luppino, G. A. 1990, *Observations of surface-brightness fluctuations in Virgo*, AJ, 100, 1416. [doi:10.1086/115606](https://doi.org/10.1086/115606)
 - Tonry, J. L. 1991, *Surface brightness fluctuations: a bridge from M31 to the Hubble constant*, ApJ, 373, L1. [doi:10.1086/186037](https://doi.org/10.1086/186037)
 - Ajhar, E. A. & Tonry, J. L. 1994, *Surface brightness fluctuations in globular clusters and stellar populations in galaxies*, ApJ, 429, 557. [doi:10.1086/174344](https://doi.org/10.1086/174344)
-- Tonry, J. L., Blakeslee, J. P., Ajhar, E. A. & Dressler, A. 1997, *The SBF Survey of Galaxy Distances. I.*, ApJ, 475, 399. [doi:10.1086/303576](https://doi.org/10.1086/303576)
+- Tonry, J. L., Blakeslee, J. P., Ajhar, E. A. & Dressler, A. 1997, *The SBF Survey of Galaxy Distances. I. Sample Selection, Photometric Calibration, and the Hubble Constant*, ApJ, 475, 399. [doi:10.1086/303576](https://doi.org/10.1086/303576) (arXiv:astro-ph/9609113)
 - Tonry, J. L., Blakeslee, J. P., Ajhar, E. A. & Dressler, A. 2000, *The Surface Brightness Fluctuation Survey of Galaxy Distances. II. Local and Large-Scale Flows*, ApJ, 530, 625. [doi:10.1086/308409](https://doi.org/10.1086/308409)
 - Tonry, J. L., Dressler, A., Blakeslee, J. P., et al. 2001, *The SBF Survey of Galaxy Distances. IV. SBF Magnitudes, Colors, and Distances*, ApJ, 546, 681. [doi:10.1086/318301](https://doi.org/10.1086/318301)
 
@@ -94,12 +119,13 @@ records.
 - Jensen, J. B., Tonry, J. L., Thompson, R. I., et al. 2001, *The Infrared Surface Brightness Fluctuation Hubble Constant*, ApJ, 550, 503. [doi:10.1086/319819](https://doi.org/10.1086/319819)
 - Jensen, J. B., Tonry, J. L., Barris, B. J., et al. 2003, *Measuring Distances and Probing the Unresolved Stellar Populations of Galaxies Using Infrared Surface Brightness Fluctuations*, ApJ, 583, 712. [doi:10.1086/345430](https://doi.org/10.1086/345430)
 - Jensen, J. B., Blakeslee, J. P., Gibson, Z., et al. 2015, *Measuring Infrared Surface Brightness Fluctuation Distances with HST WFC3: Calibration and Advice*, ApJ, 808, 91. [doi:10.1088/0004-637X/808/1/91](https://doi.org/10.1088/0004-637X/808/1/91)
-- Jensen, J. B., Blakeslee, J. P., Ma, C.-P., et al. 2021, *Infrared Surface Brightness Fluctuation Distances for MASSIVE and Type Ia Supernova Host Galaxies*, ApJS, 255, 21. [doi:10.3847/1538-4365/ac01e7](https://doi.org/10.3847/1538-4365/ac01e7)
+- Jensen, J. B., Blakeslee, J. P., Ma, C.-P., et al. 2021, *Infrared Surface Brightness Fluctuation Distances for MASSIVE and Type Ia Supernova Host Galaxies*, ApJS, 255, 21. [doi:10.3847/1538-4365/ac01e7](https://doi.org/10.3847/1538-4365/ac01e7) (arXiv:2105.08299)
 
 **Stellar populations, HST/ACS and the Hubble constant (Blakeslee and collaborators)**
 
 - Blakeslee, J. P., Vazdekis, A. & Ajhar, E. A. 2001, *Stellar populations and surface brightness fluctuations: new observations and models*, MNRAS, 320, 193. [doi:10.1046/j.1365-8711.2001.03937.x](https://doi.org/10.1046/j.1365-8711.2001.03937.x)
-- Mei, S., Blakeslee, J. P., Tonry, J. L., et al. 2005a, *The ACS Virgo Cluster Survey. IV. Data Reduction Procedures for Surface Brightness Fluctuation Measurements with the Advanced Camera for Surveys*, ApJS, 156, 113. [doi:10.1086/426544](https://doi.org/10.1086/426544)
+- Jordán, A., Blakeslee, J. P., Peng, E. W., et al. 2004, *The ACS Virgo Cluster Survey. II. Data Reduction Procedures*, ApJS, 154, 509. [doi:10.1086/422977](https://doi.org/10.1086/422977) (arXiv:astro-ph/0406433)
+- Mei, S., Blakeslee, J. P., Tonry, J. L., et al. 2005a, *The ACS Virgo Cluster Survey. IV. Data Reduction Procedures for Surface Brightness Fluctuation Measurements with the Advanced Camera for Surveys*, ApJS, 156, 113. [doi:10.1086/426544](https://doi.org/10.1086/426544) (arXiv:astro-ph/0501325)
 - Mei, S., Blakeslee, J. P., Tonry, J. L., et al. 2005b, *The ACS Virgo Cluster Survey. V. Surface Brightness Fluctuation Calibration for Giant and Dwarf Early-Type Galaxies*, ApJ, 625, 121. [doi:10.1086/429554](https://doi.org/10.1086/429554)
 - Mei, S., Blakeslee, J. P., Côté, P., et al. 2007, *The ACS Virgo Cluster Survey. XIII. SBF Distance Catalog and the Three-dimensional Structure of the Virgo Cluster*, ApJ, 655, 144. [doi:10.1086/509598](https://doi.org/10.1086/509598)
 - Blakeslee, J. P., Jordán, A., Mei, S., et al. 2009, *The ACS Fornax Cluster Survey. V. Measurement and Recalibration of Surface Brightness Fluctuations and a Precise Value of the Fornax–Virgo Relative Distance*, ApJ, 694, 556. [doi:10.1088/0004-637X/694/1/556](https://doi.org/10.1088/0004-637X/694/1/556)

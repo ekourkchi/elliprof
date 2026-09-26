@@ -12,7 +12,8 @@ lies beyond it.
 
 <div class="scope-box" markdown>
 **ELLIPROF is not an SBF pipeline.** It supplies the smooth galaxy model
-and the residual image that an SBF measurement starts from. Everything
+and the residual image that an SBF measurement starts from, the role it
+has had in published SBF analyses since the I-band SBF Survey. Everything
 after that (the power spectrum, the corrections for globular clusters
 and background galaxies, the calibration and the distance) is done by
 other software and by the researcher. See

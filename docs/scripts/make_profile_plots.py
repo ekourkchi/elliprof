@@ -6,8 +6,11 @@ level on the outer profile.
 
 The calibration numbers come from examples/u12517/calibrate.dat (from the
 original analysis; elliprof itself does not read that file):
-    SECPIX = 0.128 arcsec/pixel,  M1STAR = 35.081 mag for 1 e- (net),
-    SKY = 3250 e/pixel (21.84 mag/arcsec^2).
+    SECPIX = 0.128 arcsec/pixel,  M1STAR_J = 35.081 ("m for 1e- net"),
+    SKY_J = 3250 ("e/pixel"), SKYMAG_J = 21.84 mag/arcsec^2.
+PROVISIONAL: the image header says BUNIT = ELECTRONS/S, while these numbers
+are consistent with pixel values in total electrons.  Unresolved; see
+docs/science/surface-photometry.md.
 """
 
 import matplotlib.pyplot as plt
@@ -82,8 +85,9 @@ def surface_brightness():
     axes[1].set_title("A de Vaucouleurs r$^{1/4}$ law is a straight line here",
                       fontsize=10)
     fig.text(0.5, -0.03, r"$\mu = m_{1\star} - 2.5\log_{10}(I_0 / s^2)$ with "
-             r"$m_{1\star}=35.081$ (mag for 1 e$^-$), $s = 0.128''$/pixel. "
-             "No Galactic extinction, K-correction or dimming correction.",
+             r"$m_{1\star}=35.081$ (M1STAR_J, calibrate.dat), "
+             r"$s = 0.128''$/pixel. PROVISIONAL: image units unresolved "
+             "(BUNIT vs calibrate.dat). No extinction or K-correction.",
              ha="center", fontsize=9, color="#555555")
     fig.tight_layout()
     C.save(fig, "surface_brightness_u12517.png")

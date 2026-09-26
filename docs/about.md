@@ -27,9 +27,13 @@ The original source files keep their authorship: `elliprof.f`,
 support files by Tod R. Lauer and Richard J. Stover. See
 [THIRD_PARTY_NOTICES.md](https://github.com/ekourkchi/elliprof/blob/main/THIRD_PARTY_NOTICES.md).
 
-For the history of the surface brightness fluctuation *method*, see
-[SBF history and references](sbf/history.md). The two histories are
-separate.
+ELLIPROF has been used as the galaxy-modelling component of surface
+brightness fluctuation (SBF) analyses, from the I-band SBF Survey of
+Tonry et al. (1997) to HST studies (Jordán et al. 2004; Mei et al.
+2005a; Jensen et al. 2021). In those analyses it produced the smooth
+galaxy model and the galaxy-subtracted image. The fluctuation measurement
+and the distances came from separate, downstream steps. See
+[ELLIPROF in SBF analyses](sbf/history.md#elliprof-in-sbf-analyses).
 
 ## Licence
 

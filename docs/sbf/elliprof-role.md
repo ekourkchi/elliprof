@@ -17,6 +17,51 @@ ELLIPROF is one component of an SBF measurement: the galaxy model, and
 through it the residual. The rest is done by other software and by the
 researcher, and needs judgement that no single program should hide.
 
+## ELLIPROF in published SBF analyses
+
+ELLIPROF has historically been used as the **galaxy-modelling component**
+of surface brightness fluctuation analyses. It fits and subtracts the
+smooth galaxy light distribution, producing the galaxy-subtracted image
+used in the subsequent SBF processing. The power-spectrum measurement,
+the contaminant corrections, the calibration and the distance
+determination are separate, downstream steps.
+
+The published record:
+
+- **The I-band SBF Survey.** Tonry et al. (1997) describe the step as
+  fitting "a galaxy model to the summed, cleaned, sky-subtracted galaxy
+  image" and subtracting it. The ACS Virgo Cluster Survey papers identify
+  that software as ELLIPROF. Jordán et al. (2004) write that "galaxies
+  were modeled using the ELLIPROF program described in the SBF survey of
+  Tonry et al. (1997)". Mei et al. (2005a) call ELLIPROF "the isophotal
+  fitting software that has been used for the SBF survey by Tonry et al.
+  1997".
+- **The ACS Virgo Cluster Survey (HST/ACS).** Jordán et al. (2004) and
+  Mei et al. (2005a) fitted a smooth model to each galaxy with ELLIPROF
+  and subtracted it. They then removed the remaining large-scale
+  residuals with a SExtractor background model before detecting sources
+  and measuring the SBF.
+- **Infrared SBF with HST/WFC3 (the MASSIVE and Type Ia supernova host
+  galaxies).** Jensen et al. (2021) made an elliptical model of each
+  galaxy "using the ELLIPROF routine", first to help determine the
+  background level and then, after background subtraction, as the smooth
+  galaxy model. They saved that model "for later use to normalize the SBF
+  power spectrum", and list ELLIPROF among the software used.
+
+In all of these, ELLIPROF supplies the galaxy model. The SBF measurement
+itself is the downstream chain described on
+[Power spectrum and distance](power-spectrum.md) and
+[Workflow and cautions](workflow.md). The full references are on
+[History and references](history.md#elliprof-in-sbf-analyses).
+
+!!! note "The same program"
+    The `elliprof` package runs the original ELLIPROF fitting and model
+    code, compiled unchanged (see
+    [How elliprof is built](../reference/architecture.md)). The published
+    analyses above used ELLIPROF within their own pipelines and
+    environments. This package makes the same fitting and model code
+    available on its own. It does not reproduce those pipelines.
+
 ## Why the galaxy model matters
 
 The fluctuations are tiny compared with the galaxy itself. In the
@@ -35,10 +80,13 @@ less. Before they can be measured, the smooth galaxy must be removed
 
 A model built from fitted isophotes follows the galaxy's changing
 ellipticity, orientation and boxy/disky shape with radius, so it
-removes the galaxy closely. How SBF studies build and subtract their
-galaxy models is described in their data-reduction papers, for example
-Mei et al. (2005a) for HST/ACS and Jensen et al. (2015) for HST/WFC3-IR.
-See [History and references](history.md).
+removes the galaxy closely. The published analyses above also describe
+where such models fall short: Jordán et al. (2004) report that for seven
+galaxies with strong disk components ELLIPROF could not produce
+acceptable models. Jensen et al. (2021) fitted the remaining residual
+patterns (from neighbouring galaxies, dust lanes, shells, spiral
+structure or bars) with a spline and avoided the affected regions and
+low wavenumbers.
 
 !!! advanced "Model harmonics and the residual"
     Include the 3rd- and 4th-order terms in the model (the default,

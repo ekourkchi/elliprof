@@ -40,14 +40,29 @@ from the original analysis (elliprof does not read it):
 | | |
 |---|---|
 | pixel scale $s$ | 0.128″ / pixel |
-| $m_1$ for 1 electron (`M1STAR`) | 35.081 mag |
-| sky (`SKY`) | 3250 e / pixel = 21.84 mag arcsec⁻² (`SKYMAG`) |
+| `M1STAR_J` ("m for 1e- net") | 35.081 mag |
+| `M1_J` ("m for 1 e/sec") | 26.822 mag |
+| `ETIME_J` (exposure time) | 2011.7 s |
+| `SKY_J` ("e/pixel") | 3250 |
+| `SKYMAG_J` | 21.84 mag arcsec⁻² |
 
-These are consistent with each other:
-35.081 − 2.5 log₁₀(3250 / 0.128²) = 21.84. So the pixel values are
-electrons, although the image's `BUNIT` says `ELECTRONS/S`. (Its
-`M1_J` = 26.822 for 1 e/s plus 2.5 log₁₀ of the 2011.7 s exposure gives
-the same 35.081.)
+!!! warning "Unresolved: the units of the example image"
+    The image header and the calibration file do not agree on the units
+    of the pixel values.
+
+    - The FITS header says `BUNIT = 'ELECTRONS/S'`.
+    - Within `calibrate.dat`, the numbers agree with each other if the
+      pixel values are **total electrons**: 26.822 + 2.5 log₁₀(2011.7) =
+      35.081 (`M1_J` converted to `M1STAR_J`), and
+      35.081 − 2.5 log₁₀(3250 / 0.128²) = 21.84 (`SKY_J` converted to
+      `SKYMAG_J`). The sky level subtracted in the example (3246) is also
+      close to `SKY_J` (3250).
+
+    This has not been resolved. The calibrated profile below applies
+    `M1STAR_J` = 35.081 to the pixel values as they are. It is correct only
+    if the pixels are total electrons. If they are electrons per second,
+    the zeropoint is `M1_J` = 26.822, and every μ below would be 8.26 mag
+    smaller (brighter). Treat the calibrated numbers on this site as provisional.
 
 <figure markdown="span">
   ![Two plots of the surface brightness of UGC 12517 in magnitudes per
@@ -57,7 +72,8 @@ the same 35.081.)
   nearly a straight line. A dashed line marks the sky brightness, 21.84
   mag per square arcsecond, which the profile crosses at about 32
   arcseconds.](../assets/surface_brightness_u12517.png)
-  <figcaption>The calibrated UGC 12517 profile. Against r<sup>1/4</sup> it is
+  <figcaption>The UGC 12517 profile calibrated with <code>M1STAR_J</code> = 35.081
+  (provisional: see the units warning above). Against r<sup>1/4</sup> it is
   nearly straight, as for a de Vaucouleurs law. Beyond ~32″ the galaxy is
   fainter than the sky. No extinction or K-correction is applied.</figcaption>
 </figure>
