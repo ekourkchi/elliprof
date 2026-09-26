@@ -192,7 +192,7 @@ def rmstar():
     axes[1].text(2, top, "  (bright peaks run off the top)", fontsize=8,
                  va="top", color="#555555")
     axes[1].set_xlabel("eccentric angle [deg]")
-    axes[1].set_ylabel("science - sky [e/pixel]")
+    axes[1].set_ylabel("science - sky [image units]")
     axes[1].set_xlim(0, 359)
     axes[1].legend(frameon=False, fontsize=8, loc="upper left",
                    bbox_to_anchor=(0, -0.14), ncol=4)

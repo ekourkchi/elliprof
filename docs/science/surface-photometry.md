@@ -32,51 +32,32 @@ For publication-quality photometry you would also correct for Galactic
 extinction and, for distant galaxies, apply a K-correction and the
 $(1+z)^4$ cosmological surface-brightness dimming.
 
-### Worked example: UGC 12517
+### The UGC 12517 example is not calibrated
 
-The repository's `examples/u12517/calibrate.dat` holds the calibration
-from the original analysis (elliprof does not read it):
+On this site, the UGC 12517 profile is shown only in the measured image
+units: `I0` per pixel, exactly as ELLIPROF reports it. No
+surface-brightness profile in mag/arcsec² is given for it, because the
+units of the image are unresolved.
 
-| | |
-|---|---|
-| pixel scale $s$ | 0.128″ / pixel |
-| `M1STAR_J` ("m for 1e- net") | 35.081 mag |
-| `M1_J` ("m for 1 e/sec") | 26.822 mag |
-| `ETIME_J` (exposure time) | 2011.7 s |
-| `SKY_J` ("e/pixel") | 3250 |
-| `SKYMAG_J` | 21.84 mag arcsec⁻² |
+!!! warning "Unresolved: the units of the UGC 12517 image"
+    - The FITS header gives `BUNIT = 'ELECTRONS/S'`.
+    - The supporting file `examples/u12517/calibrate.dat`, from the
+      original analysis (elliprof does not read it), gives two
+      zeropoints: `M1_J` = 26.822 ("m for 1 e/sec") and `M1STAR_J` =
+      35.081 ("m for 1e- net"). They differ by 2.5 log₁₀ of its exposure
+      time, `ETIME_J` = 2011.7 s. Its sky entries, `SKY_J` = 3250
+      ("e/pixel") and `SKYMAG_J` = 21.84 mag arcsec⁻², agree with each
+      other only if the pixel values are total electrons.
 
-!!! warning "Unresolved: the units of the example image"
-    The image header and the calibration file do not agree on the units
-    of the pixel values.
+    The header and the calibration file therefore disagree about the
+    units of the pixel values. Which zeropoint applies depends on the
+    answer, and the two zeropoints differ by 8.26 mag. Converting this
+    profile to mag/arcsec² first requires resolving the image units and
+    the zeropoint and exposure-time convention. Until then, no calibrated
+    values are given.
 
-    - The FITS header says `BUNIT = 'ELECTRONS/S'`.
-    - Within `calibrate.dat`, the numbers agree with each other if the
-      pixel values are **total electrons**: 26.822 + 2.5 log₁₀(2011.7) =
-      35.081 (`M1_J` converted to `M1STAR_J`), and
-      35.081 − 2.5 log₁₀(3250 / 0.128²) = 21.84 (`SKY_J` converted to
-      `SKYMAG_J`). The sky level subtracted in the example (3246) is also
-      close to `SKY_J` (3250).
-
-    This has not been resolved. The calibrated profile below applies
-    `M1STAR_J` = 35.081 to the pixel values as they are. It is correct only
-    if the pixels are total electrons. If they are electrons per second,
-    the zeropoint is `M1_J` = 26.822, and every μ below would be 8.26 mag
-    smaller (brighter). Treat the calibrated numbers on this site as provisional.
-
-<figure markdown="span">
-  ![Two plots of the surface brightness of UGC 12517 in magnitudes per
-  square arcsecond, from about 16.5 at 1.5 arcseconds to 22.6 at 44
-  arcseconds. Left against the logarithm of the radius, curving
-  downwards. Right against the radius to the one-quarter power, very
-  nearly a straight line. A dashed line marks the sky brightness, 21.84
-  mag per square arcsecond, which the profile crosses at about 32
-  arcseconds.](../assets/surface_brightness_u12517.png)
-  <figcaption>The UGC 12517 profile calibrated with <code>M1STAR_J</code> = 35.081
-  (provisional: see the units warning above). Against r<sup>1/4</sup> it is
-  nearly straight, as for a de Vaucouleurs law. Beyond ~32″ the galaxy is
-  fainter than the sky. No extinction or K-correction is applied.</figcaption>
-</figure>
+Once the units are known, the conversion is the formula above, with the
+zeropoint that matches them and $s$ = 0.128″/pixel.
 
 ## The outer isophotes
 

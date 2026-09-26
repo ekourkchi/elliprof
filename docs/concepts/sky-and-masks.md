@@ -50,15 +50,17 @@ out too bright if the sky was underestimated, and too faint (falling
 too steeply) if it was overestimated.
 
 <figure markdown="span">
-  ![Left: the surface-brightness profile of UGC 12517 for five sky levels,
-  3096 to 3396 electrons per pixel; the curves lie on top of each other
-  except at the largest radii. Right: the difference in magnitudes from
-  the adopted sky; it is zero in the centre and grows to about 0.1
-  magnitudes at 45 arcseconds for a sky error of 150 electrons per
-  pixel.](../assets/sky_sensitivity.png)
+  ![Left: the isophote intensity of UGC 12517 against semi-major axis for
+  five sky levels, 3096 to 3396 in image units; the curves lie on top of
+  each other except at the largest radii. Right: the percentage change in
+  intensity relative to the adopted sky; it is zero in the centre and
+  grows to about plus or minus 10 percent at the outermost isophote for a
+  sky change of 150.](../assets/sky_sensitivity.png)
   <figcaption>Real elliprof fits of UGC 12517 that differ only in the
-  subtracted sky. A sky error of 150 e/pixel (4.6% of the sky) changes the
-  outermost isophote by 0.1 mag. The inner profile does not move.</figcaption>
+  subtracted sky (measured intensities, no calibration). Changing the sky
+  by 150 image units (4.6% of the sky level) changes the outermost
+  isophote's intensity by about 10%, because there the sky is about twice
+  as bright as the galaxy. The inner profile does not move.</figcaption>
 </figure>
 
 !!! researcher "Measure the sky carefully"

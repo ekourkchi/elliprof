@@ -72,7 +72,7 @@ python docs/scripts/make_all.py          # writes docs/assets/*.png
 | Script | Figures |
 |---|---|
 | `make_u12517_overview.py` | home-page hero, preparation chain, model, residual, model harmonics, WCS alignment, SBF residual illustration (real data) |
-| `make_profile_plots.py` | profile panels, calibrated surface brightness, sky sensitivity (real data, real re-fits) |
+| `make_profile_plots.py` | profile panels and sky sensitivity, in measured image units (real data, real re-fits) |
 | `make_isophote_diagram.py` | isophote geometry and eccentric angle (schematic); RLAW spacing (exact); RMSTAR and fitted centres (real data) |
 | `make_boxy_disky_diagram.py` | boxy/disky shapes (schematic); a4/a recovery (real fits of synthetic images) |
 | `make_sbf_workflow.py` | the SBF workflow diagram |

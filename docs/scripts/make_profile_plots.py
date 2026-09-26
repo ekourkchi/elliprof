@@ -1,15 +1,12 @@
 """Profile figures from the real u12517 fit: the full set of profile
-columns, a calibrated surface-brightness profile and the effect of the sky
-level on the outer profile.
+columns and the effect of the sky level on the outer profile.
 
     python docs/scripts/make_profile_plots.py
 
-The calibration numbers come from examples/u12517/calibrate.dat (from the
-original analysis; elliprof itself does not read that file):
-    SECPIX = 0.128 arcsec/pixel,  M1STAR_J = 35.081 ("m for 1e- net"),
-    SKY_J = 3250 ("e/pixel"), SKYMAG_J = 21.84 mag/arcsec^2.
-PROVISIONAL: the image header says BUNIT = ELECTRONS/S, while these numbers
-are consistent with pixel values in total electrons.  Unresolved; see
+Everything is in the measured image units.  No photometric calibration is
+applied: the units of the example image are unresolved (its header says
+BUNIT = ELECTRONS/S, while examples/u12517/calibrate.dat is internally
+consistent only with total electrons); see
 docs/science/surface-photometry.md.
 """
 
@@ -20,13 +17,7 @@ import common as C
 from elliprof import read_profile
 
 plt.rcParams.update(C.STYLE)
-SCALE, M1STAR = 0.128, 35.081
 PROF = C.products()["profile"].iloc[1:]     # r = 9 lies in the masked nucleus
-
-
-def mu(intensity):
-    """mag/arcsec^2 from counts per pixel (no extinction or K-correction)."""
-    return M1STAR - 2.5 * np.log10(intensity / SCALE ** 2)
 
 
 def unwrap(alpha):
@@ -69,32 +60,9 @@ def profile_panels():
     C.save(fig, "profile_panels.png")
 
 
-def surface_brightness():
-    r_as = PROF.Rmaj * SCALE
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4.2))
-    for ax, x, lab in ((axes[0], r_as, "semi-major axis [arcsec]"),
-                       (axes[1], r_as ** 0.25, "(semi-major axis / arcsec)^(1/4)")):
-        ax.plot(x, mu(PROF.I0), "o-", ms=3, color=C.INK)
-        ax.axhline(21.84, color=C.ACCENT, ls="--", lw=1)
-        ax.text(x.iloc[0], 21.84 - 0.25, "sky: 21.84 mag/arcsec$^2$",
-                color=C.ACCENT, fontsize=9)
-        ax.set_xlabel(lab)
-        ax.set_ylabel(r"$\mu$ [mag arcsec$^{-2}$]")
-        ax.invert_yaxis()
-    C.logx(axes[0])
-    axes[1].set_title("A de Vaucouleurs r$^{1/4}$ law is a straight line here",
-                      fontsize=10)
-    fig.text(0.5, -0.03, r"$\mu = m_{1\star} - 2.5\log_{10}(I_0 / s^2)$ with "
-             r"$m_{1\star}=35.081$ (M1STAR_J, calibrate.dat), "
-             r"$s = 0.128''$/pixel. PROVISIONAL: image units unresolved "
-             "(BUNIT vs calibrate.dat). No extinction or K-correction.",
-             ha="center", fontsize=9, color="#555555")
-    fig.tight_layout()
-    C.save(fig, "surface_brightness_u12517.png")
-
-
 def sky_sensitivity():
-    """Real re-fits with the subtracted sky changed by +-1.5% and +-4.6%."""
+    """Real re-fits with the subtracted sky changed by +-50 and +-150 image
+    units (the adopted sky is 3246)."""
     skies = (3096.0, 3196.0, 3246.0, 3296.0, 3396.0)
     colours = ("#1d4e89", "#6a9fcb", "k", "#f4a582", "#b2182b")
     prof = {}
@@ -108,30 +76,27 @@ def sky_sensitivity():
     for sky, col in zip(skies, colours):
         p = prof[sky]
         d = sky - 3246.0
-        lab = "adopted, 3246" if d == 0 else f"sky {d:+.0f} e/pixel"
-        r = p.Rmaj * SCALE
-        axes[0].plot(r, mu(np.clip(p.I0, 1e-3, None)), "o-", ms=3,
-                     color=col, label=lab, lw=1.5 if d == 0 else 1)
-        axes[1].plot(r, mu(np.clip(p.I0, 1e-3, None)) - mu(ref.I0), "o-",
-                     ms=3, color=col, label=lab)
-    axes[0].set_ylabel(r"$\mu$ [mag arcsec$^{-2}$]")
-    axes[0].invert_yaxis()
-    axes[1].set_ylabel(r"$\Delta\mu$ relative to the adopted sky [mag]")
+        lab = "adopted sky, 3246" if d == 0 else f"sky {d:+.0f}"
+        axes[0].plot(p.Rmaj, p.I0, "o-", ms=3, color=col, label=lab,
+                     lw=1.5 if d == 0 else 1)
+        axes[1].plot(p.Rmaj, 100 * (p.I0 / ref.I0 - 1), "o-", ms=3,
+                     color=col, label=lab)
+    axes[0].set_yscale("log")
+    axes[0].set_ylabel("I0 [image units per pixel]")
+    axes[1].set_ylabel("change in I0 relative to the adopted sky [%]")
     axes[1].axhline(0, color="k", lw=0.6)
-    axes[1].invert_yaxis()
     for ax in axes:
         C.logx(ax)
-        ax.set_xlabel("semi-major axis [arcsec]")
+        ax.set_xlabel("Rmaj [pixels]")
         ax.legend(frameon=False, fontsize=9)
     fig.text(0.5, -0.03, "Real elliprof fits of u12517 that differ only in "
-             "the subtracted sky (3246 +- 50 and +- 150 e/pixel). The inner "
-             "profile does not move; the outer profile does.", ha="center",
-             fontsize=9, color="#555555")
+             "the subtracted sky (3246 +- 50 and +- 150, image units). The "
+             "inner profile does not move; the outer profile does.",
+             ha="center", fontsize=9, color="#555555")
     fig.tight_layout()
     C.save(fig, "sky_sensitivity.png")
 
 
 if __name__ == "__main__":
     profile_panels()
-    surface_brightness()
     sky_sensitivity()
