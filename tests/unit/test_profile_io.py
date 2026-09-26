@@ -81,8 +81,12 @@ def test_csv_is_aligned_and_commented(outputs):
     assert len(names) == len(rows[0])
 
 
-def test_print_eprof_table_matches(outputs):
+def test_print_eprof_table_matches(outputs, run_native, galaxy_fits):
+    """The table printed when no profile file is written (as PRINT EPROF
+    does) agrees with the .prf; with -o/--csv it is not printed."""
     d, stdout = outputs
+    assert "SURFACE PHOTOMETRY PROFILE COMPUTATION:" not in stdout
+    stdout = run_native(galaxy_fits, *ARGS, check=True).stdout
     exact = read_profile(str(d / "g.prf"))
     table = stdout.split("SURFACE PHOTOMETRY PROFILE COMPUTATION:")[1]
     rows = [l for l in table.splitlines()[2:] if l.strip()]

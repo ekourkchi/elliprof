@@ -18,7 +18,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 from ._native import find_backend
 from .harmonics import COS3X_RANGE, COS4X_RANGE, _int_in, harmonic_settings
 from ._version import __version__
-from .io import check_same_geometry, image_info
+from .io import GeometryError
 
 PathLike = Union[str, os.PathLike]
 
@@ -63,6 +63,7 @@ class ElliprofResult:
     backend_path: Optional[Path] = None
     output_dir: Optional[Path] = None
     prepared_path: Optional[Path] = None
+    residual_path: Optional[Path] = None
 
     @property
     def ok(self) -> bool:
@@ -163,6 +164,25 @@ def _require_file(path, what):
         raise FileNotFoundError(f"{what} not found: {path}")
 
 
+def _written(ok: bool, path: Optional[Path]) -> Optional[Path]:
+    return path if ok and path is not None and path.exists() else None
+
+
+def _fits_spec(spec, what) -> Tuple[Path, str]:
+    """Split a CFITSIO file specification such as ``galaxy.fits[SCI]``
+    into the file (made absolute: the backend runs in the output
+    directory) and the HDU selector, which is passed on untouched --
+    the backend opens the selected HDU itself."""
+    text = str(spec)
+    if not Path(text).is_file() and "[" in text[1:]:
+        cut = text.index("[", 1)
+        path, selector = Path(text[:cut]), text[cut:]
+    else:
+        path, selector = Path(text), ""
+    _require_file(path, what)
+    return path.resolve(), selector
+
+
 def _kill_process_tree(proc: subprocess.Popen) -> None:
     """Terminate the backend and anything it started."""
     if os.name == "posix":
@@ -246,6 +266,9 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
                  reg_path: Optional[PathLike] = None,
                  model_path: Optional[PathLike] = None,
                  prepared: Optional[PathLike] = None,
+                 residual_path: Optional[PathLike] = None,
+                 default_outputs: bool = True,
+                 backend_verbose: bool = False,
                  timeout: Optional[float] = DEFAULT_TIMEOUT,
                  check: bool = True, backend: Optional[PathLike] = None,
                  ) -> ElliprofResult:
@@ -278,6 +301,14 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
     default), named after ``prefix`` (default: the image name), unless
     explicit paths are given.
 
+    ``image``, ``mask`` and ``sky_image`` may select a FITS extension with
+    CFITSIO syntax, e.g. ``"galaxy.fits[SCI]"`` or ``"galaxy.fits[1]"``;
+    the selected HDU is fitted and its header (WCS included) is given to
+    every image written: the model (``model``/``model_path``), the
+    prepared image (``prepared``) and the residual (``residual_path``, =
+    mask x (science - sky - model), which implies the model).  Masks are
+    logical: 0, NaN, Inf or undefined = bad, any other value = good.
+
     ``result.profile`` is a pandas DataFrame; ``load_profile=False`` skips
     it (and never imports pandas), for callers that only need the files.
 
@@ -285,10 +316,10 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
     backend runs longer, it is terminated and
     :class:`ElliprofTimeoutError` is raised.
     """
-    # ---- validate everything before anything is run
-    image = Path(image)
-    _require_file(image, "image")
-    image_info(str(image))
+    # ---- validate everything before anything is run.  FITS files are
+    # opened only by the backend (CFITSIO), which checks the selected HDU
+    # and that mask / sky image match it.
+    image_path, image_sel = _fits_spec(image, "image")
     x0 = _finite(x0, "X0")
     y0 = _finite(y0, "Y0")
     if sky is not None and sky_image is not None:
@@ -300,11 +331,9 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
         else:
             sky_arg = _num(sky)
     if sky_image is not None:
-        _require_file(sky_image, "sky image")
-        check_same_geometry(str(image), str(sky_image), "sky image")
+        sky_path, sky_sel = _fits_spec(sky_image, "sky image")
     if mask is not None:
-        _require_file(mask, "mask")
-        check_same_geometry(str(image), str(mask), "mask")
+        mask_path, mask_sel = _fits_spec(mask, "mask")
     if timeout is not None and not _finite(timeout, "timeout") > 0:
         raise ValueError("timeout must be positive (or None)")
     extra = list(extra)
@@ -329,10 +358,16 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
     out = Path(tempfile.mkdtemp(prefix="elliprof-")) if made_tmp \
         else Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
-    stem = prefix or image.name.split(".")[0]
-    prf = Path(prf_path) if prf_path else out / f"{stem}.prf"
-    csv = Path(csv_path) if csv_path else out / f"{stem}.csv"
-    reg = Path(reg_path) if reg_path else out / f"{stem}.reg"
+    stem = prefix or image_path.name.split(".")[0]
+    # default_outputs=False: only the files explicitly asked for
+    auto = default_outputs
+    prf = Path(prf_path) if prf_path else (out / f"{stem}.prf" if auto
+                                           else None)
+    csv = Path(csv_path) if csv_path else (out / f"{stem}.csv" if auto
+                                           else None)
+    reg = Path(reg_path) if reg_path else (out / f"{stem}.reg" if auto
+                                           else None)
+    res = Path(residual_path) if residual_path else None
     if model_path is not None:
         mdl = Path(model_path)
     elif model:
@@ -341,20 +376,22 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
         mdl = None
 
     exe = Path(backend) if backend else find_backend()
-    cmd = [str(exe), str(image.resolve()), f"X0={_num(x0)}",
+    cmd = [str(exe), str(image_path) + image_sel, f"X0={_num(x0)}",
            f"Y0={_num(y0)}", *words]
     if sky is not None:
         cmd += ["--sky", sky_arg]
     if sky_image is not None:
-        cmd += ["--sky-image", str(Path(sky_image).resolve())]
+        cmd += ["--sky-image", str(sky_path) + sky_sel]
     if mask is not None:
-        cmd += ["--mask", str(Path(mask).resolve())]
-    cmd += ["-o", str(prf.resolve()), "--csv", str(csv.resolve()),
-            "--reg", str(reg.resolve())]
-    if mdl is not None:
-        cmd += ["-m", str(mdl.resolve())]
+        cmd += ["--mask", str(mask_path) + mask_sel]
+    for flag, path in (("-o", prf), ("--csv", csv), ("--reg", reg),
+                       ("-m", mdl), ("--residual", res)):
+        if path is not None:
+            cmd += [flag, str(path.resolve())]
     if prepared is not None:
         cmd += ["--prepared", str(Path(prepared).resolve())]
+    if backend_verbose:
+        cmd.append("--verbose")
 
     # The backend runs in the output directory, so anything it writes on
     # its own (DUMP= -> fort.2) lands there.
@@ -367,14 +404,19 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
     ok = code == 0
     result = ElliprofResult(
         profile=_load_profile(prf) if ok and not gc and load_profile
-        else None,
-        prf_path=prf if ok and prf.exists() else None,
-        csv_path=csv if ok and csv.exists() else None,
-        reg_path=reg if ok and reg.exists() else None,
-        model_path=mdl if ok and mdl is not None and mdl.exists() else None,
+        and prf is not None else None,
+        prf_path=_written(ok, prf), csv_path=_written(ok, csv),
+        reg_path=_written(ok, reg), model_path=_written(ok, mdl),
         stdout=stdout, stderr=stderr, returncode=code, command=cmd,
         center=(x0, y0), backend_path=exe, output_dir=out,
-        prepared_path=Path(prepared) if prepared else None)
+        prepared_path=Path(prepared) if prepared else None,
+        residual_path=_written(ok, res))
+    # the backend checked the mask / sky image against the science HDU
+    geometry = [l for l in stderr.splitlines()
+                if "does not match science image" in l
+                or "do not match science image" in l]
+    if not ok and geometry:
+        raise GeometryError(geometry[0].replace("elliprof: error: ", ""))
     if check and not ok:
         detail = stderr.strip() or stdout.strip()[-2000:]
         raise ElliprofError(f"elliprof failed (exit {code}): {detail}",

@@ -91,11 +91,22 @@ def subtract_sky(data: np.ndarray, sky=None, sky_image=None) -> np.ndarray:
     return out.copy()
 
 
+def logical_mask(mask: np.ndarray) -> np.ndarray:
+    """The backend's reading of a mask: True (good) where the value is
+    finite and nonzero; False (bad) for 0, NaN and +-Inf."""
+    mask = np.asarray(mask)
+    if mask.dtype.kind in "fc":
+        return np.isfinite(mask) & (mask != 0)
+    return mask != 0
+
+
 def apply_mask(data: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    """``data * mask`` in float32: masked (0) pixels become 0."""
+    """What the backend does with a mask, in float32: bad pixels (0, NaN,
+    Inf) become exactly 0, good pixels keep their value.  The mask is
+    logical; its values are not weights."""
     data = np.asarray(data, dtype=np.float32)
-    mask = np.asarray(mask, dtype=np.float32)
+    mask = np.asarray(mask)
     if data.shape != mask.shape:
         raise GeometryError(f"mask shape {mask.shape} != image "
                             f"shape {data.shape}")
-    return data * mask
+    return np.where(logical_mask(mask), data, np.float32(0))

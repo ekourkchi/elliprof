@@ -114,7 +114,10 @@ def test_help_documents_every_public_option_and_keyword():
                "COS3X=", "COS4X="):
         assert kw in text, kw
     assert "--sc VALUE         deprecated alias of --sky" in text
-    assert "0 = bad / excluded, 1 = good" in text
+    assert "0 = bad / excluded; any other finite" in text
+    assert "NaN, Inf and" in text and "never" in text and "weights" in text
+    assert "'galaxy.fits[SCI]'" in text
+    assert "mask x (science - sky - model)" in text
     assert "(default 1800)" in text and "status 124" in text
     # profile columns, and the profile is not an image
     for col in ("Rmaj", "x0 y0", "I0", "alpha", "ellip", "I3 I4", "A3 A4",

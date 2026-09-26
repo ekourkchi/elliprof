@@ -8,6 +8,7 @@ work even in a Python environment with broken optional packages.  A fit
 never imports pandas either.
 """
 
+import re
 import sys
 from typing import List, Optional
 
@@ -55,10 +56,14 @@ USAGE
   elliprof IMAGE.fits X0=x Y0=y R0=r R1=r NR=n [KEYWORD=value ...] [options]
 
   Keywords (KEY=value, case-insensitive) and options may follow the image in
-  any order.  With no -o/--csv/--reg the profile is only printed.
+  any order.  Output is a short summary (inputs, notes, files written); the
+  profile table is printed only if neither -o nor --csv is given.
 
 INPUT IMAGE AND INITIAL CENTRE
-  IMAGE.fits    2-D FITS image of the galaxy (the first argument).
+  IMAGE.fits    2-D FITS image of the galaxy (the first argument).  An image
+                in an extension is chosen with CFITSIO syntax, quoted for
+                the shell:  'galaxy.fits[SCI]'  'galaxy.fits[1]'.  The
+                selected HDU is fitted; there is no fallback to another.
   X0=x Y0=y     REQUIRED initial galaxy centre [pixels].  ELLIPROF does not
                 look for the galaxy: you give the starting centre, and the
                 fit then finds a centre for EACH isophote (the x0, y0
@@ -119,10 +124,15 @@ SKY / BACKGROUND AND MASK
                      (science - sky_image).  It must have exactly the same
                      dimensions as the science image.
                      --sky and --sky-image cannot be used together.
-  --mask FILE        multiply by a mask: 0 = bad / excluded, 1 = good /
-                     kept.  It must have exactly the same dimensions.  FITS
-                     masks and legacy BITPIX=1 .dmask bitmaps (historical
-                     ELLIPROF data) are accepted.
+  --mask FILE        a logical mask: 0 = bad / excluded; any other finite
+                     value (1, 2, -1, 0.5, ...) = good / kept; NaN, Inf and
+                     undefined (BLANK) pixels = bad.  Values are never
+                     weights: bad pixels become exactly 0, good pixels keep
+                     their value.  Accepted: FITS images of any BITPIX (8,
+                     16, 32, 64, -32, -64) and legacy BITPIX=1 .dmask
+                     bitmaps (historical ELLIPROF data), recognised from the
+                     file itself.  Exactly the same dimensions as the image.
+  --mask and --sky-image may also select an HDU: 'products.fits[MASK]'.
   --sc VALUE         deprecated alias of --sky; use --sky.
   SKY=s              ELLIPROF's own sky level, used ONLY in the de Vaucouleurs
                      fit it prints at the end; it does not change the image or
@@ -135,14 +145,16 @@ MODEL AND HARMONIC CONTROLS
                      needed).  The model follows the fitted intensity, centre,
                      ellipticity and position angle with radius, plus the
                      harmonic terms chosen below; it is relative to the
-                     subtracted sky.  image - model shows what the smooth
-                     model does not describe (dust, disks, shells, tidal
-                     features, ...).
+                     subtracted sky and covers masked pixels too.
+  --residual FILE    mask x (science - sky - model): what the smooth model
+                     does not describe (dust, disks, shells, tidal
+                     features, ...); exactly 0 on masked pixels.  Uses the
+                     same model as -m (MODEL is implied; -m is optional).
   Every isophote is fitted with a constant plus cos/sin of 1, 2, 3 and 4
   times the angle around the ellipse.  Orders 1-2 move the ellipse; orders 3
   and 4 are always measured (I3 A3 I4 A4) but never change the ellipse.
-  These options choose what goes into the MODEL image and do NOT change the
-  fitted profile -- except --sixth-order:
+  These options choose what goes into the MODEL image (and so into the
+  residual) and do NOT change the fitted profile -- except --sixth-order:
   --model-harmonics none|3|4|3,4
                      harmonic terms included in the model (default 3,4).
   --harmonic-mode each|median
@@ -164,8 +176,12 @@ OUTPUT FILES
   --reg FILE     the fitted ellipses as a DS9 region file, to overlay on the
                  image:  ds9 IMAGE.fits -regions FILE
   -m FILE        the 2-D model image (FITS), with MODEL; see above.
-  --prepared FILE  the prepared image (after sky and mask) exactly as
-                 ELLIPROF fits it.
+  --residual FILE  mask x (science - sky - model); see above.
+  --prepared FILE  mask x (science - sky): the image exactly as ELLIPROF
+                 fits it.
+  The model, residual and prepared images are float32 FITS with the header
+  of the selected science HDU (WCS, BUNIT, ...), so they overlay the science
+  image exactly in DS9 and other WCS-aware software.
 
 PROFILE COLUMNS (.prf, --csv)
   Rmaj    semi-major axis a of the isophote [pixels]
@@ -198,6 +214,10 @@ DIAGNOSTICS AND RUNTIME OPTIONS
                      limit, not a fitting parameter: the backend and its child
                      processes are stopped, temporary files removed, and
                      elliprof exits with status 124.
+  --verbose          show ELLIPROF's full output: iteration tables, model
+                     progress, every message.  (The legacy keyword VERBOSE
+                     keeps its meaning -- print the parameters after every
+                     iteration -- and also shows the full output.)
   --diagnostics      report for support: versions, Python, OS/macOS,
                      architecture, backend location, architecture, minimum
                      macOS and version, and the numpy/pandas versions.
@@ -227,6 +247,11 @@ EXAMPLES
   6th-order fit:
     elliprof galaxy.fits X0=500 Y0=500 R0=5 R1=200 NR=30 --sixth-order
 
+  Image in an extension; model, prepared image and residual:
+    elliprof 'galaxy.fits[SCI]' --mask galaxy_mask.fits --sky 1234.5 \\
+        X0=500 Y0=500 R0=5 R1=200 NR=30 MODEL -m galaxy_model.fits \\
+        --prepared galaxy_prepared.fits --residual galaxy_residual.fits
+
 {credit}
 Maintained by {maintainer}   Email: {email}
 Documentation: https://github.com/ekourkchi/elliprof
@@ -236,11 +261,11 @@ Documentation: https://github.com/ekourkchi/elliprof
 USAGE = HELP
 
 VALUE_OPTS = {"--mask", "--sky", "--sc", "--sky-image", "-o", "--csv",
-              "--reg", "-m", "--prepared", "--timeout", "--model-harmonics",
-              "--harmonic-mode"}
+              "--reg", "-m", "--prepared", "--residual", "--timeout",
+              "--model-harmonics", "--harmonic-mode"}
 FLAG_OPTS = {"-h": "help", "--help": "help", "-v": "version",
              "--version": "version", "--diagnostics": "diagnostics",
-             "--sixth-order": "sixth-order"}
+             "--sixth-order": "sixth-order", "--verbose": "verbose"}
 
 
 class UsageError(Exception):
@@ -280,6 +305,77 @@ def _parse(argv: List[str]) -> dict:
             opts["words"].append(arg)
             i += 1
     return opts
+
+
+# Lines of the backend's standard output (its own summary lines, and
+# messages of the unchanged ELLIPROF routines) used by the short summary
+_IMAGE = re.compile(r":\s+(\d+) cols x\s+(\d+) rows")
+_SKY = re.compile(r"^\s*Sky: subtracted (scalar|image)\s+(.*?)\s*$")
+_MASK = re.compile(r"^\s*Mask: (.*) \(BITPIX (-?\d+)\): (\d+) pixels masked"
+                   r" \(\s*([\d.]+)%\)")
+_NONF = re.compile(r"^\s*Mask: (\d+) of them NaN")
+_NOTES = (
+    ("FITCONTOUR: quitting",
+     "{n} isophote fit(s) had too few usable samples along the ellipse "
+     "(e.g. inside a masked region) and kept their previous parameters"),
+    ("dlogI/dlogr forced to -2",
+     "the intensity slope was not decreasing at {n} isophote(s) and was "
+     "set to -2"),
+    ("GETCONTOUR: omitted",
+     "{n} sample(s) were skipped because their AVG box was mostly masked"),
+    ("set to 0",
+     "{n} model pixel(s) were out of range and set to 0"),
+)
+
+
+def _summary(result, opts: dict, nr: str = "") -> None:
+    """The short report of a successful fit: inputs, notes (stderr),
+    files written.  The profile table is shown only if no profile file
+    was asked for."""
+    out = result.stdout.splitlines()
+    image = str(opts["image"])
+    size = next((m for m in map(_IMAGE.search, out) if m), None)
+    print("Image:    " + image + (f" ({size.group(1)} x {size.group(2)})"
+                                   if size else ""))
+    if opts.get("--sky") is not None:
+        print("Sky:      scalar " + str(opts["--sky"]).strip())
+    elif opts.get("--sky-image"):
+        print("Sky:      image " + str(opts["--sky-image"]))
+    else:
+        print("Sky:      none")
+    mask = next((m for m in map(_MASK.match, out) if m), None)
+    if mask:
+        nonf = next((m for m in map(_NONF.match, out) if m), None)
+        extra = f", {nonf.group(1)} of them NaN/Inf/undefined" if nonf \
+            else ""
+        print(f"Mask:     {opts['--mask']} - {mask.group(3)} pixels masked "
+              f"({float(mask.group(4)):.3f}%){extra}")
+    else:
+        print("Mask:     none")
+    if "SURFACE PHOTOMETRY PROFILE COMPUTATION:" in result.stdout:
+        table = result.stdout.split(
+            "SURFACE PHOTOMETRY PROFILE COMPUTATION:", 1)[1]
+        rows = [l for l in table.splitlines() if l.strip()]
+        print("Fit complete: %d isophotes." % max(0, len(rows) - 1))
+        print("\n".join(rows))
+    elif nr:
+        print(f"Fit complete: {nr} isophotes.")
+    else:
+        print("Fit complete.")
+    sys.stdout.flush()
+    for text, note in _NOTES:
+        n = sum(text in l for l in out)
+        if n:
+            print("elliprof: note: " + note.format(n=n), file=sys.stderr)
+    sys.stderr.write(result.stderr)
+    sys.stderr.flush()
+    for label, key in (("Profile", "-o"), ("CSV", "--csv"),
+                       ("Regions", "--reg"), ("Model", "-m"),
+                       ("Prepared", "--prepared"),
+                       ("Residual", "--residual")):
+        if opts.get(key):
+            print(f"{label + ':':<9} {opts[key]}")
+    print("Done.")
 
 
 def _split_center(words: List[str]):
@@ -338,22 +434,40 @@ def main(argv: Optional[List[str]] = None) -> int:
         except ValueError:
             raise UsageError("--timeout needs a number of seconds") \
                 from None
+        # --verbose, or ELLIPROF's own VERBOSE keyword: everything the
+        # backend prints; otherwise a short summary
+        raw = opts.get("verbose", False) or any(
+            w.strip().upper() == "VERBOSE" for w in words)
+        nr = [w.partition("=")[2].strip() for w in words
+              if w.partition("=")[0].strip().upper() == "NR"]
         with tempfile.TemporaryDirectory(prefix="elliprof-") as tmp:
-            tmp = Path(tmp)
-            result = run_elliprof(
-                opts["image"], x0, y0, mask=opts.get("--mask"),
-                sky=opts.get("--sky"), sky_image=opts.get("--sky-image"),
-                extra=words, output_dir=tmp,
-                prf_path=opts.get("-o") or tmp / "p.prf",
-                csv_path=opts.get("--csv") or tmp / "p.csv",
-                reg_path=opts.get("--reg") or tmp / "p.reg",
+            kwargs = dict(
+                mask=opts.get("--mask"), sky=opts.get("--sky"),
+                sky_image=opts.get("--sky-image"), extra=words,
+                output_dir=Path(tmp), prf_path=opts.get("-o"),
+                csv_path=opts.get("--csv"), reg_path=opts.get("--reg"),
                 model_path=opts.get("-m"), prepared=opts.get("--prepared"),
+                residual_path=opts.get("--residual"),
                 model_harmonics=opts.get("--model-harmonics"),
                 harmonic_mode=opts.get("--harmonic-mode"),
                 sixth_order=opts.get("sixth-order", False),
-                timeout=timeout, check=False, load_profile=False)
-            sys.stdout.write(result.stdout)
-            sys.stderr.write(result.stderr)
+                timeout=timeout, check=False, load_profile=False,
+                default_outputs=False,
+                backend_verbose=opts.get("verbose", False))
+            if not raw:
+                print(f"elliprof {__version__}")
+                print(f"Fitting {nr[-1]} isophotes..." if nr
+                      else "Fitting...")
+                sys.stdout.flush()
+            result = run_elliprof(opts["image"], x0, y0, **kwargs)
+            if raw or result.returncode != 0:
+                # everything the backend said: on request, and always
+                # when it failed, so that no error is ever hidden
+                sys.stdout.write(result.stdout)
+                sys.stdout.flush()
+                sys.stderr.write(result.stderr)
+            else:
+                _summary(result, opts, nr[-1] if nr else "")
             return result.returncode
     except UsageError as exc:
         print(f"elliprof: error: {exc}", file=sys.stderr)

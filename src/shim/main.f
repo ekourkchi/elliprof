@@ -17,17 +17,22 @@ C     coordinates); ELLIPROF refines it during the fit.
       INCLUDE 'profile.inc'
       INCLUDE 'version.inc'
 
-      REAL, ALLOCATABLE :: PIX(:,:)
+      REAL, ALLOCATABLE :: PIX(:,:), PREP(:,:)
+      LOGICAL, ALLOCATABLE :: GOOD(:,:)
       CHARACTER*1024 ARG, FITSFILE, PRFFILE, MODFILE, CSVFILE, REGFILE
       CHARACTER*1024 MASKFILE, SKYIMG, SKYSTR, SKYDESC, MSKDESC
-      CHARACTER*1024 PREPFILE
+      CHARACTER*1024 PREPFILE, RESFILE
       CHARACTER*289 OSTRNG, LCSTRNG
       LOGICAL ERR, DOMODEL, DOGC, HASX0, HASY0, HASR0, HASR1, HASNR
-      LOGICAL PREPONLY, HASNIT
+      LOGICAL PREPONLY, HASNIT, INTMODEL
       INTEGER UPPER, NARGS, IARG, IWORD, JCHAR, IB, ICON, NSKYOPT
       INTEGER NTYPE, NUM, NCHAR, NCOL, NROW, IUNIT, IERR, L, I, J
-      INTEGER ICOS3X, MBITPIX, NZERO, NOTHER
+      INTEGER ICOS3X, MBITPIX, NBAD, NNONF
       REAL FNUM, SKYVAL, CFV, VX0, VY0, VR0, VR1, VNR, VNIT
+C     --verbose: row-by-row model progress (stubs.f TELLME) and the
+C     profile table even when it is written to a file
+      LOGICAL SHVERB
+      COMMON /SHIMOPT/ SHVERB
 
 C     ---- Command line: image file, options, ELLIPROF words
 
@@ -41,7 +46,10 @@ C     ---- Command line: image file, options, ELLIPROF words
       SKYSTR = ' '
       SKYIMG = ' '
       PREPFILE = ' '
+      RESFILE = ' '
       PREPONLY = .FALSE.
+      SHVERB = .FALSE.
+      INTMODEL = .FALSE.
       NSKYOPT = 0
       COMMAND = 'ELLIPROF'
       IARG = 0
@@ -60,11 +68,13 @@ C     CFITSIO reports its version as major + minor/100
          STOP
       ELSE IF (ARG .EQ. '--prepare-only') THEN
          PREPONLY = .TRUE.
+      ELSE IF (ARG .EQ. '--verbose') THEN
+         SHVERB = .TRUE.
       ELSE IF (ARG .EQ. '-o' .OR. ARG .EQ. '-m' .OR.
      $        ARG .EQ. '--csv' .OR. ARG .EQ. '--reg' .OR.
      $        ARG .EQ. '--mask' .OR. ARG .EQ. '--sky' .OR.
      $        ARG .EQ. '--sc' .OR. ARG .EQ. '--sky-image' .OR.
-     $        ARG .EQ. '--prepared') THEN
+     $        ARG .EQ. '--prepared' .OR. ARG .EQ. '--residual') THEN
          IF (IARG .EQ. NARGS) THEN
             WRITE (0,'(3A)') 'elliprof: error: ', ARG(1:LEN_TRIM(ARG)),
      $           ' needs a value'
@@ -86,6 +96,8 @@ C     CFITSIO reports its version as major + minor/100
             NSKYOPT = NSKYOPT + 1
          ELSE IF (ARG .EQ. '--prepared') THEN
             CALL GET_COMMAND_ARGUMENT(IARG, PREPFILE)
+         ELSE IF (ARG .EQ. '--residual') THEN
+            CALL GET_COMMAND_ARGUMENT(IARG, RESFILE)
          ELSE
             IF (ARG .EQ. '--sc') WRITE (0,'(A)')
      $           'elliprof: --sc is deprecated, use --sky'
@@ -191,6 +203,23 @@ C     command took the image buffer number there), strings to WORD.
          IF (WORD(I)(1:6) .EQ. 'NITER=') HASNIT = .TRUE.
  45   CONTINUE
 
+C     --residual needs ELLIPROF's model image: ask ELLIPROF for it (the
+C     same MODEL computation -m saves), whether or not -m is given
+      IF (RESFILE .NE. ' ' .AND. .NOT. DOMODEL .AND.
+     $     .NOT. PREPONLY) THEN
+         IF (JCHAR .GE. NCON) THEN
+            WRITE (0,'(A,I0,A)') 'elliprof: error: --residual needs '
+     $           //'room for the MODEL keyword (at most ', NCON,
+     $           ' keywords)'
+            CALL EXIT(1)
+         END IF
+         JCHAR = JCHAR + 1
+         WORD(JCHAR) = 'MODEL'
+         ORIGWORD(JCHAR) = 'MODEL'
+         DOMODEL = .TRUE.
+         INTMODEL = .TRUE.
+      END IF
+
 C     ---- Fail fast: everything ELLIPROF would otherwise report late,
 C     unclearly, or not at all.  Nothing may ever wait for input.
 
@@ -271,7 +300,13 @@ C     COS3X -2..2 (negative: 6th- instead of 3rd-order term), COS4X 0..2
       IF (IERR .EQ. 0) CALL CHKOUT(REGFILE, IERR)
       IF (IERR .EQ. 0) CALL CHKOUT(MODFILE, IERR)
       IF (IERR .EQ. 0) CALL CHKOUT(PREPFILE, IERR)
+      IF (IERR .EQ. 0) CALL CHKOUT(RESFILE, IERR)
       IF (IERR .NE. 0) CALL EXIT(1)
+      IF (PREPONLY .AND. RESFILE .NE. ' ') THEN
+         WRITE (0,'(A)') 'elliprof: error: --residual needs a fit, not '
+     $        //'--prepare-only'
+         CALL EXIT(1)
+      END IF
 
 C     ---- Control flags of the original environment (the COMMON
 C     variable names come from the unchanged include files)
@@ -336,44 +371,59 @@ C     ---- Sky, then mask (prep.f): the order matters
          SKYDESC = 'image ' // SKYIMG
       END IF
 
+C     The logical mask (all good without --mask) is kept for --residual
       MSKDESC = 'none'
+      IF (MASKFILE .NE. ' ' .OR. RESFILE .NE. ' ') THEN
+         ALLOCATE (GOOD(NCOL,NROW))
+         GOOD = .TRUE.
+      END IF
       IF (MASKFILE .NE. ' ') THEN
-         CALL APPLYMASK(MASKFILE, PIX, NCOL, NROW, ISC, ISR,
-     $        MBITPIX, NZERO, NOTHER, IERR)
+         CALL APPLYMASK(MASKFILE, PIX, NCOL, NROW, ISC, ISR, GOOD,
+     $        MBITPIX, NBAD, NNONF, IERR)
          IF (IERR .NE. 0) CALL EXIT(1)
          WRITE (6,1003) MASKFILE(1:LEN_TRIM(MASKFILE)), MBITPIX,
-     $        NZERO, 100.0*NZERO/(FLOAT(NCOL)*NROW)
+     $        NBAD, 100.0*NBAD/(FLOAT(NCOL)*NROW)
  1003    FORMAT (' Mask: ',A,' (BITPIX ',I0,'): ',I0,
      $        ' pixels masked (',F6.3,'%)')
-         IF (NOTHER .GT. 0) WRITE (0,*) 'elliprof: ', NOTHER,
-     $        ' mask pixels are neither 0 nor 1;',
-     $        ' they multiply the image'
+         IF (NNONF .GT. 0) WRITE (6,'(A,I0,A)') ' Mask: ', NNONF,
+     $        ' of them NaN, Inf or undefined'
          MSKDESC = MASKFILE
       END IF
 
-C     ---- Diagnostic: the image exactly as ELLIPROF receives it
+C     ---- The prepared image, exactly as ELLIPROF receives it:
+C     good(mask) x (science - sky)
 
       IF (PREPFILE .NE. ' ') THEN
-         CALL FITSWRITEIM(PREPFILE, NCOL, NROW, PIX, ISC, ISR,
-     $        'elliprof: image after sky and mask, input to ELLIPROF',
-     $        IERR)
+         CALL FITSWRITEPROD(PREPFILE, FITSFILE, NCOL, NROW, PIX,
+     $        'PREPARED = mask x (science - sky)', IERR)
          IF (IERR .NE. 0) CALL EXIT(1)
       END IF
       IF (PREPONLY) STOP
 
+C     ELLIPROF replaces the image with its model: keep the prepared
+C     image for the residual
+      IF (RESFILE .NE. ' ') THEN
+         ALLOCATE (PREP(NCOL,NROW))
+         PREP = PIX
+      END IF
+
 C     ---- Run the unchanged ELLIPROF
 
       CALL ELLIPROF(PIX, NROW, NCOL)
-      IF (DOMODEL) WRITE (0,*)
+      IF (DOMODEL .AND. SHVERB) WRITE (0,*)
 
       IF (XERR) THEN
          WRITE (0,*) 'elliprof: ELLIPROF reported an error'
          CALL EXIT(1)
       END IF
 
-C     ---- Print the profile the way PRINT EPROF does (printout.f)
+C     ---- Print the profile the way PRINT EPROF does (printout.f), when
+C     it is not being written to -o or --csv (or with --verbose)
 
-      IF (N_PRF .GT. 0) THEN
+      IF (N_PRF .GT. 0 .AND. .NOT. SHVERB .AND.
+     $     (PRFFILE .NE. ' ' .OR. CSVFILE .NE. ' ')) THEN
+         CONTINUE
+      ELSE IF (N_PRF .GT. 0) THEN
          WRITE (6,103)
  103     FORMAT (' SURFACE PHOTOMETRY PROFILE COMPUTATION: ')
          ICOS3X = NINT(PARAM_PRF(12,15))
@@ -433,19 +483,39 @@ C     ---- Optional CSV table and DS9 regions from the final /PRF/
          END IF
       END IF
 
-C     ---- Write the model image, which ELLIPROF left in PIX
+C     ---- Write the model image, which ELLIPROF left in PIX; it is the
+C     smooth model over the whole image, never masked
 
       IF (MODFILE .NE. ' ') THEN
          IF (DOMODEL) THEN
-            CALL FITSWRITEIM(MODFILE, NCOL, NROW, PIX, ISC, ISR,
-     $           'Model image from elliprof', IERR)
+            CALL FITSWRITEPROD(MODFILE, FITSFILE, NCOL, NROW, PIX,
+     $           'MODEL (galaxy model from the fitted isophotes)', IERR)
             IF (IERR .NE. 0) CALL EXIT(1)
          ELSE
             WRITE (0,*) 'elliprof: -m ignored, MODEL was not given'
          END IF
-      ELSE IF (DOMODEL) THEN
+      ELSE IF (DOMODEL .AND. RESFILE .EQ. ' ') THEN
          WRITE (0,*) 'elliprof: MODEL given without -m file;',
      $        ' model image not saved'
+      END IF
+
+C     ---- The residual from that same model:
+C     good(mask) x (science - sky - model), i.e. prepared - model on
+C     good pixels and exactly 0 on bad ones
+
+      IF (RESFILE .NE. ' ') THEN
+         DO 60 J = 1, NROW
+            DO 61 I = 1, NCOL
+               IF (GOOD(I,J)) THEN
+                  PREP(I,J) = PREP(I,J) - PIX(I,J)
+               ELSE
+                  PREP(I,J) = 0.0
+               END IF
+ 61         CONTINUE
+ 60      CONTINUE
+         CALL FITSWRITEPROD(RESFILE, FITSFILE, NCOL, NROW, PREP,
+     $        'RESIDUAL = mask x (science - sky - model)', IERR)
+         IF (IERR .NE. 0) CALL EXIT(1)
       END IF
 
       END
@@ -526,7 +596,7 @@ C     only for the test is removed again; an existing one is kept.
      $ 'usage: elliprof_native image.fits X0=x Y0=y R0=r R1=r NR=n',
      $ '         [KEY=value ...] [--sky value | --sky-image file]',
      $ '         [--mask file] [-o out.prf] [--csv out.csv]',
-     $ '         [--reg out.reg] [-m model.fits]',
+     $ '         [--reg out.reg] [-m model.fits] [--residual res.fits]',
      $ ' ',
      $ '  The compiled backend of the elliprof package; most users',
      $ '  should run the Python `elliprof` command instead.',
@@ -538,15 +608,22 @@ C     only for the test is removed again; an existing one is kept.
      $ '  --sky value       subtract a constant sky first',
      $ '                    (not the same as the SKY= keyword)',
      $ '  --sky-image file  subtract a sky image first',
-     $ '  --mask file       then multiply by a mask:',
-     $ '                    0 = masked, 1 = good; BITPIX=1 supported',
+     $ '  --mask file       then apply a logical mask: 0, NaN, Inf',
+     $ '                    or undefined = bad (set to 0), any other',
+     $ '                    value = good; any BITPIX, BITPIX=1 .dmask',
      $ '  -o out.prf        profile, full precision',
      $ '  --csv out.csv     profile as commented fixed-width CSV',
      $ '  --reg out.reg     fitted ellipses as DS9 regions',
      $ '  -m model.fits     the MODEL (or GC model) image',
+     $ '  --residual file   mask x (science - sky - model); implies',
+     $ '                    MODEL',
+     $ '  Images may be file.fits[N] or file.fits[EXTNAME]; products',
+     $ '  (model, prepared, residual) carry the science header/WCS.',
      $ '  --prepared file   write the image as passed to ELLIPROF',
      $ '                    (after sky and mask), for diagnostics',
      $ '  --prepare-only    stop after writing --prepared (no fit)',
+     $ '  --verbose         model progress, and the profile table',
+     $ '                    even when it is written to a file',
      $ '  --version         print the backend version'
       RETURN
       END

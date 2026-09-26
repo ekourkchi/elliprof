@@ -165,15 +165,23 @@ def test_standard_fits_mask(dtype, tmp_path, prepare):
 
 
 @pytest.mark.native
-def test_non_binary_mask_values_multiply(tmp_path, run_native):
-    write_fits(tmp_path / "m.fits", np.full((4, 4), 0.5))
+def test_mask_values_are_logical_not_weights(tmp_path, run_native):
+    """Any finite nonzero value is good and keeps the pixel unchanged;
+    0, NaN and Inf are bad and give exactly 0."""
+    m = np.array([[0.5, 2.0, -1.0, 0.0],
+                  [-3.7, 255.0, np.nan, np.inf],
+                  [1e-30, -np.inf, 1.0, 0.25],
+                  [0.0, 7.0, -0.0, 3.0]])
+    write_fits(tmp_path / "m.fits", m)
     img = write_fits(tmp_path / "img.fits", np.full((4, 4), 8.0))
     out = tmp_path / "p.fits"
     proc = run_native(img, "--prepare-only", "--prepared", out,
                       "--mask", tmp_path / "m.fits")
-    assert proc.returncode == 0
-    assert "neither 0 nor 1" in proc.stderr
-    np.testing.assert_array_equal(read_fits(out), 4.0)
+    assert proc.returncode == 0, proc.stderr
+    good = np.isfinite(m) & (m != 0)
+    np.testing.assert_array_equal(read_fits(out), np.where(good, 8.0, 0.0))
+    assert "6 pixels masked" in proc.stdout
+    assert "3 of them NaN, Inf or undefined" in proc.stdout
 
 
 @pytest.mark.native

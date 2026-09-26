@@ -147,20 +147,43 @@ elliprof galaxy.fits \
 - `profile.csv`: the radial profile, one row per isophote.
 - `profile.reg`: the fitted ellipses as a DS9 region file. View them with `ds9 galaxy.fits -regions profile.reg`.
 
-### Profile files and the model image
+### Profile files and images
 
 elliprof produces two different kinds of result:
 
 - **The profile** (`-o profile.prf`, `--csv profile.csv`): numbers, one set per fitted isophote (radius, centre, intensity, position angle, ellipticity, harmonic terms, slope). The `.prf` is ELLIPROF's native profile format at full precision, with the run settings. **It is a table of numbers, not an image.** The CSV holds the same profile as a readable table.
-- **The model image** (`MODEL -m model.fits`): a 2-D FITS image of the galaxy reconstructed from the fitted isophotes. It follows the fitted intensity, centre, ellipticity and position angle with radius, plus the harmonic terms chosen with `--model-harmonics`. It is relative to the subtracted sky.
+- **Images** (FITS, float32):
+  - **model** (`MODEL -m model.fits`): the galaxy reconstructed from the fitted isophotes. It follows the fitted intensity, centre, ellipticity and position angle with radius, plus the harmonic terms chosen with `--model-harmonics`. It is relative to the subtracted sky, and it covers masked pixels too.
+  - **prepared** (`--prepared prepared.fits`): `mask × (science − sky)`, the image exactly as ELLIPROF fits it.
+  - **residual** (`--residual residual.fits`): `mask × (science − sky − model)`. It is science − sky − model on good pixels and exactly 0 on masked ones. It uses the same model as `-m`; `-m` is not needed.
 
 ```sh
-elliprof u12517j.fits --mask u12517j.dmask --sky 3246.0 \
-    X0=567 Y0=562 R0=9 R1=347 NR=23 NITER=10 RMSTAR \
-    MODEL -m u12517j_model.fits -o u12517j.prf
+elliprof galaxy.fits \
+    --mask mask.fits \
+    --sky 1234.5 \
+    X0=500 Y0=500 R0=5 R1=200 NR=30 \
+    MODEL -m galaxy_model.fits \
+    --prepared galaxy_prepared.fits \
+    --residual galaxy_residual.fits \
+    -o galaxy.prf
 ```
 
-Subtracting the model from the sky-subtracted image shows the light the smooth isophotal model does not describe. That can reveal dust, embedded disks, shells or tidal features, and it is also where fitting problems show up. Both `MODEL` and `-m` are needed. The residual needs care in interpretation: it depends on the fit, the mask and the model settings.
+All three images carry the header of the science image, including its WCS (`CTYPE`, `CRPIX`, `CRVAL`, `CD`/`PC`/`CDELT`, distortion terms), `BUNIT` and the other keywords. Only the cards that describe how the science data were stored are left out, such as `BITPIX`, `BSCALE`, `BZERO` and `BLANK`. The science, model, prepared and residual images therefore overlay exactly in DS9 and other WCS-aware software.
+
+The residual shows the light that the smooth isophotal model does not describe. That can reveal dust, embedded disks, shells or tidal features, and it is also where fitting problems show up. It needs care in interpretation, because it depends on the fit, the mask and the model settings.
+
+### Images in FITS extensions
+
+An image in an extension is selected with CFITSIO syntax, by name or number. Quote it, because brackets mean something to the shell:
+
+```sh
+elliprof 'galaxy.fits[SCI]' \
+  X0=500 Y0=500 \
+  R0=5 R1=200 NR=30 \
+  -o galaxy.prf
+```
+
+Only the selected HDU is fitted, and its header and WCS go into the model, prepared and residual images. elliprof never falls back to another HDU; if the selected one is not a 2-D image, it stops with an error. `--mask` and `--sky-image` accept the same syntax, for example `--mask 'products.fits[MASK]'`.
 
 ### Sky and masks
 
@@ -192,9 +215,10 @@ elliprof galaxy.fits \
     R0=5 R1=200 NR=30
 ```
 
-- Mask values: **0 = bad / ignored, 1 = good.** Legacy `.dmask` bitmaps (`BITPIX = 1`) are also read.
-- The mask and the sky image must have exactly the same dimensions as the science image; nothing is resized.
-- The image is prepared as `(science − sky) × mask`, and ELLIPROF ignores pixels that are exactly 0.
+- The mask is **logical**. **0 = bad / ignored**; any other finite value (1, 2, −1, 0.5, …) = good; NaN, ±Inf and undefined (`BLANK`) pixels = bad. The values are never used as weights: bad pixels become exactly 0 and good pixels keep their value.
+- Masks may be FITS images of any type (`BITPIX` 8, 16, 32, 64, −32, −64) or legacy `.dmask` bitmaps (`BITPIX = 1`). The type is recognised from the file itself, not from its name.
+- The mask and the sky image must have exactly the same dimensions as the science image. Nothing is ever resized, interpolated, cropped, padded, shifted or reprojected.
+- The image is prepared as `mask × (science − sky)`, and ELLIPROF ignores pixels that are exactly 0.
 
 ## Harmonic terms: boxy and disky isophotes
 
@@ -327,11 +351,15 @@ One row per isophote (`result.profile`, the CSV file, and the `.prf` file):
 | `SKY=` | `elliprof_sky` | sky used only in ELLIPROF's de Vaucouleurs fit (it does not change the image) |
 | `GC` | `gc` | globular-cluster mode: circular annuli |
 | `-o F` `--csv F` `--reg F` | `prf_path` `csv_path` `reg_path` | output files |
+| `--residual F` | `residual_path` | residual image, `mask × (science − sky − model)` |
+| `--verbose` | `backend_verbose` | show ELLIPROF's full output (iteration tables, model progress) |
 | `--prepared F` | `prepared` | write the prepared image (after sky and mask) as ELLIPROF fits it |
 | `--sc V` | – | deprecated alias of `--sky` |
 | `--timeout S` | `timeout` | stop a run after S seconds (default 1800; exit status 124) |
 
-`OLD`, `EDIT` and `TV` (interactive options) are not supported. Invalid input fails immediately with a clear message, and the program never waits for keyboard input. `elliprof -h` describes every parameter and option. `elliprof -v` prints the version, and `elliprof --diagnostics` prints version, platform and backend information for bug reports.
+`OLD`, `EDIT` and `TV` (interactive options) are not supported. Invalid input fails immediately with a clear message, and the program never waits for keyboard input.
+
+A normal run prints a short summary: the image, sky and mask, the number of isophotes, notes about anything unusual, and the files written. The profile table is printed only when no profile file (`-o`, `--csv`) is asked for. `--verbose` shows ELLIPROF's full output. The legacy keyword `VERBOSE` still prints the parameters after every iteration, and also shows the full output. Errors are always shown in full. `elliprof -h` describes every parameter and option. `elliprof -v` prints the version, and `elliprof --diagnostics` prints version, platform and backend information for bug reports.
 
 ## Platforms
 

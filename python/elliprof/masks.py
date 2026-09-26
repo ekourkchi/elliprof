@@ -1,7 +1,8 @@
-"""Mask files: 0 = masked (bad) pixel, 1 = good pixel.
+"""Mask files.  A mask is logical: 0, NaN, Inf or undefined = bad
+(masked) pixel, any other value = good pixel; values are never weights.
 
-The sky-subtracted image is multiplied by the mask, so masked pixels
-become exactly 0, which ELLIPROF skips as missing data.
+The backend sets bad pixels of the sky-subtracted image to exactly 0,
+which ELLIPROF skips as missing data (see :func:`elliprof.io.apply_mask`).
 
 Besides ordinary FITS images, masks may use a legacy bitmap format:
 FITS-like files with ``BITPIX = 1`` (for example ``*.dmask``), which
@@ -165,8 +166,9 @@ def load_mask(path: str) -> np.ndarray:
     """Read a mask as float32 (rows, cols), as the backend sees it.
 
     BITPIX = 1 bitmaps are decoded here.  Other masks are read with
-    astropy (install it for this helper) and keep their values, which
-    multiply the image.
+    astropy (install it for this helper) and keep their raw values; the
+    backend treats any finite nonzero value as good (see
+    :func:`elliprof.io.logical_mask`).
     """
     if not os.path.exists(path):
         raise FileNotFoundError(path)

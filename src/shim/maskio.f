@@ -167,3 +167,118 @@ C     bitfp_: i = npix-1 .. 0 (0-based), b is an unsigned char
       IERR = 0
       RETURN
       END
+
+C     ---- Masks for the fit (0.1.3): logical, any representation.
+C
+C     A mask is LOGICAL: pixel good = finite and nonzero, bad = zero,
+C     NaN, +-Inf, or undefined (BLANK in an integer image).  Its values
+C     are never used as weights.  What the file holds is found from the
+C     file itself, not its name: a plain file whose primary header says
+C     BITPIX = 1 is a legacy bitmap (decoded by READBITMAP above);
+C     anything else is read through CFITSIO -- integer (8, 16, 32, 64)
+C     or floating-point (-32, -64) images, in the primary HDU or a
+C     selected one (mask.fits[1], products.fits[MASK]).
+
+C     Is FNAME a legacy BITPIX = 1 bitmap?  Reads only the start of the
+C     primary header; says no for anything it cannot read, so that
+C     CFITSIO then reports the problem.
+      LOGICAL FUNCTION LEGACYMASK(FNAME)
+      CHARACTER*(*) FNAME
+      CHARACTER*80 CARD
+      INTEGER K, IOS, IVAL
+      LEGACYMASK = .FALSE.
+      IF (INDEX(FNAME, '[') .GT. 0) RETURN
+      OPEN (8, FILE=FNAME, ACCESS='STREAM', FORM='UNFORMATTED',
+     $     STATUS='OLD', ACTION='READ', IOSTAT=IOS)
+      IF (IOS .NE. 0) RETURN
+      DO 10 K = 1, 36
+         READ (8, POS=(K-1)*80+1, IOSTAT=IOS) CARD
+         IF (IOS .NE. 0) GOTO 20
+         IF (K .EQ. 1 .AND. CARD(1:9) .NE. 'SIMPLE  =') GOTO 20
+         IF (CARD(1:8) .EQ. 'BITPIX') THEN
+            IVAL = 0
+            CALL CARDINT(CARD, IVAL)
+            LEGACYMASK = IVAL .EQ. 1
+            GOTO 20
+         END IF
+ 10   CONTINUE
+ 20   CLOSE (8)
+      RETURN
+      END
+
+C     Size and CNPIX origin of a mask in any supported form.
+      SUBROUTINE MASKGEOM(FNAME, MCOL, MROW, MSC, MSR, IERR)
+      CHARACTER*(*) FNAME
+      INTEGER MCOL, MROW, MSC, MSR, IERR
+      INTEGER MBITPIX, IOFF, IUNIT
+      LOGICAL LEGACYMASK
+      CHARACTER*81840 HTMP
+      IF (LEGACYMASK(FNAME)) THEN
+         CALL MASKHEAD(FNAME, MBITPIX, MCOL, MROW, MSC, MSR, IOFF, IERR)
+      ELSE
+         CALL FITSOPENIM(FNAME, IUNIT, MCOL, MROW, MSC, MSR, HTMP, IERR)
+         IF (IERR .EQ. 0) THEN
+            CALL FITSCLOSE(IUNIT)
+         ELSE
+            CALL MASKFORMS(FNAME)
+         END IF
+      END IF
+      RETURN
+      END
+
+C     The logical mask GOOD (NCOL x NROW, geometry already checked),
+C     the mask's BITPIX (1 for a legacy bitmap), the number of bad
+C     pixels and, of those, how many were NaN, Inf or undefined.
+      SUBROUTINE MASKGOOD(FNAME, NCOL, NROW, GOOD, MBITPIX, NBAD,
+     $     NNONF, IERR)
+      CHARACTER*(*) FNAME
+      INTEGER NCOL, NROW, MBITPIX, NBAD, NNONF, IERR
+      LOGICAL GOOD(NCOL*NROW)
+      REAL, ALLOCATABLE :: M(:)
+      LOGICAL, ALLOCATABLE :: UNDEF(:)
+      LOGICAL LEGACYMASK, FINITE
+      INTEGER MCOL, MROW, MSC, MSR, IOFF, IUNIT, I, STATUS
+      CHARACTER*81840 HTMP
+
+      ALLOCATE (M(NCOL*NROW), UNDEF(NCOL*NROW))
+      IF (LEGACYMASK(FNAME)) THEN
+         CALL MASKHEAD(FNAME, MBITPIX, MCOL, MROW, MSC, MSR, IOFF, IERR)
+         IF (IERR .EQ. 0) CALL READBITMAP(FNAME, IOFF, NCOL*NROW, M,
+     $        IERR)
+         DO 5 I = 1, NCOL*NROW
+            UNDEF(I) = .FALSE.
+ 5       CONTINUE
+      ELSE
+         CALL FITSOPENIM(FNAME, IUNIT, MCOL, MROW, MSC, MSR, HTMP, IERR)
+         IF (IERR .NE. 0) THEN
+            CALL MASKFORMS(FNAME)
+         ELSE
+            STATUS = 0
+            CALL FTGIDT(IUNIT, MBITPIX, STATUS)
+            CALL FITSREADFLAG(IUNIT, NCOL*NROW, M, UNDEF, IERR)
+         END IF
+      END IF
+      IF (IERR .EQ. 0) THEN
+         NBAD = 0
+         NNONF = 0
+         DO 10 I = 1, NCOL*NROW
+            FINITE = M(I) .EQ. M(I) .AND. ABS(M(I)) .LE. HUGE(M(I))
+            GOOD(I) = FINITE .AND. .NOT. UNDEF(I) .AND. M(I) .NE. 0.0
+            IF (.NOT. GOOD(I)) THEN
+               NBAD = NBAD + 1
+               IF (.NOT. FINITE .OR. UNDEF(I)) NNONF = NNONF + 1
+            END IF
+ 10      CONTINUE
+      END IF
+      DEALLOCATE (M, UNDEF)
+      RETURN
+      END
+
+      SUBROUTINE MASKFORMS(FNAME)
+      CHARACTER*(*) FNAME
+      WRITE (0,'(3A)') 'elliprof: error: cannot read the mask ',
+     $     FNAME(1:LEN_TRIM(FNAME)), '; supported masks are a 2-D FITS'
+     $     //' image of any BITPIX (optionally file.fits[HDU]) or a'
+     $     //' legacy BITPIX = 1 bitmap (.dmask)'
+      RETURN
+      END

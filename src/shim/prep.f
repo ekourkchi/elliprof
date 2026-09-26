@@ -2,11 +2,13 @@ C     Image preparation before ELLIPROF:
 C
 C        --sky V        A = A + (-V)
 C        --sky-image F  A = A - B
-C        --mask F       A = A * M      (0 = masked, 1 = good)
+C        --mask F       A = 0 where the mask is bad, else unchanged
 C
-C     All arithmetic is REAL*4, element by element.  The sky must be
-C     removed before the mask so that masked pixels end up exactly 0,
-C     which is what ELLIPROF treats as missing data.  A sky image or
+C     So the prepared image is  good(mask) x (science - sky).  The mask
+C     is logical: good = finite nonzero, bad = 0, NaN, Inf or undefined
+C     (maskio.f); its values are never used as weights.  All arithmetic
+C     is REAL*4, element by element.  The sky is removed first, and bad
+C     pixels then set to exactly 0, which ELLIPROF treats as missing.  A sky image or
 C     mask must have exactly the size and origin of the science image;
 C     it is never resized, cropped, shifted or resampled.
 
@@ -74,9 +76,9 @@ C     Check a mask's size and origin without reading its pixels.
       SUBROUTINE CHKMASK(FNAME, NCOL, NROW, ISC, ISR, IERR)
       CHARACTER*(*) FNAME
       INTEGER NCOL, NROW, ISC, ISR, IERR
-      INTEGER MBITPIX, MCOL, MROW, MSC, MSR, IOFF
+      INTEGER MCOL, MROW, MSC, MSR
 
-      CALL MASKHEAD(FNAME, MBITPIX, MCOL, MROW, MSC, MSR, IOFF, IERR)
+      CALL MASKGEOM(FNAME, MCOL, MROW, MSC, MSR, IERR)
       IF (IERR .NE. 0) RETURN
       CALL CHKGEOM('mask', MCOL, MROW, MSC, MSR,
      $     NCOL, NROW, ISC, ISR, IERR)
@@ -113,38 +115,27 @@ C     --sky-image F: subtract it pixel by pixel.
       RETURN
       END
 
-C     --mask F: multiply by it.  Returns the mask BITPIX, the number of
-C     zero (masked) pixels and of values other than 0 or 1.
-      SUBROUTINE APPLYMASK(FNAME, PIX, NCOL, NROW, ISC, ISR,
-     $     MBITPIX, NZERO, NOTHER, IERR)
+C     --mask F: set bad pixels to 0.  Returns the logical mask GOOD,
+C     the mask BITPIX (1 = legacy bitmap), the number of bad pixels and,
+C     of those, how many were NaN, Inf or undefined.
+      SUBROUTINE APPLYMASK(FNAME, PIX, NCOL, NROW, ISC, ISR, GOOD,
+     $     MBITPIX, NBAD, NNONF, IERR)
       CHARACTER*(*) FNAME
-      INTEGER NCOL, NROW, ISC, ISR, MBITPIX, NZERO, NOTHER, IERR
+      INTEGER NCOL, NROW, ISC, ISR, MBITPIX, NBAD, NNONF, IERR
       REAL PIX(NCOL,NROW)
-      REAL, ALLOCATABLE :: M(:,:)
-      INTEGER MCOL, MROW, MSC, MSR, IOFF, I, J
+      LOGICAL GOOD(NCOL,NROW)
+      INTEGER I, J
 
-      CALL MASKHEAD(FNAME, MBITPIX, MCOL, MROW, MSC, MSR, IOFF, IERR)
+      CALL CHKMASK(FNAME, NCOL, NROW, ISC, ISR, IERR)
       IF (IERR .NE. 0) RETURN
-      CALL CHKGEOM('mask', MCOL, MROW, MSC, MSR,
-     $     NCOL, NROW, ISC, ISR, IERR)
+      CALL MASKGOOD(FNAME, NCOL, NROW, GOOD, MBITPIX, NBAD, NNONF,
+     $     IERR)
       IF (IERR .NE. 0) RETURN
-      ALLOCATE (M(NCOL,NROW))
-      CALL MASKREAD(FNAME, MBITPIX, IOFF, NCOL, NROW, M, IERR)
-      IF (IERR .EQ. 0) THEN
-         NZERO = 0
-         NOTHER = 0
-         DO 10 J = 1, NROW
-            DO 11 I = 1, NCOL
-               IF (M(I,J) .EQ. 0.0) THEN
-                  NZERO = NZERO + 1
-               ELSE IF (M(I,J) .NE. 1.0) THEN
-                  NOTHER = NOTHER + 1
-               END IF
-               PIX(I,J) = PIX(I,J) * M(I,J)
- 11         CONTINUE
- 10      CONTINUE
-      END IF
-      DEALLOCATE (M)
+      DO 10 J = 1, NROW
+         DO 11 I = 1, NCOL
+            IF (.NOT. GOOD(I,J)) PIX(I,J) = 0.0
+ 11      CONTINUE
+ 10   CONTINUE
       RETURN
       END
 

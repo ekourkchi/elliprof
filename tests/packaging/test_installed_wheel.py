@@ -205,6 +205,39 @@ def test_harmonic_selection(tmp_path):
     assert bad.returncode == 1 and "model harmonics must be" in bad.stderr
 
 
+def test_extension_model_prepared_residual(tmp_path):
+    """The installed backend opens a selected HDU and writes the model,
+    prepared and residual images with that HDU's header (WCS)."""
+    fits = pytest.importorskip("astropy.io.fits")   # test-only dependency
+    data = fits.getdata(GALAXY)
+    h = fits.Header()
+    h.update(CTYPE1="RA---TAN", CTYPE2="DEC--TAN", CRVAL1=150.1,
+             CRVAL2=2.2, CRPIX1=128.0, CRPIX2=121.0, CDELT1=-1e-4,
+             CDELT2=1e-4, BUNIT="counts")
+    fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU(data, header=h,
+                                                   name="SCI")]).writeto(
+        tmp_path / "multi.fits")
+    m = np.ones(data.shape, np.float32)
+    m[200:220, 20:40] = np.nan                      # NaN = bad
+    fits.PrimaryHDU(m).writeto(tmp_path / "mask.fits")
+    p = run(str(tmp_path / "multi.fits") + "[SCI]", *FIT, "--sky", "100",
+            "--mask", tmp_path / "mask.fits", "MODEL",
+            "-m", tmp_path / "m.fits", "--prepared", tmp_path / "p.fits",
+            "--residual", tmp_path / "r.fits", "-o", tmp_path / "x.prf")
+    assert p.returncode == 0, p.stderr
+    assert "Residual:" in p.stdout and "Done." in p.stdout
+    good = np.isfinite(m)
+    prep = fits.getdata(tmp_path / "p.fits")
+    model = fits.getdata(tmp_path / "m.fits")
+    res = fits.getdata(tmp_path / "r.fits")
+    assert np.array_equal(res[good], (prep - model)[good])
+    assert np.all(res[~good] == 0) and np.all(prep[~good] == 0)
+    for name in ("m", "p", "r"):
+        out = fits.getheader(tmp_path / f"{name}.fits")
+        assert out["BITPIX"] == -32 and out["CRVAL1"] == 150.1
+        assert out["BUNIT"] == "counts" and "EXTNAME" not in out
+
+
 def test_paths_with_spaces_and_unicode(tmp_path):
     d = tmp_path / "dir with spaces"
     d.mkdir()

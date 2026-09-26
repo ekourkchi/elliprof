@@ -33,10 +33,14 @@ C     TVCROSS, TVCIRC: overlays on the TV display (tvgraph.f).  No-ops.
       END
 
 C     TELLME: progress line on stderr, as ccode/tellme.c prints it
-C     ("%s %4d %s\r").
+C     ("%s %4d %s\r").  ELLIPROF calls it only for "Row N modelled"
+C     while building a model image; printed only with --verbose.
       SUBROUTINE TELLME(S1, K, S2)
       CHARACTER*(*) S1, S2
       INTEGER K
+      LOGICAL SHVERB
+      COMMON /SHIMOPT/ SHVERB
+      IF (.NOT. SHVERB) RETURN
       WRITE (0,'(A,1X,I4,1X,A,A)',ADVANCE='NO')
      $     S1(1:LEN_TRIM(S1)), K, S2(1:LEN_TRIM(S2)), CHAR(13)
       FLUSH (0)

@@ -125,7 +125,8 @@ def test_invalid_image_file(capsys, tmp_path):
     bad = tmp_path / "bad.fits"
     bad.write_text("nope")
     code, _, err = run(capsys, bad, "X0=5", "Y0=5", *FIT)
-    assert code == 1 and "not a readable FITS" in err
+    # read by the backend (CFITSIO), which names the file and the problem
+    assert code == 1 and "cannot open" in err and "bad.fits" in err
 
 
 def test_keyword_builder():
