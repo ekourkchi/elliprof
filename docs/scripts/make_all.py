@@ -18,6 +18,7 @@ SCRIPTS = (
     "make_boxy_disky_diagram.py",
     "make_sbf_workflow.py",
     "make_sbf_power_spectrum_schematic.py",
+    "make_readme_banner.py",
 )
 
 if __name__ == "__main__":
