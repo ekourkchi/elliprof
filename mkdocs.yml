@@ -1,0 +1,119 @@
+site_name: ELLIPROF
+site_description: >-
+  Galaxy isophote fitting with ELLIPROF: surface-brightness profiles, shapes,
+  boxy/disky isophotes, model and residual images, and the role of galaxy
+  modelling in surface brightness fluctuation (SBF) distances.
+site_author: Ehsan Kourkchi (Edwin Kay)
+site_url: https://ekourkchi.github.io/elliprof/
+repo_url: https://github.com/ekourkchi/elliprof
+repo_name: ekourkchi/elliprof
+edit_uri: ""
+copyright: >-
+  ELLIPROF was originally developed by John Tonry as part of MONSTA.
+  Maintained by Ehsan Kourkchi (Edwin Kay) &middot; ekourkchi@gmail.com
+
+theme:
+  name: material
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  icon:
+    logo: material/orbit
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search
+
+# figure scripts live next to the pages but are not part of the site
+exclude_docs: |
+  scripts/
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Install: install.md
+      - 5-minute quick start: quickstart.md
+  - Concepts:
+      - What is an isophote?: concepts/isophotes.md
+      - How ELLIPROF fits a galaxy: concepts/how-it-works.md
+      - Sky and masks: concepts/sky-and-masks.md
+      - Boxy and disky isophotes: concepts/harmonics.md
+  - Outputs:
+      - The profile: outputs/profile.md
+      - Model, residual and prepared images: outputs/images.md
+  - Science:
+      - Galaxy surface photometry: science/surface-photometry.md
+      - Surface brightness fluctuations:
+          - sbf/index.md
+          - "ELLIPROF's role in SBF": sbf/elliprof-role.md
+          - Power spectrum and distance: sbf/power-spectrum.md
+          - Workflow and cautions: sbf/workflow.md
+          - History and references: sbf/history.md
+  - Tutorials:
+      - "UGC 12517, step by step": tutorials/u12517.md
+      - A residual for SBF work: tutorials/sbf-residual.md
+  - Reference:
+      - Command line: reference/cli.md
+      - Python: reference/python.md
+      - How elliprof is built: reference/architecture.md
+  - Help:
+      - Common mistakes: help/mistakes.md
+      - FAQ: help/faq.md
+      - About and credits: about.md

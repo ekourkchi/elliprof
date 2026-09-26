@@ -19,3 +19,7 @@ fort.2
 .ipynb_checkpoints/
 # notebook run outputs
 notebooks/elliprof_output/
+
+# documentation build
+/site/
+docs/scripts/_work/
