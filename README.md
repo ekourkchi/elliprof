@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/ekourkchi/elliprof/actions/workflows/ci.yml"><img src="https://github.com/ekourkchi/elliprof/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
-  <a href="https://github.com/ekourkchi/elliprof/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/tests-363%20passing-brightgreen?logo=pytest&logoColor=white" alt="363 tests passing"></a>
+  <a href="https://github.com/ekourkchi/elliprof/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ekourkchi/elliprof/ci.yml?branch=main&label=tests&logo=pytest&logoColor=white" alt="Test status"></a>
   <a href="https://github.com/ekourkchi/elliprof/blob/main/tests/original_source_hashes.txt"><img src="https://img.shields.io/badge/original%20Fortran-unchanged%20(SHA--256%20verified)-blueviolet" alt="Original Fortran unchanged, SHA-256 verified"></a>
   <a href="https://github.com/ekourkchi/elliprof/actions/workflows/wheels.yml"><img src="https://github.com/ekourkchi/elliprof/actions/workflows/wheels.yml/badge.svg" alt="Wheel builds"></a>
   <a href="https://ekourkchi.github.io/elliprof/"><img src="https://img.shields.io/badge/docs-online-blue?logo=materialformkdocs&logoColor=white" alt="Documentation"></a>
