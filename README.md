@@ -1,8 +1,28 @@
+<p align="center">
+  <a href="https://ekourkchi.github.io/elliprof/"><img src="docs/assets/elliprof_banner.png" width="100%" alt="ELLIPROF: an HST image of the elliptical galaxy UGC 12517 with its fitted elliptical isophotes drawn over it, fading into the residual image left after the model is subtracted, next to the words ELLIPROF, galaxy isophote fitting"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/ekourkchi/elliprof/actions/workflows/ci.yml"><img src="https://github.com/ekourkchi/elliprof/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
+  <a href="https://github.com/ekourkchi/elliprof/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/tests-363%20passing-brightgreen?logo=pytest&logoColor=white" alt="363 tests passing"></a>
+  <a href="https://github.com/ekourkchi/elliprof/blob/main/tests/original_source_hashes.txt"><img src="https://img.shields.io/badge/original%20Fortran-unchanged%20(SHA--256%20verified)-blueviolet" alt="Original Fortran unchanged, SHA-256 verified"></a>
+  <a href="https://github.com/ekourkchi/elliprof/actions/workflows/wheels.yml"><img src="https://github.com/ekourkchi/elliprof/actions/workflows/wheels.yml/badge.svg" alt="Wheel builds"></a>
+  <a href="https://ekourkchi.github.io/elliprof/"><img src="https://img.shields.io/badge/docs-online-blue?logo=materialformkdocs&logoColor=white" alt="Documentation"></a>
+  <br>
+  <a href="https://pypi.org/project/elliprof/"><img src="https://img.shields.io/pypi/v/elliprof?logo=pypi&logoColor=white" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/elliprof/"><img src="https://img.shields.io/badge/python-3.6%E2%80%933.14-blue?logo=python&logoColor=white" alt="Python 3.6 to 3.14"></a>
+  <a href="#platforms"><img src="https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-informational" alt="Linux, macOS, Windows"></a>
+  <a href="https://pypi.org/project/elliprof/#files"><img src="https://img.shields.io/pypi/wheel/elliprof" alt="Prebuilt wheels"></a>
+  <a href="https://github.com/ekourkchi/elliprof/blob/main/LICENSE"><img src="https://img.shields.io/pypi/l/elliprof" alt="MIT License"></a>
+</p>
+
 # elliprof
 
 **ELLIPROF is an astronomical isophote-fitting tool for measuring the radial surface-brightness and shape profiles of galaxies.** Given a FITS image and an initial galaxy centre, it fits a sequence of elliptical isophotes and measures, for each one, its intensity, centre, ellipticity, position angle, radial intensity slope, and the 3rd- and 4th-order harmonic deviations from a pure ellipse. It can also build a smooth model image of the galaxy from the fitted isophotes.
 
 `elliprof` packages the original ELLIPROF Fortran, compiled unchanged, as a command-line program and a Python library.
+
+Documentation: <https://ekourkchi.github.io/elliprof/>
 
 Source code and issue tracker: <https://github.com/ekourkchi/elliprof>
 

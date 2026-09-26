@@ -77,6 +77,7 @@ python docs/scripts/make_all.py          # writes docs/assets/*.png
 | `make_boxy_disky_diagram.py` | boxy/disky shapes (schematic); a4/a recovery (real fits of synthetic images) |
 | `make_sbf_workflow.py` | the SBF workflow diagram |
 | `make_sbf_power_spectrum_schematic.py` | SBF simulation and power-spectrum fit (simulation) |
+| `make_readme_banner.py` | the README header image (real data) |
 | `residual_checks.py` | the residual table in the [SBF tutorial](../tutorials/sbf-residual.md) |
 | `common.py` | shared settings and the elliprof runs |
 
