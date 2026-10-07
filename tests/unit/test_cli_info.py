@@ -114,8 +114,18 @@ def test_help_documents_every_public_option_and_keyword():
                "COS3X=", "COS4X="):
         assert kw in text, kw
     assert "--sc VALUE         deprecated alias of --sky" in text
-    assert "0 = bad / excluded; any other finite" in text
-    assert "NaN, Inf and" in text and "never" in text and "weights" in text
+    # both mask conventions, the default first
+    assert re.search(r"0\s+= bad / excluded\n\s+any other finite value\s+"
+                     r"= good / kept", text)
+    assert re.search(r"zero-good is the opposite\s+convention:\n\s+0\s+"
+                     r"= good / kept\n\s+any nonzero value\s+= bad", text)
+    assert "NaN, Inf, undefined (BLANK) = bad" in text
+    assert "never weights" in text
+    # -m alone writes the model; MODEL is not needed (and not advertised)
+    assert "no MODEL keyword" in text
+    assert "MODEL -m" not in text
+    assert "(default 5" in text and "--niter n" in text
+    assert "-o n1234.dat -m n1234.prf" in text
     assert "'galaxy.fits[SCI]'" in text
     assert "mask x (science - sky - model)" in text
     assert "(default 1800)" in text and "status 124" in text

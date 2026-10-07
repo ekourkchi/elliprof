@@ -91,22 +91,33 @@ def subtract_sky(data: np.ndarray, sky=None, sky_image=None) -> np.ndarray:
     return out.copy()
 
 
-def logical_mask(mask: np.ndarray) -> np.ndarray:
-    """The backend's reading of a mask: True (good) where the value is
-    finite and nonzero; False (bad) for 0, NaN and +-Inf."""
+def logical_mask(mask: np.ndarray,
+                 convention: str = "nonzero-good") -> np.ndarray:
+    """The backend's reading of a mask (True = good pixel).
+
+    ``"nonzero-good"`` (default): good where the value is finite and
+    nonzero; bad for 0, NaN and +-Inf.  ``"zero-good"``: good where the
+    value is exactly 0; bad for any nonzero value, NaN and +-Inf."""
     mask = np.asarray(mask)
-    if mask.dtype.kind in "fc":
-        return np.isfinite(mask) & (mask != 0)
-    return mask != 0
+    finite = np.isfinite(mask) if mask.dtype.kind in "fc" \
+        else np.ones(mask.shape, bool)
+    if convention == "nonzero-good":
+        return finite & (mask != 0)
+    if convention == "zero-good":
+        return finite & (mask == 0)
+    raise ValueError("convention must be 'nonzero-good' or 'zero-good', "
+                     f"got {convention!r}")
 
 
-def apply_mask(data: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    """What the backend does with a mask, in float32: bad pixels (0, NaN,
-    Inf) become exactly 0, good pixels keep their value.  The mask is
-    logical; its values are not weights."""
+def apply_mask(data: np.ndarray, mask: np.ndarray,
+               convention: str = "nonzero-good") -> np.ndarray:
+    """What the backend does with a mask, in float32: bad pixels become
+    exactly 0, good pixels keep their value (see :func:`logical_mask`
+    for ``convention``).  The mask is logical; its values are not
+    weights."""
     data = np.asarray(data, dtype=np.float32)
     mask = np.asarray(mask)
     if data.shape != mask.shape:
         raise GeometryError(f"mask shape {mask.shape} != image "
                             f"shape {data.shape}")
-    return np.where(logical_mask(mask), data, np.float32(0))
+    return np.where(logical_mask(mask, convention), data, np.float32(0))

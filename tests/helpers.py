@@ -22,3 +22,19 @@ def write_fits(path, data, header=None, dtype=np.float32):
 def read_fits(path):
     from astropy.io import fits
     return fits.getdata(path)
+
+
+def run_cli(*args, cwd=None, timeout=600):
+    """Run ``python -m elliprof`` from this source tree as a separate
+    process (the package need not be installed; the backend is the one
+    the suite uses, see conftest.py)."""
+    import os
+    import subprocess
+    import sys
+    path = os.environ.get("PYTHONPATH")
+    env = dict(os.environ, PYTHONPATH=str(ROOT / "python")
+               + (os.pathsep + path if path else ""))
+    return subprocess.run([sys.executable, "-m", "elliprof",
+                           *map(str, args)], cwd=cwd, env=env,
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          universal_newlines=True, timeout=timeout)

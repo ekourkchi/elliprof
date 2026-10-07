@@ -273,3 +273,47 @@ print("ok")
                           universal_newlines=True)
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.strip() == "ok"
+
+
+def test_014_model_masks_niter_float64(tmp_path):
+    """0.1.4 on the installed wheel: -m alone writes the model (same data
+    as legacy MODEL -m), the zero-good mask convention, --niter, and a
+    BITPIX = -64 image."""
+    fits = pytest.importorskip("astropy.io.fits")   # test-only dependency
+    data = fits.getdata(GALAXY).astype(np.float32)
+    a = run(GALAXY, *FIT, "--sky", "100", "RMSTAR", "NITER=5",
+            "-o", tmp_path / "n1234.dat", "-m", tmp_path / "n1234.prf")
+    assert a.returncode == 0, a.stderr
+    b = run(GALAXY, *FIT, "--sky", "100", "RMSTAR", "MODEL", "--niter", "5",
+            "-o", tmp_path / "legacy.dat", "-m", tmp_path / "legacy.prf")
+    assert b.returncode == 0, b.stderr
+    assert "no longer needed" in b.stderr
+    assert (tmp_path / "n1234.dat").read_bytes() == \
+        (tmp_path / "legacy.dat").read_bytes()
+    assert np.array_equal(fits.getdata(tmp_path / "n1234.prf"),
+                          fits.getdata(tmp_path / "legacy.prf"))
+    bad = np.zeros(data.shape, bool)
+    bad[200:220, 20:40] = True
+    fits.PrimaryHDU((~bad).astype(np.int16)).writeto(tmp_path / "A.fits")
+    fits.PrimaryHDU(bad.astype(np.int16)).writeto(tmp_path / "B.fits")
+    fits.PrimaryHDU(data.astype(np.float64)).writeto(tmp_path / "f64.fits")
+    outs = []
+    for img, mask, conv in ((GALAXY, "A.fits", []),
+                            (GALAXY, "B.fits",
+                             ["--mask-convention", "zero-good"]),
+                            (tmp_path / "f64.fits", "A.fits", [])):
+        out = tmp_path / f"m{len(outs)}.dat"
+        p = run(img, *FIT, "--sky", "100", "--mask", tmp_path / mask,
+                *conv, "-o", out, "--residual", out.with_suffix(".fits"))
+        assert p.returncode == 0, p.stderr
+        assert f"{int(bad.sum())} pixels masked" in p.stdout
+        outs.append((np.asarray(_read_prf(out)), fits.getdata(
+            out.with_suffix(".fits"))))
+    for prof, res in outs[1:]:
+        assert np.array_equal(prof, outs[0][0])
+        assert np.array_equal(res, outs[0][1])
+
+
+def _read_prf(path):
+    from elliprof import read_prf
+    return read_prf(str(path))["params"]
