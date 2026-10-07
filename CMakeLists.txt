@@ -77,7 +77,7 @@ set(SHIM main stubs fitsio profout maskio prep)
 # Double-precision backend (precision ports of original routines)
 set(DOUBLE elliprof_d jtutil_d)
 # and its driver, image preparation and output
-set(SHIMD main_d fitsio_d prep_d profout_d)
+set(SHIMD main_d fitsio_d prep_d profout_d auto_d)
 set(SOURCES "")
 foreach(f ${ORIGINAL})
   list(APPEND SOURCES "src/original/${f}.f")

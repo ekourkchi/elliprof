@@ -1,12 +1,15 @@
-"""64-bit FITS science images (0.1.4): BITPIX = -64 and 64.
+"""64-bit FITS science images in the single backend (--precision
+single; 0.1.4 behaviour, unchanged): BITPIX = -64 and 64.
 
-ELLIPROF computes in 32-bit floating point (REAL*4) and that is not
-changed: CFITSIO converts the stored values (after BSCALE/BZERO) to the
-nearest 32-bit float as it reads them.  So the same values stored with
-different BITPIX give identical results, and a 64-bit value that a
-32-bit float cannot hold exactly gives the result of its nearest 32-bit
-float -- exactly what numpy's float32 conversion gives.  The products
-(model, residual, prepared) stay 32-bit floating point."""
+The single backend computes in 32-bit floating point (REAL*4): CFITSIO
+converts the stored values (after BSCALE/BZERO) to the nearest 32-bit
+float as it reads them.  So the same values stored with different
+BITPIX give identical results, and a 64-bit value that a 32-bit float
+cannot hold exactly gives the result of its nearest 32-bit float --
+exactly what numpy's float32 conversion gives.  The products (model,
+residual, prepared) stay 32-bit floating point.  (With the default
+--precision auto, 64-bit images go to the double backend instead: see
+test_precision_auto.py.)"""
 
 import subprocess
 
@@ -23,7 +26,8 @@ FIT = ["X0=100.3", "Y0=99.6", "R0=3", "R1=80", "NR=25", "NITER=5"]
 
 
 def native_run(native, *args):
-    return subprocess.run([str(native), *map(str, args)],
+    return subprocess.run([str(native), "--precision", "single",
+                           *map(str, args)],
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                           universal_newlines=True, timeout=600)
 
@@ -174,4 +178,5 @@ def test_cli_summary_reports_the_conversion(tmp_path, sci):
     fits.PrimaryHDU(sci.astype(np.float64)).writeto(tmp_path / "f64.fits")
     p = run_cli(tmp_path / "f64.fits", *FIT, "-o", tmp_path / "a.dat")
     assert p.returncode == 0, p.stderr
-    assert "BITPIX -64 read as 32-bit float" in p.stdout
+    # --precision auto (the default): a 64-bit image is fitted in double
+    assert "read as 32-bit float" not in p.stdout

@@ -55,10 +55,11 @@ C     NaN compares unequal to itself; DS9 cannot parse such a line
 C     Comma-separated profile with fixed-width columns and # comments.
 C     Values are PARAM_PRF exactly as stored.  PARAMS is the ELLIPROF
 C     keyword line, recorded for provenance.
-C     MASK and SKY describe the preparation ('none' if not used).
-      SUBROUTINE WRITECSV(FNAME, IMAGE, MASK, SKY, PARAMS, ISC, ISR,
-     $     IERR)
-      CHARACTER*(*) FNAME, IMAGE, MASK, SKY, PARAMS
+C     MASK and SKY describe the preparation ('none' if not used);
+C     PRECLN the backend precision and how it was chosen.
+      SUBROUTINE WRITECSV(FNAME, IMAGE, MASK, SKY, PARAMS, PRECLN,
+     $     ISC, ISR, IERR)
+      CHARACTER*(*) FNAME, IMAGE, MASK, SKY, PARAMS, PRECLN
       INTEGER ISC, ISR, IERR
       INCLUDE 'profile.inc'
       INCLUDE 'version.inc'
@@ -75,7 +76,8 @@ C     MASK and SKY describe the preparation ('none' if not used).
      $     '# Mask: '//MASK(1:LEN_TRIM(MASK)),
      $     '# Sky: '//SKY(1:LEN_TRIM(SKY)),
      $     '# Parameters: '//PARAMS(1:LEN_TRIM(PARAMS)),
-     $     '# elliprof version: '//VERSTR
+     $     '# elliprof version: '//VERSTR,
+     $     '# Precision: '//PRECLN(1:LEN_TRIM(PRECLN))
       WRITE (7,1001) N_PRF, PRF_SC, ISC, ISR
  1001 FORMAT ('# Contours: ',I0,'   SCALE: ',G0,
      $     '   Image origin (CNPIX1,CNPIX2): ',I0,',',I0)

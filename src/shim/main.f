@@ -22,8 +22,9 @@ C     coordinates); ELLIPROF refines it during the fit.
       CHARACTER*1024 ARG, FITSFILE, PRFFILE, MODFILE, CSVFILE, REGFILE
       CHARACTER*1024 MASKFILE, SKYIMG, SKYSTR, SKYDESC, MSKDESC
       CHARACTER*1024 PREPFILE, RESFILE, MCONV
-      CHARACTER*16 PRECREQ
+      CHARACTER*16 PRECREQ, PRECSEL
       CHARACTER*256 PRECWHY
+      CHARACTER*512 PRECLN
       CHARACTER*289 OSTRNG, LCSTRNG
       LOGICAL ERR, DOMODEL, DOGC, HASX0, HASY0, HASR0, HASR1, HASNR
       LOGICAL PREPONLY, HASNIT, INTMODEL, ZGOOD, KWMODEL
@@ -50,7 +51,7 @@ C     ---- Command line: image file, options, ELLIPROF words
       PREPFILE = ' '
       RESFILE = ' '
       MCONV = 'nonzero-good'
-      PRECREQ = 'single'
+      PRECREQ = 'auto'
       PRECWHY = ' '
       PREPONLY = .FALSE.
       SHVERB = .FALSE.
@@ -157,10 +158,13 @@ C     convention before 0.1.4.
 
 C     --precision: the backend.  single is ELLIPROF compiled unchanged
 C     (REAL*4); double is the precision port (src/double) with its own
-C     driver (src/shim/double/main_d.f).
-      IF (PRECREQ .NE. 'single' .AND. PRECREQ .NE. 'double') THEN
+C     driver (src/shim/double/main_d.f); auto chooses from the data
+C     (src/shim/double/auto_d.f).
+      IF (PRECREQ .NE. 'single' .AND. PRECREQ .NE. 'double' .AND.
+     $     PRECREQ .NE. 'auto') THEN
          WRITE (0,'(3A)') 'elliprof: error: --precision must be single'
-     $        //' or double, got "', PRECREQ(1:LEN_TRIM(PRECREQ)), '"'
+     $        //', double or auto, got "',
+     $        PRECREQ(1:LEN_TRIM(PRECREQ)), '"'
          CALL EXIT(1)
       END IF
 
@@ -347,8 +351,17 @@ C     would treat them like one of these.
       CALL CHKMODE('COS3X', -3, 2, IERR)
       IF (IERR .EQ. 0) CALL CHKMODE('COS4X', 0, 2, IERR)
       IF (IERR .NE. 0) CALL EXIT(1)
+C     --precision auto: decide now, from the data (the single backend
+C     then reads them exactly as with --precision single)
+      PRECSEL = PRECREQ
+      PRECWHY = ' '
+      IF (PRECREQ .EQ. 'auto') THEN
+         CALL AUTOPREC(FITSFILE, SKYIMG, SKYSTR, PRECSEL, PRECWHY,
+     $        IERR)
+         IF (IERR .NE. 0) CALL EXIT(1)
+      END IF
 C     (the double driver parses --sky itself, exactly, in double)
-      IF (SKYSTR .NE. ' ' .AND. PRECREQ .EQ. 'single') THEN
+      IF (SKYSTR .NE. ' ' .AND. PRECSEL .EQ. 'single') THEN
          CALL PARSENUM(SKYSTR, SKYVAL, IERR)
          IF (IERR .NE. 0) THEN
             WRITE (0,'(2A)') 'elliprof: error: --sky needs one '
@@ -381,12 +394,13 @@ C     variable names come from the unchanged include files)
       TTYLUN = 6
       REDIRLUN = 6
 
-C     ---- --precision double: the double backend takes over from here
+C     ---- Double precision: the double backend takes over from here
 
-      IF (PRECREQ .EQ. 'double') THEN
+      IF (PRECSEL .EQ. 'double') THEN
          IF (DOGC) THEN
-            WRITE (0,'(A)') 'elliprof: error: double-precision GC '
-     $           //'mode is not yet supported (use --precision single)'
+            WRITE (0,'(3A)') 'elliprof: error: double-precision GC '
+     $           //'mode is not yet supported', PRECWHY(1:LEN_TRIM(
+     $           PRECWHY)), '; GC needs --precision single'
             CALL EXIT(1)
          END IF
          CALL ELLIPROFDRV(FITSFILE, PRFFILE, MODFILE, CSVFILE,
@@ -419,6 +433,10 @@ C     ---- Read the image into buffer 1 (what RD 1 file does)
      $     ISC, ISR
  1000 FORMAT (1X,A,': ',I6,' cols x',I6,' rows, origin (col,row) = (',
      $     I6,',',I6,')')
+      WRITE (PRECLN,'(3A)') 'single (REAL*4, the original ELLIPROF); '
+     $     //'requested ', PRECREQ(1:LEN_TRIM(PRECREQ)),
+     $     PRECWHY(1:LEN_TRIM(PRECWHY))
+      WRITE (6,'(2A)') ' Precision: ', PRECLN(1:LEN_TRIM(PRECLN))
 C     ELLIPROF works in REAL*4: 64-bit pixels are rounded to the nearest
 C     32-bit float by CFITSIO (BSCALE/BZERO applied first)
       IF (IBITPIX .EQ. 64 .OR. IBITPIX .EQ. -64) WRITE (6,1002) IBITPIX
@@ -573,7 +591,7 @@ C     ---- Optional CSV table and DS9 regions from the final /PRF/
             IF (CSVFILE .NE. ' ') THEN
                L = LEN_TRIM(ORIGCOMMAND)
                CALL WRITECSV(CSVFILE, FITSFILE, MSKDESC, SKYDESC,
-     $              ORIGCOMMAND(10:MAX(10,L)), ISC, ISR, IERR)
+     $              ORIGCOMMAND(10:MAX(10,L)), PRECLN, ISC, ISR, IERR)
                IF (IERR .NE. 0) CALL EXIT(1)
             END IF
             IF (REGFILE .NE. ' ') THEN
@@ -747,10 +765,11 @@ C     only for the test is removed again; an existing one is kept.
      $ '  --prepare-only    stop after writing --prepared (no fit)',
      $ '  --verbose         model progress, and the profile table',
      $ '                    even when it is written to a file',
-     $ '  --precision single|double',
+     $ '  --precision single|double|auto',
      $ '                    the backend: single (REAL*4, the original',
-     $ '                    ELLIPROF; default) or double (IEEE-754',
-     $ '                    binary64 throughout)',
+     $ '                    ELLIPROF), double (IEEE-754 binary64',
+     $ '                    throughout) or auto (default: double',
+     $ '                    for 64-bit data or values beyond float32)',
      $ '  --version         print the backend version'
       RETURN
       END
