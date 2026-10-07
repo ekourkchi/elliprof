@@ -93,7 +93,10 @@ outermost isophotes by about as much as single and double differ.
   normalization cannot centre the data, and some intermediate
   quantities of the fit (an intensity ratio along an isophote, an `AVG`
   box sum) can overflow; such isophotes come out as NaN. This needs
-  data spanning most of the double range in a single image.
+  data spanning most of the double range in a single image. A `LINEAR`
+  fit, which squares intensities, refuses such an image with a clear
+  error; the default log fit handles it unless the ratios themselves
+  overflow.
 - The **single** backend's command-line parser refuses numbers with a
   decimal exponent beyond ±38 even when a 32-bit float holds them (for
   example `--sky 1e-40`), as before; `--precision double` reads them.
