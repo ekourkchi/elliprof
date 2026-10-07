@@ -297,8 +297,10 @@ jobs:
           done
       - name: CFITSIO and a flang-built backend (not a wheel)
         shell: msys2 {0}
+        # FC=flang: build_cfitsio.sh compiles its Fortran ABI probe with
+        # the compiler that builds the backend (no gfortran in CLANGARM64)
         run: |
-          CFLAGS="-UWIN32 -DgFortran" CFITSIO_CMAKE_GENERATOR=Ninja \
+          FC=flang CFLAGS="-UWIN32 -DgFortran" CFITSIO_CMAKE_GENERATOR=Ninja \
               bash tools/ci/build_cfitsio.sh /c/cfitsio
           nm /c/cfitsio/lib/libcfitsio.a | grep -E ' T (ftgkyj_|ftinit_|ftvers_)$'
           make elliprof_native FC=flang CFITSIO= LDLIBS="-L/c/cfitsio/lib -lcfitsio -lz"
