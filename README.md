@@ -18,7 +18,9 @@
 
 # elliprof
 
-**ELLIPROF is an astronomical isophote-fitting tool for measuring the radial surface-brightness and shape profiles of galaxies.** Given a FITS image and an initial galaxy centre, it fits a sequence of elliptical isophotes and measures, for each one, its intensity, centre, ellipticity, position angle, radial intensity slope, and the 3rd- and 4th-order harmonic deviations from a pure ellipse. It can also build a smooth model image of the galaxy from the fitted isophotes.
+**ELLIPROF is an astronomical isophote-fitting tool for measuring the radial surface-brightness and shape profiles of galaxies.** Given a FITS image and an initial galaxy centre, it fits a sequence of elliptical isophotes and measures their intensity, centre, ellipticity, position angle, radial intensity slope, and higher-order deviations from a pure ellipse. By default it measures 3rd- and 4th-order isophotal Fourier terms; an optional 6th-order mode can be used in place of the 3rd-order term.
+
+It can also build a smooth model image of the galaxy from the fitted isophotes.
 
 `elliprof` packages the original ELLIPROF Fortran, compiled unchanged, as a command-line program and a Python library.
 
@@ -32,7 +34,7 @@ ELLIPROF is intended primarily for galaxy images. It is particularly useful for:
 
 - elliptical galaxies, smooth spheroidal systems and galaxy bulges, and other smooth light distributions;
 - surface-brightness profiles, and how ellipticity and position angle change with radius (isophote twists);
-- departures from pure elliptical isophotes, in particular the 4th-order term that characterizes **boxy** or **disky** isophotes.
+- departures from pure elliptical isophotes, including 4th-order **boxy/disky** structure and other higher-order asymmetries.
 
 It describes a galaxy as a set of nested ellipses, so it is not necessarily the best tool for irregular galaxies or strongly structured light (spiral arms, bars, dust lanes, bright clumps). Stars and other contaminants should be masked.
 
@@ -308,33 +310,57 @@ elliprof galaxy.fits \
 
 ## Harmonic analysis
 
-Along each fitted ellipse, ELLIPROF also measures how the isophote departs from a pure ellipse, as harmonic terms of the eccentric angle θ: `I/I0 ≈ 1 + In cos n(θ − An)`.
+ELLIPROF measures departures from a perfect ellipse using Fourier terms around each fitted isophote.
 
-- **4th order** (`I4`, `A4`): always measured. The classic **boxy/disky** term: `A4` near 0° (≡ 90°) is disky, near 45° boxy. To first order, `a4/a ≈ I4 × cos(4 × A4) / (−slope)`.
-- **3rd order** (`I3`, `A3`): measured by default, for lopsided (egg-shaped) isophotes.
-- **6th order**, optional, measured *instead of* the 3rd. There are no I6/A6 columns: `I3` then holds the 6th-order amplitude and `A3` twice its phase.
+By default it measures:
 
-Separately, you choose which measured terms go into the **model image**: none, the median over all isophotes, or each isophote's own. This changes only the model and the residual, never the profile. Both the original concise settings and descriptive options are supported and run the same code:
+- **3rd order** (`I3`, `A3`): asymmetric departures from a pure ellipse.
+- **4th order** (`I4`, `A4`): the familiar boxy/disky isophotal term. `A4` near 0° (or 90°) means disky, near 45° boxy. The conversion to the conventional a4/a is on the [Harmonic analysis](https://ekourkchi.github.io/elliprof/concepts/harmonics/#the-conventional-a4a) page.
 
-| Original | Measured | In the model | Modern equivalent of this value |
-|---|---|---|---|
-| `COS3X=2` | 3rd order | each isophote | 3 in `--model-harmonics` (default) |
-| `COS3X=1` | 3rd order | median | 3 in `--model-harmonics`, with `--harmonic-mode median` |
-| `COS3X=0` | 3rd order | none | 3 not in `--model-harmonics` |
-| `COS3X=-2` | 6th order | each isophote | `--sixth-order`, 6 in `--model-harmonics` (default) |
-| `COS3X=-1` | 6th order | median | `--sixth-order`, 6 in `--model-harmonics`, with `--harmonic-mode median` |
-| `COS3X=-3` | 6th order | none | `--sixth-order`, 6 not in `--model-harmonics` |
-| `COS4X=2` / `1` / `0` | 4th order | each / median / none | 4 in `--model-harmonics` / with `--harmonic-mode median` / 4 not in it |
+The 4th-order term is always measured.
 
-The modern options set both values at once (for example `--model-harmonics 4` is `COS3X=0 COS4X=2`, and `--sixth-order --model-harmonics none` is `COS3X=-3 COS4X=0`); the documentation lists every pair.
+### Optional 6th order
 
-A 6th-order term *in the model* has a known limitation of the original code when the fitted position angle wraps across 0°/180° (elliprof warns). `COS3X=-3` measures the 6th order without modelling it.
+ELLIPROF also supports an optional **6th-order isophotal Fourier term**:
+
+```sh
+elliprof galaxy.fits \
+    --sixth-order \
+    X0=500 Y0=500 \
+    R0=5 R1=200 NR=30
+```
+
+With `--sixth-order`, ELLIPROF measures the 6th-order term **instead of the 3rd-order term**. The 4th-order term is still measured.
+
+For historical compatibility, the 6th-order measurement uses the same `I3`/`A3` output fields; there are no separate `I6`/`A6` columns.
+
+### Harmonics in the model
+
+Measuring a harmonic and including it in the model image (`-m`) are separate choices. `--model-harmonics` lists the measured terms to include:
+
+```sh
+--model-harmonics none      # pure ellipses
+--model-harmonics 4         # the 4th-order term only
+--model-harmonics 3,4       # both (the default)
+```
+
+With sixth-order mode:
+
+```sh
+--sixth-order --model-harmonics none
+--sixth-order --model-harmonics 4
+--sixth-order --model-harmonics 4,6     # both (default)
+```
+
+For a fixed choice of measured harmonic order, changing which terms are included in the model changes the model and residual, not the fitted profile.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/ekourkchi/elliprof/main/docs/assets/model_harmonics.png" width="85%" alt="Three panels for UGC 12517: the model with no harmonic terms; the difference between the model with the 4th-order term and the pure-ellipse model, a four-fold pattern near the centre; and the same for the 3rd- and 4th-order terms together.">
 </p>
 
-The full treatment is on the documentation site: conventions, phases, the a4/a conversion, sixth order, synthetic tests, the UGC 12517 harmonic profile and the SBF context. See [Harmonic analysis with ELLIPROF](https://ekourkchi.github.io/elliprof/concepts/harmonics/).
+The original `COS3X=` and `COS4X=` controls remain available for users familiar with the historical MONSTA/ELLIPROF interface. Their complete meanings, including median and measurement-only modes, are documented on the [Harmonic analysis](https://ekourkchi.github.io/elliprof/concepts/harmonics/) page, together with the exact conventions, the sixth-order details and tests.
+
+**6th-order model note:** the original ELLIPROF model synthesis has a known limitation if the fitted position angle wraps through 0°/180°. The 6th-order measurement itself remains valid; see the [harmonic-analysis documentation](https://ekourkchi.github.io/elliprof/concepts/harmonics/#sixth-order) for details.
 
 ## Python
 
@@ -366,7 +392,9 @@ result = run_elliprof(
 print(result.model_path)
 ```
 
-`model_path=` alone computes and writes the model (`model=True` writes it under a default name). `mask_convention="zero-good"` selects the second mask convention. `harmonic_mode="median"` and `sixth_order=True` correspond to the command-line options. `cos3x=` and `cos4x=` set the original ELLIPROF values directly. The command line and the Python API run exactly the same backend with the same settings.
+`model_path=` alone computes and writes the model (`model=True` writes it under a default name). `mask_convention="zero-good"` selects the second mask convention.
+
+`model_harmonics=` selects which measured harmonic terms are included in the model. `sixth_order=True` measures the 6th-order term instead of the 3rd. `harmonic_mode="median"` uses the median measured harmonic term in the model. The original `cos3x=` and `cos4x=` controls are also available for compatibility. The command line and the Python API run exactly the same backend with the same settings.
 
 `python -m elliprof` is the same as the `elliprof` command. A worked example on a real HST image is in [examples/u12517](https://github.com/ekourkchi/elliprof/tree/main/examples/u12517) and [notebooks/elliprof_example.ipynb](https://github.com/ekourkchi/elliprof/blob/main/notebooks/elliprof_example.ipynb).
 
@@ -381,9 +409,11 @@ One row per isophote (`result.profile`, the CSV file, and the text profile writt
 | `I0` | intensity of the isophote, in image units after sky subtraction |
 | `alpha` | position angle of the major axis in degrees (0–180), counter-clockwise from the +y axis; the major axis lies at `alpha + 90`° counter-clockwise from +x |
 | `ellip` | ellipticity, 1 − b/a |
-| `I3`, `I4` | amplitude of the 3rd- and 4th-order intensity variation along the isophote, as a fraction of `I0` |
-| `A3`, `A4` | their phases in degrees: the intensity varies as cos(3(θ − A3)) and cos(4(θ − A4)), where θ is the angle around the ellipse (the eccentric angle), measured from the major axis. A3 is 0–120°, A4 is 0–90°. These are **not** the position angle. |
+| `I3`, `I4` | amplitudes of the measured 3rd- and 4th-order isophotal Fourier terms, as fractions of `I0` |
+| `A3`, `A4` | their phases in degrees (not position angles); see [Harmonic analysis](https://ekourkchi.github.io/elliprof/concepts/harmonics/#the-convention) for the exact convention |
 | `slope` | logarithmic slope d ln I / d ln r, from neighbouring isophotes (set to −2 where it would be positive) |
+
+With `--sixth-order`, the historical `I3`/`A3` fields contain the 6th-order measurement instead of the 3rd-order one.
 
 ### Coordinates
 
@@ -406,10 +436,10 @@ One row per isophote (`result.profile`, the CSV file, and the text profile writt
 | `ELLIP=` | `ellip` | force this ellipticity |
 | `RMSTAR` | `rmstar` | along each ellipse, ignore samples brighter than median + 4 × (upper quartile − median); rejects bright outliers point by point, so mask larger contaminants |
 | `-m F` | `model_path` (or `model=True`) | compute the model image and write it as FITS |
-| `--model-harmonics` | `model_harmonics` | harmonic terms in the model (above) |
-| `--harmonic-mode` | `harmonic_mode` | `each` (default) or `median` |
-| `--sixth-order` | `sixth_order` | measure the 6th- instead of the 3rd-order term |
-| `COS3X=` `COS4X=` | `cos3x` `cos4x` | the original harmonic settings: COS3X −3 to 2, COS4X 0 to 2 |
+| `--model-harmonics` | `model_harmonics` | which measured harmonic terms are included in the model image |
+| `--harmonic-mode` | `harmonic_mode` | use each isophote's measured term or the median term in the model; see [Harmonic analysis](https://ekourkchi.github.io/elliprof/concepts/harmonics/) |
+| `--sixth-order` | `sixth_order` | measure the 6th-order term instead of the 3rd-order term |
+| `COS3X=` `COS4X=` | `cos3x` `cos4x` | original ELLIPROF harmonic controls; see [Harmonic analysis](https://ekourkchi.github.io/elliprof/concepts/harmonics/) |
 | `TIE=` | `tie` | smooth the parameters with radius |
 | `AVG=` | `avg` | average a (2n+1)² box when sampling |
 | `GAIN=` | `gain` | iteration gain (default 1) |
