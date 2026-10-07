@@ -1,6 +1,6 @@
 # Changes
 
-## 0.1.4 (release candidate, not yet released)
+## 0.1.4 (2026-10-06)
 
 The numerical results are unchanged: for the same input, mask
 convention and parameters, 0.1.4 writes a byte-identical profile (`-o`)
