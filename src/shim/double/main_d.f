@@ -25,7 +25,7 @@ C     physical units -> products.  ISTAT returns the exit status.
       LOGICAL, ALLOCATABLE :: GOOD(:,:)
       DOUBLE PRECISION SKYVAL, BYTES
       INTEGER NCOL, NROW, IUNIT, IERR, IBITPIX, MBITPIX, NBAD, NNONF
-      INTEGER NOVER, IST, KPREF, KMIN, KMAX, I, NHIST
+      INTEGER NOVER, IST, KPREF, KMIN, KMAX, I, J, K, NHIST, ICOS3X
       INTEGER*8 NPIX, NUSED, NINEX
       LOGICAL LINEAR, SHVERB
       CHARACTER*1024 SKYDESC, MSKDESC
@@ -205,7 +205,168 @@ C     sky), BITPIX -64
          RETURN
       END IF
 
-      WRITE (0,'(A)') 'elliprof: error (double precision, fit): '
-     $     //'double-precision fitting is not enabled in this build'
+C     ELLIPROFD replaces the image with its model: keep the prepared
+C     image (physical units) for the residual
+      IF (RESFILE .NE. ' ') THEN
+         ALLOCATE (PREP(NCOL,NROW), STAT=IST)
+         IF (IST .NE. 0) THEN
+            CALL NOMEMD('the prepared image for --residual', 8D0*NPIX)
+            RETURN
+         END IF
+         PREP = PIX
+      END IF
+
+C     ---- The fit, on the normalized image
+
+      CALL SCALEIMD(PIX, NPIX, -KNORM)
+      CALL ELLIPROFD(PIX, NROW, NCOL)
+      IF (DOMODEL .AND. SHVERB) WRITE (0,*)
+      IF (XERR) THEN
+         WRITE (0,'(A)') 'elliprof: error (double precision, fit): '
+     $        //'ELLIPROF reported an error'
+         RETURN
+      END IF
+      IF (N_PRF .LE. 0) THEN
+         WRITE (0,'(A)') 'elliprof: error (double precision, fit): '
+     $        //'no profile was computed'
+         RETURN
+      END IF
+
+C     ---- Back to physical units: I0 of every isophote (the only
+C     intensity of the profile; the harmonic amplitudes, slope and
+C     flags are dimensionless), exactly
+
+      DO 50 I = 1, N_PRF
+         PARAM_PRF(4,I) = SCALE(PARAM_PRF(4,I), KNORM)
+ 50   CONTINUE
+      CALL PRFMARKD(KNORM, KPREF)
+
+C     A 6th-order term in the model and a PA wrap: as in main.f
+      IF (DOMODEL .AND. N_PRF .GT. 1) THEN
+         ICOS3X = NINT(PARAM_PRF(12,15))
+         IF (ICOS3X .EQ. -1 .OR. ICOS3X .EQ. -2) THEN
+            CALL PAWRAPD(N_PRF, PARAM_PRF, K)
+            IF (K .GT. 0) WRITE (0,'(A,I0,A,F0.1,6A)')
+     $           'elliprof: warning: the fitted PA wraps across 0/180'//
+     $           ' deg at isophote ', K, ' (Rmaj = ', PARAM_PRF(1,K),
+     $           '). The 6th-order measurements are valid, but the ',
+     $           'original model synthesis gives the 6th-order term ',
+     $           'the wrong sign beyond the wrap: the model and ',
+     $           'residual may be wrong there. COS3X=-3 ',
+     $           '(--sixth-order --model-harmonics none) measures ',
+     $           'without modelling.'
+         END IF
+      END IF
+
+C     ---- The profile table (as main.f), I0 in a format for the whole
+C     double range
+
+      IF (SHVERB .OR. (PRFFILE .EQ. ' ' .AND. CSVFILE .EQ. ' ')) THEN
+         WRITE (6,103)
+ 103     FORMAT (' SURFACE PHOTOMETRY PROFILE COMPUTATION: ')
+         IF (NINT(PARAM_PRF(12,15)) .GE. 0) THEN
+            WRITE (6,105)
+         ELSE
+            WRITE (6,107)
+         END IF
+ 105     FORMAT ('  Rmaj     x0      y0           I0        alpha ',
+     $        'ellip  I(3x)  A(3x)  I(4x)  A(4x) slope')
+ 107     FORMAT ('  Rmaj     x0      y0           I0        alpha ',
+     $        'ellip  I(6x)  A(6x)  I(4x)  A(4x) slope')
+         DO 55 I = 1, N_PRF
+            WRITE (6,106) (PARAM_PRF(J,I),J=1,11)
+ 106        FORMAT (F6.1,2F8.2,1X,1PE16.8E3,0P,F7.2,F6.3,
+     $           2(F7.4,F7.2),F6.2)
+ 55      CONTINUE
+      END IF
+
+C     ---- The profile (-o): the layout of SAVE ELLIPROF=file ASCII,
+C     every value with 18 significant digits and a 3-digit exponent
+
+      IF (PRFFILE .NE. ' ') THEN
+         CALL WRITEDATD(PRFFILE, IERR)
+         IF (IERR .NE. 0) RETURN
+      END IF
+
+      ISTAT = 0
+      RETURN
+      END
+
+C     The double profile is marked in its header text: HISTORY cards,
+C     inserted before END, give the precision and the normalization.
+C     (Row 12 of PARAM_PRF holds the run flags and, in the original
+C     MONSTA, other per-contour values: no slot is free for a marker.)
+      SUBROUTINE PRFMARKD(KNORM, KPREF)
+      INTEGER KNORM, KPREF
+      INCLUDE 'profile_d.inc'
+      INTEGER IEND, NCARD, MAXC
+      CHARACTER*80 C1, C2, C3
+      MAXC = LEN(PRF_HEAD) / 80
+      IEND = 0
+      DO 10 NCARD = 1, MAXC
+         IF (PRF_HEAD((NCARD-1)*80+1:(NCARD-1)*80+8) .EQ. 'END') THEN
+            IEND = NCARD
+            GOTO 11
+         END IF
+ 10   CONTINUE
+ 11   IF (IEND .EQ. 0) IEND = MAXC
+C     room for three cards and END: drop the last header cards if needed
+      IF (IEND + 3 .GT. MAXC) THEN
+         WRITE (0,'(A,I0,A)') 'elliprof: note: the header is full; ',
+     $        IEND + 3 - MAXC, ' card(s) at its end not kept in the '
+     $        //'profile'
+         IEND = MAXC - 3
+      END IF
+      C1 = 'HISTORY elliprof profile precision: double (IEEE-754 '
+     $     //'binary64)'
+      WRITE (C2,'(A,I0,A,I0)') 'HISTORY elliprof profile '
+     $     //'normalization: k=', KNORM, ' preferred=', KPREF
+      C3 = 'HISTORY elliprof profile: I0 in physical units'
+      PRF_HEAD((IEND-1)*80+1:(IEND-1)*80+80) = C1
+      PRF_HEAD(IEND*80+1:IEND*80+80) = C2
+      PRF_HEAD((IEND+1)*80+1:(IEND+1)*80+80) = C3
+      PRF_HEAD((IEND+2)*80+1:(IEND+2)*80+80) = 'END'
+      RETURN
+      END
+
+C     -o FILE: N_PRF, PRF_SC, PARAM_PRF(12,250), header text, in that
+C     order (as the single backend's list-directed WRITE), each number
+C     as ES25.17E3: 18 significant digits (17 suffice to give back the
+C     same double) and an explicit 3-digit exponent, so every finite
+C     double from 4.9E-324 to 1.8E+308 is written readably.
+      SUBROUTINE WRITEDATD(FNAME, IERR)
+      CHARACTER*(*) FNAME
+      INTEGER IERR
+      INCLUDE 'profile_d.inc'
+      OPEN (4, FILE=FNAME, FORM='FORMATTED', STATUS='UNKNOWN',
+     $     IOSTAT=IERR)
+      IF (IERR .NE. 0) THEN
+         WRITE (0,'(3A)') 'elliprof: error (double precision, output):'
+     $        //' cannot open ', FNAME(1:LEN_TRIM(FNAME))
+         RETURN
+      END IF
+      WRITE (4,'(1X,I0)') N_PRF
+      WRITE (4,'(1X,ES25.17E3)') PRF_SC
+      WRITE (4,'(4(1X,ES25.17E3))') PARAM_PRF
+      WRITE (4,'(1X,A)') PRF_HEAD(1:LEN_TRIM(PRF_HEAD))
+      CLOSE (4)
+      RETURN
+      END
+
+C     PAWRAP (main.f) for the double profile, with the arithmetic of
+C     SYNTHESIZED.
+      SUBROUTINE PAWRAPD(N, PRM, K)
+      INTEGER N, K, I
+      DOUBLE PRECISION PRM(12,*), TH, THPREV, D, PI, Q
+      PARAMETER (PI=3.14159265D0)
+      Q = 180/PI
+      K = 0
+      THPREV = (PRM(5,1) + 90) / Q
+      DO 10 I = 2, N
+         TH = (PRM(5,I) + 90) / Q
+         D = PI * ANINT((TH - THPREV) / PI)
+         IF (D .NE. 0 .AND. K .EQ. 0) K = I
+         THPREV = TH - D
+ 10   CONTINUE
       RETURN
       END

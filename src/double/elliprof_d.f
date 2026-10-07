@@ -446,8 +446,8 @@ C     PRECISION PORT: Ie and Sky printed in physical units
       write(6,2001) reff, remin, pow2d(feff,knorm),
      $     pow2d(femin,knorm), pow2d(sky,knorm),
      $     pow2d(skymin,knorm)
- 2001 format(1x,'Re =',2f8.1,4x,'Ie =',2(1x,1pg15.8),4x,
-     $     'Sky =',2(1x,1pg15.8))
+ 2001 format(1x,'Re =',2f8.1,4x,'Ie =',2(1x,1pe16.8e3),4x,
+     $     'Sky =',2(1x,1pe16.8e3))
 
       IF(ITEST.EQ.1) THEN
          ALPHA = 7.669D0
@@ -655,7 +655,8 @@ C      end if
             write(6,1000) par(1,k),par(2,k)+ix0,par(3,k)+iy0,
      $           pow2d(par(4,k),knorm),par(5,k)-90,1-par(6,k),(par(i,k),
      $     i=7,11)
- 1000       format(f6.1,2f8.2,1pg13.6,0p,f7.2,f6.3,2(f7.4,f7.2),f6.2)
+ 1000       format(f6.1,2f8.2,1x,1pe14.6e3,0p,f7.2,f6.3,2(f7.4,f7.2),
+     $     f6.2)
  18      continue
       end if
  1001 format('   r      x0      y0      I0    alpha  ellip',
@@ -1537,7 +1538,7 @@ C     PRECISION PORT: f and sky printed in physical units
       write(6,6725) rmajor, pow2d(exp(flog),knorm),
      $     pow2d(sky,knorm), epsilon
  6725 format('Extrapolated outer isophote: r,f,sky,eps =',
-     $     f9.1,2(1x,1pg15.8),0p,f9.3)
+     $     f9.1,2(1x,1pe16.8e3),0p,f9.3)
       f0(n+1) = flog
       eps(n+1) = epsilon
 

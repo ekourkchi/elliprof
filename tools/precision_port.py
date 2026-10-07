@@ -136,15 +136,15 @@ REVIEWED = {
          "      write(6,2001) reff, remin, pow2d(feff,knorm),\n"
          "     $     pow2d(femin,knorm), pow2d(sky,knorm),\n"
          "     $     pow2d(skymin,knorm)\n"
-         " 2001 format(1x,'Re =',2f8.1,4x,'Ie =',2(1x,1pg15.8),4x,\n"
-         "     $     'Sky =',2(1x,1pg15.8))\n", "print-devauc"),
+         " 2001 format(1x,'Re =',2f8.1,4x,'Ie =',2(1x,1pe16.8e3),4x,\n"
+         "     $     'Sky =',2(1x,1pe16.8e3))\n", "print-devauc"),
         (r"WRITE\(6,\*\) K, PARAM\(1,K\), PARAM\(4,K\), FIT\+SKY\n",
          "WRITE(6,*) K, PARAM(1,K), POW2D(PARAM(4,K),KNORM),\n"
          "     $           POW2D(FIT+SKY,KNORM)\n", "print-test"),
         (r"(     \$ +)par\(4,k\),par\(5,k\)-90,",
          r"\1pow2d(par(4,k),knorm),par(5,k)-90,", "print-table", 2),
         (r" 1000       format\(f6\.1,2f8\.2,f8\.0,",
-         " 1000       format(f6.1,2f8.2,1pg13.6,0p,", "print-table-fmt"),
+         " 1000       format(f6.1,2f8.2,1x,1pe14.6e3,0p,", "print-table-fmt"),
         (r"      write\(6,6725\) rmajor, exp\(flog\), sky, epsilon\n"
          r" 6725 format\('Extrapolated outer isophote: r,f,sky,eps =',"
          r"3f9\.1,f9\.3\)\n",
@@ -152,7 +152,7 @@ REVIEWED = {
          "      write(6,6725) rmajor, pow2d(exp(flog),knorm),\n"
          "     $     pow2d(sky,knorm), epsilon\n"
          " 6725 format('Extrapolated outer isophote: r,f,sky,eps =',\n"
-         "     $     f9.1,2(1x,1pg15.8),0p,f9.3)\n", "print-extrap"),
+         "     $     f9.1,2(1x,1pe16.8e3),0p,f9.3)\n", "print-extrap"),
     ],
 }
 
