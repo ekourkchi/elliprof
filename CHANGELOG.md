@@ -34,9 +34,22 @@
 - An image with a third axis longer than 1 (a cube) is refused instead
   of being fitted on its first plane; select a plane with a CFITSIO
   section, `'cube.fits[SCI][*,*,2:2]'`.
+- An image with an empty axis (`NAXISn = 0`, e.g. 256 x 0) is refused
+  with "selected FITS image has invalid dimensions" before anything is
+  allocated or fitted, in every precision (it used to hang or fit
+  nothing).
 - The CSV header has a `# Precision:` line, and the backend summary a
   `Precision:` line.
 - `parse_elliprof_csv` parses numbers round-trip exactly.
+
+### Fixed
+
+- Wheel builds: CFITSIO 4.7.0's Fortran wrappers passed every C `long`
+  argument with the wrong size on riscv64 (its `f77_wrap.h` lists the
+  64-bit architectures and omits riscv64), so the riscv64 backend read
+  images as 256 x 0. `tools/ci/build_cfitsio.sh` adds riscv64 to that
+  list (no change on any other architecture) and runs a Fortran ABI
+  probe (`tools/ci/cfitsio_f77_probe.f`) after every CFITSIO build.
 
 ## 0.1.4 (2026-10-06)
 

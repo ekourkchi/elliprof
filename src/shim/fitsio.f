@@ -9,8 +9,9 @@ C     ISC = CNPIX1, ISR = CNPIX2, or 0 when those keywords are absent.
       CHARACTER*(*) FNAME, HEAD
       INTEGER IUNIT, NCOL, NROW, ISC, ISR, IERR
       INTEGER STATUS, NAXIS, NAXES(9), NKEYS, NMORE, I, NCARD
-      INTEGER HDUTYP
+      INTEGER HDUTYP, J
       CHARACTER*80 CARD, COMMENT
+      CHARACTER*120 DIMS
 
       IERR = 1
       STATUS = 0
@@ -48,6 +49,28 @@ C     another HDU.
          NAXES(I) = 1
  5    CONTINUE
       CALL FTGISZ(IUNIT, MIN(NAXIS,9), NAXES, STATUS)
+      IF (STATUS .NE. 0) THEN
+         CALL FITSERR('reading the image size of '//
+     $        FNAME(1:LEN_TRIM(FNAME)), STATUS)
+         CALL FITSCLOSE(IUNIT)
+         RETURN
+      END IF
+C     Every axis must hold at least one pixel, before anything is
+C     allocated or fitted.  An empty axis is legal FITS but there is no
+C     image to fit; it is also what a mis-sized CFITSIO Fortran wrapper
+C     returns (CFITSIO 4.7.0 on riscv64 without the f77_wrap.h fix in
+C     tools/ci/build_cfitsio.sh read 256 x 256 as 256 x 0).
+      DO 4 I = 1, MIN(NAXIS,9)
+         IF (NAXES(I) .LT. 1) THEN
+            WRITE (DIMS,'(I0,8(A,I0))') NAXES(1),
+     $           (' x ', NAXES(J), J = 2, MIN(NAXIS,9))
+            WRITE (0,'(5A)') 'elliprof: error: ',
+     $           FNAME(1:LEN_TRIM(FNAME)), ': selected FITS image ',
+     $           'has invalid dimensions (', DIMS(1:LEN_TRIM(DIMS))//')'
+            CALL FITSCLOSE(IUNIT)
+            RETURN
+         END IF
+ 4    CONTINUE
       NCOL = NAXES(1)
       NROW = NAXES(2)
 C     2-D images only.  A cube (or any axis beyond the second longer
