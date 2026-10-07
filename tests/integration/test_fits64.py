@@ -180,3 +180,8 @@ def test_cli_summary_reports_the_conversion(tmp_path, sci):
     assert p.returncode == 0, p.stderr
     # --precision auto (the default): a 64-bit image is fitted in double
     assert "read as 32-bit float" not in p.stdout
+    assert "Precision: double (auto: science image BITPIX -64" in p.stdout
+    p = run_cli(tmp_path / "f64.fits", *FIT, "-o", tmp_path / "a.dat",
+                "--precision", "single")
+    assert p.returncode == 0, p.stderr
+    assert "BITPIX -64 read as 32-bit float" in p.stdout

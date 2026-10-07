@@ -51,14 +51,24 @@ FLAG_NAMES = ["x0", "y0", "r0", "r1", "nr", "niter", "rlaw", "fitlog",
 NPROFILE = 250  # PARAMETER NPROFILE in profile.inc
 
 
+DOUBLE_MARK = "HISTORY elliprof profile precision: double"
+_NORM = re.compile(r"HISTORY elliprof profile normalization: k=(-?\d+)")
+
+
 def read_prf(path: str) -> Dict[str, object]:
     """Read the text profile written by ``-o`` (the original ELLIPROF
     profile format; any file name, traditionally ``n1234.dat``).
 
-    The file holds, list-directed: ``N_PRF, PRF_SC, PARAM_PRF(12,250)``
-    (Fortran column order) and the FITS header text.  Returns ``n``,
-    ``scale``, ``params`` (array (250, 12), row k = contour k+1) and
-    ``header`` (the header text).
+    The file holds ``N_PRF, PRF_SC, PARAM_PRF(12,250)`` (Fortran column
+    order) and the FITS header text.  Returns ``n``, ``scale``,
+    ``params`` (array (250, 12), row k = contour k+1), ``header`` (the
+    header text), ``precision`` and ``normalization_exponent``.
+
+    A profile of the single backend holds REAL*4 values: they are
+    rounded through float32, giving exactly the values ELLIPROF
+    computed.  A profile of the double backend (marked by a HISTORY
+    card in its header text) holds IEEE-754 doubles written with 18
+    significant digits: they are read as float64, exactly.
     """
     with open(path) as f:
         text = f.read()
@@ -70,31 +80,42 @@ def read_prf(path: str) -> Dict[str, object]:
     try:
         n = int(tokens[0])
         scale = float(tokens[1])
-        # 9 significant digits identify a REAL*4 value exactly; round
-        # through float32 so the result is the value ELLIPROF computed.
         values = np.array([float(t) for t in tokens[2:need]],
-                          dtype=np.float32).astype(np.float64)
+                          dtype=np.float64)
     except ValueError as exc:
         raise ValueError(f"{path} is not an ELLIPROF text profile (-o output): {exc}") \
             from None
     if not 0 <= n <= NPROFILE:
         raise ValueError(f"{path}: invalid contour count {n}")
     header = tokens[need] if len(tokens) > need else ""
+    double = DOUBLE_MARK in header
+    norm = _NORM.search(header)
+    if not double:
+        # 9 significant digits identify a REAL*4 value exactly; round
+        # through float32 so the result is the value ELLIPROF computed.
+        values = values.astype(np.float32).astype(np.float64)
     return {"n": n, "scale": scale,
             "params": values.reshape(NPROFILE, 12),
-            "header": header}
+            "header": header,
+            "precision": "double" if double else "single",
+            "normalization_exponent": int(norm.group(1)) if norm
+            else None}
 
 
 def read_profile(path: str) -> pd.DataFrame:
     """The fitted profile from a text profile (-o) as a DataFrame with columns
-    ``Rmaj, x0, y0, I0, alpha, ellip, I3, A3, I4, A4, slope`` (exact
-    REAL*4 values).  ``df.attrs`` holds ``scale`` and the run ``flags``.
+    ``Rmaj, x0, y0, I0, alpha, ellip, I3, A3, I4, A4, slope`` (the exact
+    values of the backend: REAL*4 or float64).  ``df.attrs`` holds
+    ``scale``, the run ``flags``, ``precision`` ("single" or "double")
+    and ``normalization_exponent`` (double only).
     """
     prf = read_prf(path)
     params = prf["params"]
     df = pd.DataFrame(params[:prf["n"], :11], columns=COLUMNS)
     df.attrs["scale"] = prf["scale"]
     df.attrs["flags"] = dict(zip(FLAG_NAMES, params[:17, 11].tolist()))
+    df.attrs["precision"] = prf["precision"]
+    df.attrs["normalization_exponent"] = prf["normalization_exponent"]
     return df
 
 
@@ -112,6 +133,8 @@ def parse_elliprof_csv(path: str) -> Tuple[pd.DataFrame, Dict[str, str]]:
             m = _META.match(line.strip())
             if m and m.group(1) not in ("Columns", "Units"):
                 meta[m.group(1).strip()] = m.group(2).strip()
+    # round_trip: every value exactly as written (the default parser
+    # may be off by one unit in the last place)
     df = pd.read_csv(path, comment="#", header=None, names=COLUMNS,
-                     skipinitialspace=True)
+                     skipinitialspace=True, float_precision="round_trip")
     return df.astype(np.float64), meta

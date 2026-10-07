@@ -7,6 +7,7 @@ line, runs the backend with a time limit, and reads the results.
 
 import math
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -29,6 +30,11 @@ NITER_MAX = 1000
 UNSUPPORTED = ("OLD", "EDIT", "TV")  # interactive or stateful options
 DEFAULT_NITER = 5  # ELLIPROF's own default (src/original/elliprof.f)
 MASK_CONVENTIONS = ("nonzero-good", "zero-good")
+PRECISIONS = ("auto", "single", "double")
+_PRECISION = re.compile(r"^\s*Precision: (single|double) \(.*?\); "
+                        r"requested (\w+)(?: \(auto: (.*)\))?\s*$", re.M)
+_NORMALIZATION = re.compile(r"Normalization: fit on image x 2\*\*\(-k\), "
+                            r"k = (-?\d+)")
 
 
 class ElliprofError(RuntimeError):
@@ -66,6 +72,15 @@ class ElliprofResult:
     output_dir: Optional[Path] = None
     prepared_path: Optional[Path] = None
     residual_path: Optional[Path] = None
+    #: the backend that ran: "single" or "double" (None if it did not
+    #: get that far)
+    precision: Optional[str] = None
+    #: what was asked for: "auto", "single" or "double"
+    precision_requested: Optional[str] = None
+    #: why --precision auto chose the backend
+    precision_reason: Optional[str] = None
+    #: double backend: the fit ran on image x 2**(-k); k (else None)
+    normalization_exponent: Optional[int] = None
 
     @property
     def ok(self) -> bool:
@@ -260,6 +275,19 @@ def _load_profile(prf: Path):
     return read_profile(str(prf))
 
 
+def _precision_info(stdout: str) -> dict:
+    """The backend's report of its precision and normalization."""
+    info = {}
+    m = _PRECISION.search(stdout)
+    if m:
+        info.update(precision=m.group(1), precision_requested=m.group(2),
+                    precision_reason=m.group(3))
+    n = _NORMALIZATION.search(stdout)
+    if n:
+        info["normalization_exponent"] = int(n.group(1))
+    return info
+
+
 def run_elliprof(image: PathLike, x0: float, y0: float, *,
                  mask: Optional[PathLike] = None,
                  sky: Optional[float] = None,
@@ -271,6 +299,7 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
                  verbose=False, extra: Iterable[str] = (),
                  model_harmonics=None, harmonic_mode=None,
                  sixth_order=False, mask_convention: str = "nonzero-good",
+                 precision: str = "auto",
                  load_profile: bool = True,
                  output_dir: Optional[PathLike] = None,
                  prefix: Optional[str] = None,
@@ -325,9 +354,21 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
     ``<prefix>_model.fits``); no separate MODEL keyword is needed.
     File names are free: extensions are never checked or added.
 
+    ``precision`` chooses the backend: ``"single"`` is the original
+    ELLIPROF, in 32-bit floating point (REAL*4); ``"double"`` its
+    precision port, in IEEE-754 double precision throughout (reading,
+    sky, fit, model, products); ``"auto"`` (the default) uses double
+    only when single could not hold the data: a science or sky image
+    stored with BITPIX 64 or -64, or values (after BSCALE/BZERO, or the
+    sky) beyond the float32 range or nonzero but 0 in float32.
+    ``result.precision`` tells which one ran and
+    ``result.precision_reason`` why.  The double backend reads and
+    processes 64-bit FITS data without reducing them to float32; it
+    writes 64-bit products.
+
     ``image`` may be stored with any FITS BITPIX (8, 16, 32, 64, -32,
-    -64); its pixels are converted to 32-bit floating point, the
-    precision ELLIPROF works in.
+    -64).  The single backend converts its pixels to 32-bit floating
+    point; the double backend reads them as 64-bit floats.
 
     ``image``, ``mask`` and ``sky_image`` may select a FITS extension with
     CFITSIO syntax, e.g. ``"galaxy.fits[SCI]"`` or ``"galaxy.fits[1]"``;
@@ -366,6 +407,12 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
                          f"'zero-good', got {mask_convention!r}")
     if mask_convention != "nonzero-good" and mask is None:
         raise ValueError("mask_convention needs a mask")
+    if precision not in PRECISIONS:
+        raise ValueError("precision must be 'auto', 'single' or 'double', "
+                         f"got {precision!r}")
+    if gc and precision == "double":
+        raise ValueError("double-precision GC mode is not yet supported; "
+                         "use precision='single'")
     if timeout is not None and not _finite(timeout, "timeout") > 0:
         raise ValueError("timeout must be positive (or None)")
     extra = list(extra)
@@ -428,6 +475,7 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
             cmd += [flag, str(path.resolve())]
     if prepared is not None:
         cmd += ["--prepared", str(Path(prepared).resolve())]
+    cmd += ["--precision", precision]
     if backend_verbose:
         cmd.append("--verbose")
 
@@ -448,7 +496,7 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
         stdout=stdout, stderr=stderr, returncode=code, command=cmd,
         center=(x0, y0), backend_path=exe, output_dir=out,
         prepared_path=Path(prepared) if prepared else None,
-        residual_path=_written(ok, res))
+        residual_path=_written(ok, res), **_precision_info(stdout))
     # the backend checked the mask / sky image against the science HDU
     geometry = [l for l in stderr.splitlines()
                 if "does not match science image" in l
