@@ -84,12 +84,13 @@ def test_u12517_well_conditioned_isophotes_agree(run_native, tmp_path):
     assert n == 23
     assert np.all(np.isfinite(d[:n, :11]))
     d, s = d[:19], s[:19]
-    # (single's float32 results vary a little between platforms' libm:
-    # isophote 2 differs by 2.5e-4 px on macOS arm64, 1.6e-3 on Linux)
+    # (single's float32 results vary a little between platforms' libm,
+    # most at the central isophote 2: x0 2.5e-4 px / ellip 3.6e-5 on
+    # macOS arm64, 1.6e-3 px / 1.5e-4 on Linux aarch64)
     assert np.abs(d[:, 1:3] - s[:, 1:3]).max() < 5e-3
     assert np.abs(d[:, 3] / s[:, 3] - 1).max() < 1e-5
-    assert np.abs(d[:, 5] - s[:, 5]).max() < 1e-4
-    assert np.abs(d[:, 4] - s[:, 4]).max() < 2e-3
+    assert np.abs(d[:, 5] - s[:, 5]).max() < 1e-3
+    assert np.abs(d[:, 4] - s[:, 4]).max() < 2e-2
 
 
 @pytest.mark.parametrize("linear", [False, True])
