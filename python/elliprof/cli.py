@@ -253,7 +253,8 @@ LEGACY ELLIPROF CONTROLS (the original concise interface, fully supported)
                    0  measure 3rd, not in the model
                   -2  measure 6th, model each isophote's term
                   -1  measure 6th, model the median term
-                  -3  measure 6th, not in the model
+                  -3  measure 6th, not in the model (the original code
+                      does this for COS3X <= -3; -3 is the supported value)
   COS4X=k       the 4th order is always measured:
                    2  model each isophote's term (default)
                    1  model the median term

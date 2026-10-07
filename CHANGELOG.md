@@ -44,11 +44,14 @@ as typed. The original ELLIPROF Fortran is untouched (SHA-256 verified).
 - `--niter N`, the same as ELLIPROF's `NITER=N` (default 5, from the
   original code). NITER is the only iteration count of the isophote fit.
 - `COS3X=-3`: measure the 6th-order harmonic without putting it into the
-  model (completing the original family: 2/1/0 = 3rd order, each /
-  median / none; -2/-1/-3 = 6th order, each / median / none). Modern
-  spelling: `--sixth-order --model-harmonics none` (or `4`). With
-  `--sixth-order`, `--model-harmonics` also accepts `6` and `4,6`.
-  `COS3X` outside -3..2 and `COS4X` outside 0..2 are still refused.
+  model. The original ELLIPROF code does this for any `COS3X` <= -3 (its
+  help documents only 0/1/2 and "< 0: 6th order"); the package now
+  exposes `COS3X=-3` as the supported spelling. Together: 2/1/0 = 3rd
+  order, each / median / none; -2/-1/-3 = 6th order, each / median /
+  none. Modern spelling: `--sixth-order --model-harmonics none` (or
+  `4`). With `--sixth-order`, `--model-harmonics` also accepts `6` and
+  `4,6`. Exactly -3..2 (`COS3X`) and 0..2 (`COS4X`) are accepted; other
+  values are refused.
 - A warning when a 6th-order term is put into the model (`COS3X=-2` or
   `-1`) and the fitted position angle wraps across 0/180 deg. This is a
   pre-existing limitation of the original ELLIPROF model synthesis, not a

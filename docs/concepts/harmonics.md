@@ -92,15 +92,28 @@ ellipse* the extra light is, relative to the major axis.
   intensity term Iₙ cos n(θ − Aₙ) on the fitted ellipse.</figcaption>
 </figure>
 
-!!! warning "A3 can jump by 60° where the position angle wraps"
+!!! warning "In 3rd-order mode, A3 can jump by 60° where the position angle wraps"
     `alpha` is reported in 0–180°. Where the fitted position angle of the
     isophotes crosses 0°/180° (common for a galaxy whose major axis is
     near the y axis, and for nearly round isophotes with an uncertain
     angle), the end of the major axis that θ is measured from swaps to
-    the other end. The same physical 3rd-order pattern then shows a
-    **60° jump in A3** (180°/3). This is a convention effect, not a
-    change in the galaxy. `A4` does not jump (a 4th-order pattern looks
-    the same from either end), and neither does the 6th-order phase.
+    the other end, which shifts θ by 180°. The phase of an order-n term
+    then shifts by 180°, counted modulo its period 360°/n:
+
+    | Order | Period of the phase | Effect of the 180° swap |
+    |---|---|---|
+    | 3rd (`A3`, `COS3X` ≥ 0) | 120° | **60° jump in A3** (half a period) |
+    | 4th (`A4`) | 90° | none (two whole periods) |
+    | 6th (A6) | 60° | none (three whole periods) |
+
+    So **only the ordinary 3rd-order A3** jumps. It is a convention
+    effect, not a change in the galaxy. In
+    [sixth-order mode](#sixth-order) the `A3` column holds 2 × A6, and
+    since A6 does not jump, neither does that column. In the synthetic
+    test (a fixed pattern on a galaxy whose angle wraps from 179.9° to
+    2.0°), the 3rd-order `A3` goes from 60.2° to 0.4°, while in
+    sixth-order mode the `A3` column stays near 0.2° (0.1–0.4°) on both
+    sides, and `A4` changes only smoothly with the twist.
 
 ## Measuring versus modelling { #the-harmonics-in-the-model-image }
 
@@ -137,7 +150,15 @@ profiles, models and residuals.
 
 The **sign** of `COS3X` chooses the order measured (≥ 0: 3rd, < 0:
 6th); its **size** chooses the use in the model (0 none, 1 median, 2
-each). Other values are refused.
+each).
+
+The original program documents `COS3X` as 0/1/2 and "`COS3X` < 0: use
+cos 6x instead of cos 3x". In the original code, every value ≤ −3
+measures the 6th order and leaves it out of the model; the elliprof
+package exposes `COS3X=-3` as the supported spelling of that behaviour.
+The package deliberately accepts exactly −3, −2, −1, 0, 1 and 2 (and
+`COS4X` 0, 1, 2) and refuses other values, although the original code
+would treat them like one of these.
 
 ### Fourth order: `COS4X`
 
@@ -361,7 +382,10 @@ a negative `COS3X` (`--sixth-order`).
     - `I3` holds the **6th-order amplitude** (fraction of `I0`);
     - `A3` holds **twice the 6th-order phase**: A3 = 2 × A6, in 0–120°
       (A6 itself is in 0–60°);
-    - the 3rd order is not measured at all.
+    - the 3rd order is not measured at all;
+    - the 3rd-order rule that `A3` jumps by 60° at a position-angle wrap
+      **does not apply**: neither A6 nor this `A3` column jumps
+      ([see above](#the-convention)).
 
     ELLIPROF's printed table labels the columns `I(6x)` and `A(6x)` in this
     mode. The `.dat` profile and the CSV keep the column names `I3`, `A3`;
