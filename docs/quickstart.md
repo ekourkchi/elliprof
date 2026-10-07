@@ -24,8 +24,8 @@ elliprof u12517j.fits \
     --mask u12517j.dmask --sky 3246 \
     X0=567 Y0=562 \
     R0=9 R1=347 NR=23 NITER=10 RMSTAR \
-    -o u12517j.prf --csv u12517j.csv --reg u12517j.reg \
-    MODEL -m u12517j_model.fits --residual u12517j_residual.fits
+    -o u12517.dat --csv u12517.csv --reg u12517.reg \
+    -m u12517.prf --residual u12517_residual.fits
 ```
 
 | Part | Meaning |
@@ -36,25 +36,25 @@ elliprof u12517j.fits \
 | `R0=9 R1=347 NR=23` | 23 isophotes with semi-major axes from 9 to 347 pixels |
 | `NITER=10` | 10 iterations of the fit (the default is 5) |
 | `RMSTAR` | reject star-like bright points along each ellipse |
-| `-o`, `--csv`, `--reg` | the profile (native format and CSV) and the ellipses as DS9 regions |
-| `MODEL -m ...` | build the model image and write it |
+| `-o`, `--csv`, `--reg` | the profile (native text format, traditionally `.dat`, and CSV) and the ellipses as DS9 regions |
+| `-m u12517.prf` | compute the model image and write it (FITS; `.prf` is the traditional name) |
 | `--residual ...` | write data − sky − model (masked pixels are 0) |
 
 elliprof prints a short summary:
 
 ```text
-elliprof 0.1.3
+elliprof 0.1.4
 Fitting 23 isophotes...
 Image:    u12517j.fits (1025 x 1022)
 Sky:      scalar 3246
-Mask:     u12517j.dmask - 103402 pixels masked (9.871%)
+Mask:     u12517j.dmask - 103402 pixels masked (9.871%); nonzero-good
 Fit complete: 23 isophotes.
 elliprof: note: 10 isophote fit(s) had too few usable samples along the ellipse (e.g. inside a masked region) and kept their previous parameters
-Profile:  u12517j.prf
-CSV:      u12517j.csv
-Regions:  u12517j.reg
-Model:    u12517j_model.fits
-Residual: u12517j_residual.fits
+Profile:  u12517.dat
+CSV:      u12517.csv
+Regions:  u12517.reg
+Model:    u12517.prf
+Residual: u12517_residual.fits
 Done.
 ```
 
@@ -68,14 +68,14 @@ goes away.
 **The ellipses on the image** (in [SAOImage DS9](https://sites.google.com/cfa.harvard.edu/saoimageds9)):
 
 ```sh
-ds9 u12517j.fits -regions u12517j.reg
+ds9 u12517j.fits -regions u12517.reg
 ```
 
-**The model and residual:** open `u12517j_model.fits` and
-`u12517j_residual.fits` in DS9 next to the image. They carry the image's
+**The model and residual:** open `u12517.prf` and
+`u12517_residual.fits` in DS9 next to the image. They carry the image's
 WCS, so you can lock them by WCS (Frame → Lock → Frame → WCS).
 
-**The profile:** `u12517j.csv` is a table with one row per isophote:
+**The profile:** `u12517.csv` is a table with one row per isophote:
 
 ```text
 #     Rmaj,         x0,         y0,              I0,      alpha,      ellip,              I3,         A3,              I4,         A4,      slope
@@ -94,7 +94,7 @@ Plot it in Python:
 import matplotlib.pyplot as plt
 from elliprof import read_profile
 
-p = read_profile("u12517j.prf").iloc[1:]      # skip the unfitted r = 9
+p = read_profile("u12517.dat").iloc[1:]      # skip the unfitted r = 9
 fig, ax = plt.subplots(1, 2, figsize=(9, 3.5))
 ax[0].loglog(p.Rmaj, p.I0, "o-")
 ax[0].set(xlabel="semi-major axis [pixels]", ylabel="I0")
@@ -110,7 +110,7 @@ from elliprof import run_elliprof
 
 r = run_elliprof("u12517j.fits", x0=567, y0=562, r0=9, r1=347, nr=23,
                  niter=10, rmstar=True, mask="u12517j.dmask", sky=3246,
-                 model=True, residual_path="u12517j_residual.fits",
+                 model_path="u12517.prf", residual_path="u12517_residual.fits",
                  output_dir=".")
 print(r.profile[["Rmaj", "I0", "ellip", "alpha", "I4", "A4"]])
 print(r.model_path, r.residual_path)

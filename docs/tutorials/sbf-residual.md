@@ -18,8 +18,8 @@ ELLIPROF's role ends.
 elliprof u12517j.fits \
     --mask u12517j.dmask --sky 3246 \
     X0=567 Y0=562 R0=9 R1=347 NR=23 NITER=10 RMSTAR \
-    -o u12517j.prf \
-    MODEL -m u12517j_model.fits --residual u12517j_residual.fits
+    -o u12517.dat \
+    -m u12517.prf --residual u12517_residual.fits
 ```
 
 - The model keeps the default 3rd- and 4th-order harmonic terms.
@@ -76,15 +76,15 @@ import numpy as np
 from astropy.io import fits
 from elliprof import load_mask
 
-res = fits.getdata("u12517j_residual.fits").astype(float)
-model = fits.getdata("u12517j_model.fits").astype(float)
+res = fits.getdata("u12517_residual.fits").astype(float)
+model = fits.getdata("u12517.prf").astype(float)
 good = load_mask("u12517j.dmask") != 0   # the same mask as the fit
 
 norm = np.full(res.shape, np.nan)
 ok = good & (model > 0)
 norm[ok] = res[ok] / np.sqrt(model[ok])
 
-hdr = fits.getheader("u12517j_residual.fits")   # keeps the WCS
+hdr = fits.getheader("u12517_residual.fits")   # keeps the WCS
 fits.writeto("u12517j_norm.fits", norm.astype(np.float32), hdr, overwrite=True)
 ```
 
@@ -100,9 +100,9 @@ For the downstream analysis you now have:
 
 | File | Use |
 |---|---|
-| `u12517j_model.fits` | normalisation (√model), and the galaxy brightness for colours |
-| `u12517j_residual.fits` | the fluctuation image, before large-scale cleaning and point-source masking |
-| `u12517j.prf` | the isophote geometry, e.g. to define elliptical annuli |
+| `u12517.prf` | normalisation (√model), and the galaxy brightness for colours |
+| `u12517_residual.fits` | the fluctuation image, before large-scale cleaning and point-source masking |
+| `u12517.dat` | the isophote geometry, e.g. to define elliptical annuli |
 | the mask | the same pixels to exclude |
 
 Record the elliprof version, the sky, the mask and every fit parameter

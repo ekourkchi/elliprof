@@ -25,7 +25,8 @@ lower case, in Python.
       isophote.
 
     Then update the logarithmic slopes of all the isophotes.
-5. **Write** the profile and, with `MODEL`, build the model image.
+5. **Write** the profile and, when `-m` (or `--residual`) asks for it,
+   build the model image.
 
 ## 1. The initial centre and the fitted centres
 
@@ -130,12 +131,18 @@ Positive values (intensity increasing outwards) are replaced by −2.
 
 ## 5. Iterations: NITER
 
-One iteration visits every isophote once. `NITER` (default 5, at most
-1000) sets how many iterations are run. Increase it when the parameters
-are still changing between the last iterations, for example after a poor
-starting centre. `--verbose` or the keyword `VERBOSE` prints the
-parameters after every iteration, so you can see whether they have
-settled.
+One iteration visits every isophote once. `NITER` (default 5, 1 to
+1000) sets how many iterations are run; on the command line `--niter N`
+is the same as `NITER=N`, and in Python it is `niter=`. The default of 5
+is the original ELLIPROF's own. Increase it when the parameters are still
+changing between the last iterations, for example after a poor starting
+centre. The keyword `VERBOSE` prints the parameters after every
+iteration, so you can see whether they have settled.
+
+`NITER` is the only iteration count of the isophote fit. The original
+code has fixed internal limits elsewhere (for example in the
+de Vaucouleurs fit it prints at the end), but they do not affect the
+profile, the model or the residual, and they are not parameters.
 
 `TIE=k` smooths the parameters with radius after each iteration. With
 k ≥ 0 it fits a weighted polynomial of order k in $r^{1/4}$. With k < −1
@@ -174,8 +181,10 @@ $$ \text{median} + 4\times(Q_3 - \text{median}) $$
 
 ## 7. The model image
 
-With `MODEL` (and `-m FILE` to write it), ELLIPROF builds a 2-D model of
-the galaxy from the fitted isophotes. The model follows the fitted
+With `-m FILE`, ELLIPROF builds a 2-D model of the galaxy from the fitted
+isophotes and elliprof writes it as FITS (no `MODEL` keyword is needed
+since 0.1.4). The model is built after the fit is finished, so asking for
+it never changes the profile. The model follows the fitted
 intensity, centre, ellipticity and position angle with radius, plus the
 3rd- and 4th-order terms you choose ([model harmonics](harmonics.md#the-harmonics-in-the-model-image)).
 It covers the whole image, masked pixels included.

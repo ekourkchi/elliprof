@@ -1,11 +1,26 @@
 # Command-line reference
 
-This page documents **elliprof 0.1.3**. `elliprof -h` prints the same
+This page documents **elliprof 0.1.4**. `elliprof -h` prints the same
 information.
 
 ```text
 elliprof IMAGE.fits X0=x Y0=y R0=r R1=r NR=n [KEYWORD=value ...] [options]
 ```
+
+The common workflow, with the traditional ELLIPROF file names (`.dat` for
+the text profile, `.prf` for the FITS model image):
+
+```sh
+elliprof n1234j.fits \
+    RMSTAR \
+    X0=514 Y0=514 \
+    R0=10 R1=450 NR=25 NITER=5 \
+    -o n1234.dat \
+    -m n1234.prf
+```
+
+`-o FILE` writes the profile; `-m FILE` computes the model and writes
+it. File names are free: elliprof never checks or adds extensions.
 
 Keywords (`KEY=value`, case-insensitive) and options may follow the
 image in any order. The output is a short summary (inputs, notes, files
@@ -16,7 +31,7 @@ is given.
 
 | Argument | Meaning |
 |---|---|
-| `IMAGE.fits` | 2-D FITS image (first argument). Select an extension with CFITSIO syntax, quoted: `'galaxy.fits[SCI]'`, `'galaxy.fits[1]'`. The selected HDU is fitted; there is no fallback to another |
+| `IMAGE.fits` | 2-D FITS image (first argument), any BITPIX: 8, 16, 32, 64, −32, −64 (converted to 32-bit floating point, the precision ELLIPROF works in). Select an extension with CFITSIO syntax, quoted: `'galaxy.fits[SCI]'`, `'galaxy.fits[1]'`. The selected HDU is fitted; there is no fallback to another |
 | `X0=x Y0=y` | **required** initial centre, in pixels. ELLIPROF refines the centre of each isophote unless `FIXCTR=1`. The centre of the pixel in FITS column *i* is at x = *i* − 0.5 |
 
 ## Radial fitting parameters
@@ -27,7 +42,7 @@ is given.
 | `R1=r` | required | semi-major axis of the outermost isophote; 0 < R0 < R1 |
 | `NR=n` | required | number of isophotes, 2–100, including R0 and R1 |
 | `RLAW=k` | 2 | spacing: 2 = equal steps in r^¼, 1 = in log r, 0 = in r |
-| `NITER=n` | 5 | iterations (at most 1000) |
+| `NITER=n` | 5 | iterations of the fit (1–1000); `--niter n` is the same. See [Iterations](../concepts/how-it-works.md#5-iterations-niter) |
 | `RMSTAR` | off | reject samples brighter than median + 4 × (Q3 − median) along each ellipse |
 | `FIXCTR=k` | 0 | 0 = each isophote fits its centre; 1 = fixed at X0, Y0; 2 = median of fitted centres |
 | `ELLIP=e` | fitted | hold the ellipticity (1 − b/a) fixed |
@@ -47,7 +62,8 @@ Details: [How ELLIPROF fits a galaxy](../concepts/how-it-works.md).
 |---|---|
 | `--sky VALUE` | subtract one constant sky level (image units) |
 | `--sky-image FILE` | subtract a sky image pixel by pixel; same dimensions as the science image. Not together with `--sky` |
-| `--mask FILE` | logical mask: 0 = bad; other finite values = good; NaN, Inf, BLANK = bad. FITS of any BITPIX, or legacy BITPIX=1 `.dmask`. Same dimensions |
+| `--mask FILE` | logical mask, by default: 0 = bad; other finite values = good; NaN, Inf, BLANK = bad. FITS of any BITPIX, or legacy BITPIX=1 `.dmask`. Same dimensions |
+| `--mask-convention nonzero-good\|zero-good` | how the mask values are read. `nonzero-good` (default): the rule above. `zero-good`: 0 = good; any nonzero value, NaN, Inf, BLANK = bad. Refused for a legacy `.dmask` (1 always means good) |
 | `--sc VALUE` | deprecated alias of `--sky` |
 | `SKY=s` | ELLIPROF's own sky, used **only** in the de Vaucouleurs fit it prints; does not change the image or profile |
 
@@ -60,8 +76,9 @@ reprojected. Details: [Sky and masks](../concepts/sky-and-masks.md).
 
 | Option | Meaning |
 |---|---|
-| `MODEL -m FILE` | build the model image and write it (both are needed) |
-| `--residual FILE` | write mask × (science − sky − model); implies `MODEL` |
+| `-m FILE` | compute the model image and write it as FITS (nothing else is needed) |
+| `--residual FILE` | write mask × (science − sky − model); computes the same model, with or without `-m` |
+| `MODEL` | no longer needed; accepted and ignored, with a note. `MODEL=value` is an error |
 | `--model-harmonics none\|3\|4\|3,4` | harmonic terms in the model (default 3,4) |
 | `--harmonic-mode each\|median` | each isophote's own terms (default) or the median over isophotes |
 | `--sixth-order` | fit and model the 6th-order term in place of the 3rd (**changes the fit**) |
@@ -76,15 +93,15 @@ Use either `COS3X`/`COS4X` or the options above, not both. Only the
 
 | Option | Output |
 |---|---|
-| `-o FILE` | profile in ELLIPROF's native `.prf` format (a table, **not an image**) |
+| `-o FILE` | the profile in ELLIPROF's native text format (a table, **not an image**); traditionally `n1234.dat` |
 | `--csv FILE` | the profile as a commented CSV table |
 | `--reg FILE` | the fitted ellipses as a DS9 region file |
-| `-m FILE` | the model image (with `MODEL`) |
+| `-m FILE` | the model image (FITS); traditionally `n1234.prf` |
 | `--residual FILE` | the residual image |
 | `--prepared FILE` | mask × (science − sky), the image as fitted |
 
-The images are float32 FITS with the header (and WCS) of the selected
-science HDU. Details: [The profile](../outputs/profile.md),
+The images are 32-bit floating-point FITS (whatever the BITPIX of the
+input) with the header (and WCS) of the selected science HDU. Details: [The profile](../outputs/profile.md),
 [Model, residual and prepared images](../outputs/images.md).
 
 ## Runtime options
@@ -96,28 +113,41 @@ science HDU. Details: [The profile](../outputs/profile.md),
 | `--diagnostics` | versions, Python, OS, architecture and backend details, for bug reports |
 | `-v`, `--version` | version, original developer and maintainer |
 | `-h`, `--help` | full help |
+| `--check-update` | ask PyPI whether a newer elliprof exists (installs nothing) |
+| `-u`, `--update` | install the newest elliprof with this Python's pip ([Updating](../install.md#updating)) |
 
 Not supported: the interactive options `OLD`, `EDIT` and `TV` of the
 original program.
 
+Changed in 0.1.4: `-m FILE` alone computes and writes the model (before,
+`MODEL` was also required and `-m` alone was ignored).
+
 ## Examples
 
 ```sh
-# basic fit, profile + CSV + DS9 regions
+# profile (text) and model (FITS), traditional names
+elliprof n1234j.fits RMSTAR X0=514 Y0=514 R0=10 R1=450 NR=25 NITER=5 \
+    -o n1234.dat -m n1234.prf
+
+# profile + CSV + DS9 regions
 elliprof galaxy.fits X0=500 Y0=500 R0=5 R1=200 NR=30 \
-    -o galaxy.prf --csv galaxy.csv --reg galaxy.reg
+    -o galaxy.dat --csv galaxy.csv --reg galaxy.reg
 
 # mask and sky image
 elliprof galaxy.fits --mask galaxy_mask.fits --sky-image background.fits \
     X0=500 Y0=500 R0=5 R1=200 NR=30
 
-# model with the 4th-order (boxy/disky) term only
-elliprof galaxy.fits X0=500 Y0=500 R0=5 R1=200 NR=30 \
-    MODEL -m galaxy_model.fits --model-harmonics 4
+# a mask with 0 = good and nonzero = bad (e.g. a segmentation map)
+elliprof galaxy.fits --mask segmap.fits --mask-convention zero-good \
+    X0=500 Y0=500 R0=5 R1=200 NR=30
+
+# model with the 4th-order (boxy/disky) term only; 10 iterations
+elliprof galaxy.fits X0=500 Y0=500 R0=5 R1=200 NR=30 --niter 10 \
+    -m galaxy.prf --model-harmonics 4
 
 # image in an extension; model, prepared image and residual
 elliprof 'galaxy.fits[SCI]' --mask galaxy_mask.fits --sky 1234.5 \
-    X0=500 Y0=500 R0=5 R1=200 NR=30 MODEL -m galaxy_model.fits \
+    X0=500 Y0=500 R0=5 R1=200 NR=30 -o galaxy.dat -m galaxy.prf \
     --prepared galaxy_prepared.fits --residual galaxy_residual.fits
 ```
 

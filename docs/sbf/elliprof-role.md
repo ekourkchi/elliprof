@@ -111,7 +111,7 @@ low wavenumbers.
 ```sh
 elliprof galaxy.fits --mask mask.fits --sky SKY \
     X0=... Y0=... R0=... R1=... NR=... NITER=10 \
-    MODEL -m galaxy_model.fits --residual galaxy_residual.fits
+    -m galaxy.prf --residual galaxy_residual.fits
 ```
 
 What you get:

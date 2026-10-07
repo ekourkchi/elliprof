@@ -92,7 +92,7 @@ From the profile you can compute, for example:
 - **colour profiles**, by comparing two filters at matched semi-major
   axes (the same `R0`, `R1`, `NR`, `RLAW` and centre). Fit each filter,
   check that the geometries agree, and difference the surface
-  brightnesses. (elliprof 0.1.3 cannot impose the geometry of one fit on
+  brightnesses. (elliprof, as of 0.1.4, cannot impose the geometry of one fit on
   another. `FIXCTR=1` fixes the centre, and `ELLIP=` fixes one
   ellipticity for all isophotes.)
 

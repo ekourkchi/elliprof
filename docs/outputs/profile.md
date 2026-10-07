@@ -6,18 +6,26 @@ content:
 
 | Option | File |
 |---|---|
-| `-o FILE.prf` | ELLIPROF's native profile format, at full precision, with the run settings and the image header |
+| `-o FILE` | ELLIPROF's native text profile format, at full precision, with the run settings and the image header (traditionally `n1234.dat`) |
 | `--csv FILE.csv` | a commented, comma-separated table, one row per isophote |
 
 In Python, `result.profile` (from `run_elliprof`) or
-`elliprof.read_profile("FILE.prf")` gives the same table as a pandas
+`elliprof.read_profile("n1234.dat")` gives the same table as a pandas
 DataFrame.
 
-!!! warning "A .prf file is not an image"
-    The `.prf` is a **table of numbers**, not a picture. You cannot open it
-    in DS9. To *see* the fit, use the DS9 region file (`--reg`) on the
-    image, the model image (`MODEL -m`) or the residual (`--residual`).
+!!! warning "The profile is not an image"
+    The `-o` file is a **table of numbers**, not a picture. You cannot open
+    it in DS9. To *see* the fit, use the DS9 region file (`--reg`) on the
+    image, the model image (`-m`) or the residual (`--residual`).
     See [Model, residual and prepared images](images.md).
+
+!!! note "File names: .dat and .prf"
+    In the traditional ELLIPROF naming, `n1234.dat` is this text profile
+    and `n1234.prf` is the FITS **model image** written by `-m`. Older
+    elliprof documentation (0.1.0–0.1.3) called the text profile `.prf`
+    instead. The names do not matter to elliprof, which never checks or
+    adds extensions: `-o` always writes the text profile and `-m` always
+    writes a FITS image.
 
 If you give neither `-o` nor `--csv`, the profile table is printed on the
 terminal instead.
@@ -103,10 +111,10 @@ its ellipticity and I4 differ from their neighbours.
 ```python
 from elliprof import read_profile, read_prf
 
-p = read_profile("u12517j.prf")      # pandas DataFrame
+p = read_profile("u12517.dat")       # pandas DataFrame
 print(p.attrs["scale"])              # SCALE= (arcsec/pixel), if given
 
-raw = read_prf("u12517j.prf")        # dict: n, scale, params (250 x 12), header
+raw = read_prf("u12517.dat")         # dict: n, scale, params (250 x 12), header
 ```
 
 The CSV starts with `#` comment lines (input, mask, sky, parameters,
@@ -115,10 +123,10 @@ version, units, and the column names). elliprof reads it back with
 
 ```python
 from elliprof import parse_elliprof_csv
-p, meta = parse_elliprof_csv("u12517j.csv")    # DataFrame, dict of header lines
+p, meta = parse_elliprof_csv("u12517.csv")    # DataFrame, dict of header lines
 print(meta["Sky"], meta["Parameters"])
 ```
 
 With another CSV reader, skip the `#` lines and supply the column names
 (they are in `elliprof.COLUMNS`):
-`pandas.read_csv("u12517j.csv", comment="#", header=None, names=elliprof.COLUMNS, skipinitialspace=True)`.
+`pandas.read_csv("u12517.csv", comment="#", header=None, names=elliprof.COLUMNS, skipinitialspace=True)`.

@@ -30,9 +30,12 @@ cd "$HERE"
     --sky 3246.0 \
     X0=567 Y0=562 \
     R0=9 R1=347 NR=23 NITER=10 RMSTAR \
-    -o "$OUT/u12517j.prf" \
-    --csv "$OUT/u12517j.csv" \
-    --reg "$OUT/u12517j.reg"
+    -o "$OUT/u12517.dat" \
+    -m "$OUT/u12517.prf" \
+    --residual "$OUT/u12517_residual.fits" \
+    --csv "$OUT/u12517.csv" \
+    --reg "$OUT/u12517.reg"
 
 echo
-echo "Wrote $OUT/u12517j.prf, u12517j.csv and u12517j.reg"
+echo "Wrote $OUT/u12517.dat (profile), u12517.prf (model image),"
+echo "u12517_residual.fits, u12517.csv and u12517.reg"

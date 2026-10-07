@@ -43,7 +43,7 @@ No, only the model image (and so the residual). The exception is
 `--sixth-order` (`COS3X` < 0), which changes the fit.
 
 **Can I get the profile as an image?**
-The profile is a table. The model image (`MODEL -m`) is the profile
+The profile is a table. The model image (`-m`) is the profile
 turned into an image. Plot the profile from the CSV or with
 `read_profile`.
 
