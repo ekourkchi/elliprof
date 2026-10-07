@@ -229,22 +229,49 @@ C     Size and CNPIX origin of a mask in any supported form.
 C     The logical mask GOOD (NCOL x NROW, geometry already checked),
 C     the mask's BITPIX (1 for a legacy bitmap), the number of bad
 C     pixels and, of those, how many were NaN, Inf or undefined.
-      SUBROUTINE MASKGOOD(FNAME, NCOL, NROW, GOOD, MBITPIX, NBAD,
-     $     NNONF, IERR)
+C
+C     Two conventions for the stored values (0.1.4):
+C       ZGOOD false (nonzero-good, the default):
+C                    good = finite and value /= 0
+C       ZGOOD true  (zero-good):
+C                    good = finite and value == 0
+C     NaN, +-Inf and undefined (BLANK) pixels are bad in both.  The
+C     values are read in double precision, so the test is made on the
+C     value actually stored, whatever the BITPIX.  A legacy BITPIX = 1
+C     bitmap has a fixed meaning (set bit = good) and is refused with
+C     ZGOOD.
+      SUBROUTINE MASKGOOD(FNAME, NCOL, NROW, ZGOOD, GOOD, MBITPIX,
+     $     NBAD, NNONF, IERR)
       CHARACTER*(*) FNAME
       INTEGER NCOL, NROW, MBITPIX, NBAD, NNONF, IERR
-      LOGICAL GOOD(NCOL*NROW)
-      REAL, ALLOCATABLE :: M(:)
+      LOGICAL ZGOOD, GOOD(NCOL*NROW)
+      DOUBLE PRECISION, ALLOCATABLE :: M(:)
+      REAL, ALLOCATABLE :: B(:)
       LOGICAL, ALLOCATABLE :: UNDEF(:)
       LOGICAL LEGACYMASK, FINITE
-      INTEGER MCOL, MROW, MSC, MSR, IOFF, IUNIT, I, STATUS
+      INTEGER MCOL, MROW, MSC, MSR, IOFF, IUNIT, I
       CHARACTER*81840 HTMP
 
       ALLOCATE (M(NCOL*NROW), UNDEF(NCOL*NROW))
       IF (LEGACYMASK(FNAME)) THEN
+         IF (ZGOOD) THEN
+            WRITE (0,'(3A)') 'elliprof: error: ',
+     $           FNAME(1:LEN_TRIM(FNAME)), ' is a legacy BITPIX = 1 '
+     $           //'bitmap mask, whose set bits always mean good; '
+     $           //'--mask-convention zero-good does not apply to it'
+            IERR = 1
+            DEALLOCATE (M, UNDEF)
+            RETURN
+         END IF
          CALL MASKHEAD(FNAME, MBITPIX, MCOL, MROW, MSC, MSR, IOFF, IERR)
-         IF (IERR .EQ. 0) CALL READBITMAP(FNAME, IOFF, NCOL*NROW, M,
-     $        IERR)
+         IF (IERR .EQ. 0) THEN
+            ALLOCATE (B(NCOL*NROW))
+            CALL READBITMAP(FNAME, IOFF, NCOL*NROW, B, IERR)
+            DO 4 I = 1, NCOL*NROW
+               M(I) = B(I)
+ 4          CONTINUE
+            DEALLOCATE (B)
+         END IF
          DO 5 I = 1, NCOL*NROW
             UNDEF(I) = .FALSE.
  5       CONTINUE
@@ -253,9 +280,8 @@ C     pixels and, of those, how many were NaN, Inf or undefined.
          IF (IERR .NE. 0) THEN
             CALL MASKFORMS(FNAME)
          ELSE
-            STATUS = 0
-            CALL FTGIDT(IUNIT, MBITPIX, STATUS)
-            CALL FITSREADFLAG(IUNIT, NCOL*NROW, M, UNDEF, IERR)
+            CALL FITSBITPIX(IUNIT, MBITPIX)
+            CALL FITSREADFLAGD(IUNIT, NCOL*NROW, M, UNDEF, IERR)
          END IF
       END IF
       IF (IERR .EQ. 0) THEN
@@ -263,10 +289,15 @@ C     pixels and, of those, how many were NaN, Inf or undefined.
          NNONF = 0
          DO 10 I = 1, NCOL*NROW
             FINITE = M(I) .EQ. M(I) .AND. ABS(M(I)) .LE. HUGE(M(I))
-            GOOD(I) = FINITE .AND. .NOT. UNDEF(I) .AND. M(I) .NE. 0.0
+     $           .AND. .NOT. UNDEF(I)
+            IF (ZGOOD) THEN
+               GOOD(I) = FINITE .AND. M(I) .EQ. 0D0
+            ELSE
+               GOOD(I) = FINITE .AND. M(I) .NE. 0D0
+            END IF
             IF (.NOT. GOOD(I)) THEN
                NBAD = NBAD + 1
-               IF (.NOT. FINITE .OR. UNDEF(I)) NNONF = NNONF + 1
+               IF (.NOT. FINITE) NNONF = NNONF + 1
             END IF
  10      CONTINUE
       END IF
