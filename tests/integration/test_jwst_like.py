@@ -139,23 +139,77 @@ def test_dq_as_a_mask(run_native, jwst):
 
 
 def test_nonfinite_policies(run_native, jwst):
+    """--nonfinite auto (default): mask, except with an explicit
+    --precision single (keep: the historical reproduction)."""
     cal = f"{jwst / 'cal.fits'}[SCI]"
-    keep, p = fit(run_native, cal, jwst / "k.dat", "--prepared",
-                  jwst / "k.fits")
-    assert "NaN/Inf science pixel(s) are not masked" in p.stderr
-    mask, p = fit(run_native, cal, jwst / "m.dat", "--prepared",
-                  jwst / "m.fits", "--nonfinite", "mask")
     nan = int(np.isnan(science()).sum())
-    assert f"Non-finite: {nan} NaN/Inf science pixel(s) masked" in p.stdout
-    # log fit: ELLIPROF already skips NaN samples; the products differ
-    assert np.array_equal(keep, mask, equal_nan=True)
+    auto, p = fit(run_native, cal, jwst / "a.dat", "--prepared",
+                  jwst / "a.fits")
+    assert f"Non-finite: policy mask (auto); NaN {nan}, +Inf 0, -Inf 0; " \
+        f"masked {nan}" in p.stdout
+    assert "not masked" not in p.stderr
+    pa = fits.getdata(jwst / "a.fits")
+    assert not np.isnan(pa).any() and (pa == 0).sum() >= nan
+    mask, p = fit(run_native, cal, jwst / "m.dat", "--nonfinite", "mask")
+    assert "policy mask;" in p.stdout
+    assert np.array_equal(auto, mask, equal_nan=True)
+    keep, p = fit(run_native, cal, jwst / "k.dat", "--prepared",
+                  jwst / "k.fits", "--nonfinite", "keep")
+    assert "NaN/Inf science pixel(s) are not masked" in p.stderr
+    assert f"policy keep; NaN {nan}, +Inf 0, -Inf 0; masked 0" in p.stdout
     assert np.isnan(fits.getdata(jwst / "k.fits")).sum() == nan
-    pm = fits.getdata(jwst / "m.fits")
-    assert not np.isnan(pm).any() and (pm == 0).sum() >= nan
+    # log fit: ELLIPROF already skips NaN samples; only the products
+    # differ between keep and mask
+    assert np.array_equal(keep, mask, equal_nan=True)
+    hist, p = fit(run_native, cal, jwst / "h.dat", "--precision",
+                  "single")
+    assert "policy keep (auto)" in p.stdout
+    assert "are not masked" in p.stderr
     p = run_native(cal, *FIT, "--nonfinite", "error", "-o",
                    jwst / "e.dat")
     assert p.returncode == 1
-    assert f"(single precision, preparation): {nan} NaN/Inf" in p.stderr
+    assert f"(single precision, preparation): {nan} non-finite science " \
+        f"pixel(s) are not masked (NaN {nan}, +Inf 0, -Inf 0" in p.stderr
+
+
+@pytest.mark.parametrize("prec", ["single", "double"])
+def test_nonfinite_types_are_counted(run_native, tmp_path, prec):
+    img = fits.getdata(GAL).astype(np.float64)
+    img[5:7, 5:8] = np.nan
+    img[10, 10:14] = np.inf
+    img[12, 10] = -np.inf
+    # float32 for single: CFITSIO refuses to convert a float64 Inf to
+    # float32 (status 412), as before
+    fits.PrimaryHDU(img.astype(np.float32 if prec == "single"
+                               else np.float64)).writeto(tmp_path / "t.fits")
+    p = run_native(tmp_path / "t.fits", *FIT, "--precision", prec, "-o",
+                   tmp_path / "t.dat")
+    assert p.returncode == 0, p.stderr
+    # explicit --precision single: auto means keep (nothing masked)
+    masked = 0 if prec == "single" else 11
+    assert f"NaN 6, +Inf 4, -Inf 1; masked {masked}" in p.stdout
+
+
+@pytest.mark.parametrize("prec", ["auto", "double"])
+def test_linear_nan_failure_gone_by_default(run_native, tmp_path, prec):
+    """LINEAR with NaN regions: with keep, NaN isophotes and a NaN model
+    (the 0.1.4 behaviour, still there with --nonfinite keep); the
+    default masks them: a finite profile and model."""
+    img = science()
+    fits.PrimaryHDU(img.astype(np.float32)).writeto(tmp_path / "n.fits")
+    out = {}
+    for policy in ("auto", "keep"):
+        p = run_native(tmp_path / "n.fits", *FIT, "LINEAR", "--precision",
+                       prec, "--nonfinite", policy, "-o",
+                       tmp_path / f"{policy}.dat", "-m",
+                       tmp_path / f"{policy}.fits")
+        assert p.returncode == 0, p.stderr
+        out[policy] = (read_dat(tmp_path / f"{policy}.dat"),
+                       fits.getdata(tmp_path / f"{policy}.fits"))
+    prof, model = out["auto"]
+    assert np.isfinite(prof[:, :6]).all() and np.isfinite(model).all()
+    prof, model = out["keep"]
+    assert not np.isfinite(prof[:, :6]).all() and np.isnan(model).any()
 
 
 @pytest.mark.parametrize("unit", ["electrons", "electrons/s", "DN/s",

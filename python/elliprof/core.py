@@ -31,7 +31,10 @@ UNSUPPORTED = ("OLD", "EDIT", "TV")  # interactive or stateful options
 DEFAULT_NITER = 5  # ELLIPROF's own default (src/original/elliprof.f)
 MASK_CONVENTIONS = ("nonzero-good", "zero-good")
 PRECISIONS = ("auto", "single", "double")
-NONFINITE = ("keep", "mask", "error")
+NONFINITE = ("auto", "mask", "keep", "error")
+_NONFIN = re.compile(r"Non-finite: policy (\w+)(?: \(auto\))?; NaN (\d+), "
+                     r"\+Inf (\d+), -Inf (\d+); masked (\d+)")
+_UNDERFLOW = re.compile(r"Model: (\d+) pixels underflowed to zero")
 _PRECISION = re.compile(r"^\s*Precision: (single|double) \(.*?\); "
                         r"requested (\w+)(?: \(auto: (.*)\))?\s*$", re.M)
 _NORMALIZATION = re.compile(r"Normalization: fit on image x 2\*\*\(-k\), "
@@ -82,6 +85,12 @@ class ElliprofResult:
     precision_reason: Optional[str] = None
     #: double backend: the fit ran on image x 2**(-k); k (else None)
     normalization_exponent: Optional[int] = None
+    #: the non-finite policy applied ("mask", "keep" or "error")
+    nonfinite_policy: Optional[str] = None
+    #: NaN / +Inf / -Inf science pixels found, and how many were masked
+    nonfinite_counts: Optional[Dict[str, int]] = None
+    #: double backend with a model: model pixels that underflowed to 0
+    model_underflow_zero_count: Optional[int] = None
 
     @property
     def ok(self) -> bool:
@@ -276,7 +285,7 @@ def _load_profile(prf: Path):
     return read_profile(str(prf))
 
 
-def _precision_info(stdout: str) -> dict:
+def _precision_info(stdout: str, model: bool = False) -> dict:
     """The backend's report of its precision and normalization."""
     info = {}
     m = _PRECISION.search(stdout)
@@ -286,6 +295,17 @@ def _precision_info(stdout: str) -> dict:
     n = _NORMALIZATION.search(stdout)
     if n:
         info["normalization_exponent"] = int(n.group(1))
+    f = _NONFIN.search(stdout)
+    if f:
+        info["nonfinite_policy"] = f.group(1)
+        info["nonfinite_counts"] = dict(zip(
+            ("nan", "posinf", "neginf", "masked"),
+            map(int, f.groups()[1:])))
+    u = _UNDERFLOW.search(stdout)
+    if u:
+        info["model_underflow_zero_count"] = int(u.group(1))
+    elif info.get("precision") == "double" and model:
+        info["model_underflow_zero_count"] = 0
     return info
 
 
@@ -301,7 +321,7 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
                  model_harmonics=None, harmonic_mode=None,
                  sixth_order=False, mask_convention: str = "nonzero-good",
                  precision: str = "auto",
-                 nonfinite: str = "keep",
+                 nonfinite: str = "auto",
                  load_profile: bool = True,
                  output_dir: Optional[PathLike] = None,
                  prefix: Optional[str] = None,
@@ -369,11 +389,13 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
     writes 64-bit products.
 
     ``nonfinite``: what happens to science pixels that are NaN or +-Inf
-    after the sky and the mask (e.g. the no-data regions of JWST
-    images).  ``"keep"`` (the default, as before 0.2.0) passes them to
-    ELLIPROF, with a warning; ``"mask"`` excludes them like masked
-    pixels (0 in the prepared image and residual); ``"error"`` refuses
-    them.
+    after the sky and the mask (e.g. the no-data regions of resampled or
+    JWST images).  ``"mask"`` excludes them like masked pixels (0 in the
+    prepared image and residual); ``"keep"`` passes them to ELLIPROF, as
+    before 0.2.0, with a warning; ``"error"`` refuses them.  ``"auto"``
+    (the default) is ``"keep"`` with ``precision="single"`` (the
+    historical reproduction) and ``"mask"`` otherwise.
+    ``result.nonfinite_counts`` gives the NaN, +Inf and -Inf counts.
 
     ``image`` may be stored with any FITS BITPIX (8, 16, 32, 64, -32,
     -64).  The single backend converts its pixels to 32-bit floating
@@ -488,8 +510,7 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
     if prepared is not None:
         cmd += ["--prepared", str(Path(prepared).resolve())]
     cmd += ["--precision", precision]
-    if nonfinite != "keep":
-        cmd += ["--nonfinite", nonfinite]
+    cmd += ["--nonfinite", nonfinite]
     if backend_verbose:
         cmd.append("--verbose")
 
@@ -510,7 +531,8 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
         stdout=stdout, stderr=stderr, returncode=code, command=cmd,
         center=(x0, y0), backend_path=exe, output_dir=out,
         prepared_path=Path(prepared) if prepared else None,
-        residual_path=_written(ok, res), **_precision_info(stdout))
+        residual_path=_written(ok, res),
+        **_precision_info(stdout, model=mdl is not None or res is not None))
     # the backend checked the mask / sky image against the science HDU
     geometry = [l for l in stderr.splitlines()
                 if "does not match science image" in l

@@ -128,18 +128,54 @@ def test_sky_value_decides_too(run_native, tmp_path, sky, prec):
         assert "--sky value is beyond float32" in line
 
 
-@pytest.mark.parametrize("sky", ["1e-40", "3.4e38"])
-def test_single_parser_limit_is_kept(run_native, tmp_path, sky):
-    """Values float32 holds (so auto keeps single) but whose decimal
-    exponent the original parser (DISSECT) refuses beyond +-38: an
-    error, as in 0.1.4; --precision double reads them."""
+F32_MAX = "3.4028234663852886e+38"
+
+
+@pytest.mark.parametrize("sky, prec, why", [
+    ("3246.7", "single", "every value is within float32"),
+    ("1e38", "single", "every value is within float32"),
+    ("1e-38", "single", "every value is within float32"),
+    ("1.1754943508222875e-38", "single", "every value is within float32"),
+    # float32 holds them, the historical parser does not
+    (F32_MAX, "double", "cannot be read by the single parser"),
+    ("3.4e38", "double", "cannot be read by the single parser"),
+    ("1e-40", "double", "cannot be read by the single parser"),
+    ("-1e-40", "double", "cannot be read by the single parser"),
+    ("1.401298464324817e-45", "double",
+     "cannot be read by the single parser"),
+    # float32 does not hold them
+    ("3.4028236e38", "double", "beyond float32"),
+    ("1e39", "double", "beyond float32"),
+    ("7e-46", "double", "beyond float32"),
+    ("1e-46", "double", "beyond float32"),
+])
+def test_sky_scalar_boundaries(run_native, tmp_path, sky, prec, why):
+    """The legacy parser is run on the text itself: whatever it cannot
+    read goes to double; float32 representability decides the rest."""
     sci = write(tmp_path / "a.fits", gal(), np.float32)
-    p = run_native(sci, "--sky", sky, "--prepared", tmp_path / "p.fits",
-                   "--prepare-only")
-    assert p.returncode == 1 and "--sky needs one finite number" in p.stderr
-    p = run_native(sci, "--sky", sky, "--precision", "double",
-                   "--prepared", tmp_path / "p.fits", "--prepare-only")
-    assert p.returncode == 0, p.stderr
+    got, line = chosen(run_native, tmp_path, sci, "--sky", sky)
+    assert got == prec and why in line, line
+
+
+def test_parser_limit_cases_now_run(run_native, tmp_path):
+    """0.1.4 failed on --sky 1e-40 (the parser); auto now runs them in
+    double, and --precision single still fails as before."""
+    sci = write(tmp_path / "a.fits", gal(), np.float32)
+    for sky in ("1e-40", "3.4e38"):
+        p = run_native(sci, "--sky", sky, *FIT, "-o", tmp_path / "x.dat")
+        assert p.returncode == 0 and "Precision: double" in p.stdout
+        p = run_native(sci, "--sky", sky, "--precision", "single",
+                       "--prepared", tmp_path / "p.fits", "--prepare-only")
+        assert p.returncode == 1 and "--sky needs one finite number" in \
+            p.stderr
+
+
+def test_sky_keyword_parser_limit(run_native, tmp_path):
+    sci = write(tmp_path / "a.fits", gal(), np.float32)
+    got, line = chosen(run_native, tmp_path, sci, "SKY=1e-40")
+    assert got == "double" and "SKY= cannot be read by the single" in line
+    got, line = chosen(run_native, tmp_path, sci, "SKY=250.5")
+    assert got == "single"
 
 
 def test_sky_keyword_decides_too(run_native, tmp_path):

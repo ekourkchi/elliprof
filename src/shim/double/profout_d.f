@@ -43,12 +43,14 @@ C     DS9 regions: as WRITEREG, from the double profile.
 
 C     The CSV table: the columns of WRITECSV, every value as ES25.17E3
 C     (18 significant digits, explicit 3-digit exponent: the whole
-C     double range, read back exactly), and two more comment lines for
-C     the precision (PRECLN) and the normalization (NORMLN).
+C     double range, read back exactly), and more comment lines for the
+C     precision (PRECLN), the normalization (NORMLN) and, with a model,
+C     the model pixels that underflowed to zero (UNDLN).
       SUBROUTINE WRITECSVD(FNAME, IMAGE, MASK, SKY, PARAMS, ISC, ISR,
-     $     PRECLN, NORMLN, IERR)
+     $     PRECLN, NORMLN, UNDLN, IERR)
       IMPLICIT NONE
       CHARACTER*(*) FNAME, IMAGE, MASK, SKY, PARAMS, PRECLN, NORMLN
+      CHARACTER*(*) UNDLN
       INTEGER ISC, ISR, IERR
       INCLUDE 'profile_d.inc'
       INCLUDE 'version.inc'
@@ -69,6 +71,8 @@ C     the precision (PRECLN) and the normalization (NORMLN).
      $     '# elliprof version: '//VERSTR,
      $     '# Precision: '//PRECLN(1:LEN_TRIM(PRECLN)),
      $     '# Normalization: '//NORMLN(1:LEN_TRIM(NORMLN))
+      IF (UNDLN .NE. ' ') WRITE (7,'(A)')
+     $     '# Model underflow to zero: '//UNDLN(1:LEN_TRIM(UNDLN))
       WRITE (7,1001) N_PRF, PRF_SC, ISC, ISR
  1001 FORMAT ('# Contours: ',I0,'   SCALE: ',G0,
      $     '   Image origin (CNPIX1,CNPIX2): ',I0,',',I0)

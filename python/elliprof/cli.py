@@ -166,11 +166,13 @@ SKY / BACKGROUND AND MASK
                        NaN, Inf, undefined (BLANK) = bad
                      A legacy .dmask bitmap always means 1 = good and is
                      refused with zero-good.
-  --nonfinite keep|mask|error
+  --nonfinite auto|mask|keep|error
                      science pixels that are NaN or +-Inf after the sky and
-                     the mask (e.g. no-data regions): keep (default) passes
-                     them on, with a warning; mask excludes them like masked
-                     pixels; error refuses the image.
+                     the mask (e.g. no-data regions): mask excludes them like
+                     masked pixels; keep passes them on, as before 0.2.0, with
+                     a warning; error refuses the image.  auto (default):
+                     keep with --precision single (historical reproduction),
+                     mask otherwise.
   --mask and --sky-image may also select an HDU: 'products.fits[MASK]'.
   --sc VALUE         deprecated alias of --sky; use --sky.
   SKY=s              ELLIPROF's own sky level, used ONLY in the de Vaucouleurs
@@ -411,7 +413,9 @@ _SKY = re.compile(r"^\s*Sky: subtracted (scalar|image)\s+(.*?)\s*$")
 _MASK = re.compile(r"^\s*Mask: (.*) \(BITPIX (-?\d+)\): (\d+) pixels masked"
                    r" \(\s*([\d.]+)%\)")
 _NONF = re.compile(r"^\s*Mask: (\d+) of them NaN")
-_NONFIN = re.compile(r"^\s*Non-finite: (\d+) NaN/Inf science pixel")
+_NONFIN = re.compile(r"^\s*Non-finite: policy (.*?); NaN (\d+), \+Inf "
+                     r"(\d+), -Inf (\d+); masked (\d+)")
+_UNDER = re.compile(r"^\s*Model: (\d+) pixels underflowed to zero")
 _BITPIX64 = re.compile(r"^\s*Image: BITPIX (-?64) converted")
 _PREC = re.compile(r"^\s*Precision: (single|double) .*?; requested (\w+)"
                    r"(?: \(auto: (.*)\))?\s*$")
@@ -467,8 +471,10 @@ def _summary(result, opts: dict, nr: str = "") -> None:
     else:
         print("Mask:     none")
     nf = next((m for m in map(_NONFIN.match, out) if m), None)
-    if nf:
-        print(f"Non-finite: {nf.group(1)} NaN/Inf science pixels masked")
+    if nf and any(int(g) for g in nf.groups()[1:4]):
+        print(f"Non-finite: NaN {nf.group(2)}, +Inf {nf.group(3)}, -Inf "
+              f"{nf.group(4)}; {nf.group(5)} masked (policy "
+              f"{nf.group(1)})")
     if "SURFACE PHOTOMETRY PROFILE COMPUTATION:" in result.stdout:
         table = result.stdout.split(
             "SURFACE PHOTOMETRY PROFILE COMPUTATION:", 1)[1]
@@ -479,6 +485,10 @@ def _summary(result, opts: dict, nr: str = "") -> None:
         print(f"Fit complete: {nr} isophotes.")
     else:
         print("Fit complete.")
+    under = next((m for m in map(_UNDER.match, out) if m), None)
+    if under:
+        print(f"Model: {under.group(1)} pixels underflowed to zero at "
+              "double precision.")
     sys.stdout.flush()
     for text, note in _NOTES:
         n = sum(text in l for l in out)
@@ -562,10 +572,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                              f"zero-good, not {conv!r}")
         if "--mask-convention" in opts and "--mask" not in opts:
             raise UsageError("--mask-convention needs --mask")
-        nonfinite = opts.get("--nonfinite", "keep")
-        if nonfinite not in ("keep", "mask", "error"):
-            raise UsageError("--nonfinite must be keep, mask or error, "
-                             f"not {nonfinite!r}")
+        nonfinite = opts.get("--nonfinite", "auto")
+        if nonfinite not in ("auto", "mask", "keep", "error"):
+            raise UsageError("--nonfinite must be auto, mask, keep or "
+                             f"error, not {nonfinite!r}")
         precision = opts.get("--precision", "auto")
         if precision not in ("auto", "single", "double"):
             raise UsageError("--precision must be auto, single or double, "

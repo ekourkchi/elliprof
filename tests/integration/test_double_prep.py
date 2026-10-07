@@ -231,9 +231,18 @@ def test_gc_and_unknown_precision_refused(run_native, tmp_path):
 
 
 def test_memory_estimate_with_verbose(run_native, tmp_path):
+    """Per-pixel arrays: 8 (image) + 4 (mask; --nonfinite mask is the
+    default) bytes, plus 8 for --residual and 12 while a mask file is
+    read: 32 bytes per pixel with a mask and a residual."""
     path = write(tmp_path / "s.fits", np.ones((100, 200)))
     p = run_native(path, "--precision", "double", "--verbose",
                    "--prepared", tmp_path / "p.fits", "--prepare-only")
     assert p.returncode == 0
-    assert "Memory: about 0.2 MiB for the double-precision images" \
-        in p.stdout
+    assert "Memory: about 0.2 MiB for the per-pixel arrays (baseline; " \
+        "peak use is higher)" in p.stdout                 # 12 B/pixel
+    write(tmp_path / "m.fits", np.ones((100, 200)), dtype=np.int16)
+    p = run_native(path, "--precision", "double", "--verbose", "--mask",
+                   tmp_path / "m.fits", "X0=100", "Y0=50", "R0=3",
+                   "R1=40", "NR=5", "--residual", tmp_path / "r.fits")
+    assert p.returncode == 0, p.stderr
+    assert "Memory: about 0.6 MiB" in p.stdout     # 20000 x 32 B

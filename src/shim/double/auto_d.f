@@ -9,7 +9,10 @@ C           would be Inf in float32 or is nonzero but would be 0 in
 C           float32 (checked on the actual values, read in double, and
 C           only when BSCALE/BZERO make that possible: unscaled 8-, 16-
 C           and 32-bit integers and 32-bit floats never do);
-C       (D) the --sky value, or SKY=, meets the same criterion.
+C       (D) the --sky value, or SKY=, meets the same criterion, or is a
+C           valid finite number that the historical single parser
+C           (DISSECT, through PARSENUM) cannot read: it is run on the
+C           text, so its actual behaviour decides (AUTOSCAL).
 C     Not for values that stay nonzero float32 subnormals, values that
 C     merely are not exact in float32, or 32-bit integers above 2**24.
 C     Masks are never considered.  Otherwise single.  WHY explains the
@@ -20,7 +23,7 @@ C     the data.
       INTEGER IERR
       INCLUDE 'vistalink.inc'
       DOUBLE PRECISION V
-      INTEGER I, IBP, NOVER, NZERO, J
+      INTEGER I, IBP, NOVER, NZERO, IWHY
       LOGICAL F32BAD
 
       PRECSEL = 'double'
@@ -50,23 +53,24 @@ C     the data.
          END IF
       END IF
       IF (SKYSTR .NE. ' ') THEN
-         CALL PARSENUMD(SKYSTR, V, J)
-         IF (J .EQ. 0 .AND. F32BAD(V)) THEN
+         CALL AUTOSCAL(SKYSTR, IWHY)
+         IF (IWHY .EQ. 1) THEN
             WHY = ' (auto: the --sky value is beyond float32)'
             RETURN
-         END IF
-         IF (J .EQ. 2 .OR. J .EQ. 3) THEN
-C           beyond double as well: the double driver reports it
-            WHY = ' (auto: the --sky value is beyond float32)'
+         ELSE IF (IWHY .EQ. 2) THEN
+            WHY = ' (auto: the --sky value cannot be read by the '
+     $           //'single parser)'
             RETURN
          END IF
       END IF
       DO 10 I = 1, NCON
          IF (WORD(I)(1:4) .EQ. 'SKY=') THEN
-            CALL PARSENUMD(WORD(I)(5:), V, J)
-            IF ((J .EQ. 0 .AND. F32BAD(V)) .OR. J .EQ. 2 .OR.
-     $           J .EQ. 3) THEN
+            CALL AUTOSCAL(WORD(I)(5:), IWHY)
+            IF (IWHY .EQ. 1) THEN
                WHY = ' (auto: SKY= is beyond float32)'
+               RETURN
+            ELSE IF (IWHY .EQ. 2) THEN
+               WHY = ' (auto: SKY= cannot be read by the single parser)'
                RETURN
             END IF
          END IF
@@ -158,5 +162,34 @@ C     (NOVER) or 0 (NZERO) in float32.
  10      CONTINUE
       END IF
       DEALLOCATE (B)
+      RETURN
+      END
+
+C     A scalar (--sky or SKY=) for --precision auto.  IWHY = 0: single
+C     can take it; 1: a plain number whose float32 value would be Inf,
+C     or 0 although it is nonzero (or beyond double itself: the double
+C     driver then reports that); 2: a valid finite number that the
+C     historical single parser (PARSENUM -> DISSECT) refuses, or reads
+C     as 0 or a non-finite value.  Not a plain number at all (e.g. an
+C     expression for SKY=): 0, the single path then handles it as before.
+      SUBROUTINE AUTOSCAL(STR, IWHY)
+      CHARACTER*(*) STR
+      INTEGER IWHY, J, JS
+      DOUBLE PRECISION V
+      REAL SV
+      LOGICAL F32BAD
+      IWHY = 0
+      CALL PARSENUMD(STR, V, J)
+      IF (J .EQ. 1) RETURN
+      IF (J .EQ. 2 .OR. J .EQ. 3 .OR. F32BAD(V)) THEN
+         IWHY = 1
+         RETURN
+      END IF
+      CALL PARSENUM(STR, SV, JS)
+      IF (JS .NE. 0) THEN
+         IWHY = 2
+      ELSE IF (V .NE. 0 .AND. SV .EQ. 0) THEN
+         IWHY = 2
+      END IF
       RETURN
       END

@@ -356,36 +356,37 @@ C     BYTES in MiB, one decimal, left-adjusted (0.2, not .2).
       END
 
 C     --nonfinite for the double image: as NONFINS (prep.f).
-      SUBROUTINE NONFIND(PIX, NCOL, NROW, MASK, GOOD, NNF)
+      SUBROUTINE NONFIND(PIX, NCOL, NROW, GOOD, NNAN, NPINF, NMINF)
       IMPLICIT NONE
-      INTEGER NCOL, NROW, NNF, I, J
+      INTEGER NCOL, NROW, NNAN, NPINF, NMINF, I, J
       DOUBLE PRECISION PIX(NCOL,NROW)
-      LOGICAL MASK, GOOD(NCOL,NROW), FINITED
-      NNF = 0
+      LOGICAL GOOD(NCOL,NROW), NONFTYPE
+      NNAN = 0
+      NPINF = 0
+      NMINF = 0
       DO 10 J = 1, NROW
          DO 11 I = 1, NCOL
-            IF (.NOT. FINITED(PIX(I,J))) THEN
-               NNF = NNF + 1
-               IF (MASK) THEN
-                  PIX(I,J) = 0
-                  GOOD(I,J) = .FALSE.
-               END IF
+            IF (NONFTYPE(PIX(I,J), NNAN, NPINF, NMINF)) THEN
+               PIX(I,J) = 0
+               GOOD(I,J) = .FALSE.
             END IF
  11      CONTINUE
  10   CONTINUE
       RETURN
       END
 
-C     The NaN/Inf count of NONFIND, without masking (keep, error).
-      SUBROUTINE NONFCNTD(PIX, NCOL, NROW, NNF)
+C     The counts of NONFIND, without masking (keep, error).
+      SUBROUTINE NONFCNTD(PIX, NCOL, NROW, NNAN, NPINF, NMINF)
       IMPLICIT NONE
-      INTEGER NCOL, NROW, NNF, I, J
+      INTEGER NCOL, NROW, NNAN, NPINF, NMINF, I, J
       DOUBLE PRECISION PIX(NCOL,NROW)
-      LOGICAL FINITED
-      NNF = 0
+      LOGICAL NONFTYPE, L
+      NNAN = 0
+      NPINF = 0
+      NMINF = 0
       DO 10 J = 1, NROW
          DO 11 I = 1, NCOL
-            IF (.NOT. FINITED(PIX(I,J))) NNF = NNF + 1
+            L = NONFTYPE(PIX(I,J), NNAN, NPINF, NMINF)
  11      CONTINUE
  10   CONTINUE
       RETURN

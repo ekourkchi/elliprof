@@ -10,10 +10,10 @@ C     physical units -> products.  ISTAT returns the exit status.
 
       SUBROUTINE ELLIPROFDRV(FITSFILE, PRFFILE, MODFILE, CSVFILE,
      $     REGFILE, MASKFILE, SKYIMG, SKYSTR, PREPFILE, RESFILE, ZGOOD,
-     $     PREPONLY, DOMODEL, PRECREQ, PRECWHY, NONFIN, ISTAT)
+     $     PREPONLY, DOMODEL, PRECREQ, PRECWHY, NONFIN, NFREQ, ISTAT)
       CHARACTER*(*) FITSFILE, PRFFILE, MODFILE, CSVFILE, REGFILE
       CHARACTER*(*) MASKFILE, SKYIMG, SKYSTR, PREPFILE, RESFILE
-      CHARACTER*(*) PRECREQ, PRECWHY, NONFIN
+      CHARACTER*(*) PRECREQ, PRECWHY, NONFIN, NFREQ
       LOGICAL ZGOOD, PREPONLY, DOMODEL
       INTEGER ISTAT
       INCLUDE 'vistalink.inc'
@@ -26,14 +26,15 @@ C     physical units -> products.  ISTAT returns the exit status.
       DOUBLE PRECISION SKYVAL, BYTES
       INTEGER NCOL, NROW, IUNIT, IERR, IBITPIX, MBITPIX, NBAD, NNONF
       INTEGER NOVER, IST, KPREF, KMIN, KMAX, I, J, K, NHIST, ICOS3X, L
-      INTEGER NNF
+      INTEGER NNAN, NPINF, NMINF
       INTEGER*8 NPIX, NUSED, NINEX
       LOGICAL LINEAR, SHVERB
       CHARACTER*1024 SKYDESC, MSKDESC
-      CHARACTER*72 HIST(4)
+      CHARACTER*72 HIST(5)
       CHARACTER*3 YESNO
       CHARACTER*16 MIBD
-      CHARACTER*512 PRECLN, NORMLN
+      CHARACTER*512 PRECLN, NORMLN, UNDLN
+      INTEGER NUNDT
       DOUBLE PRECISION V
       LOGICAL FINITED
       COMMON /SHIMOPT/ SHVERB
@@ -67,13 +68,16 @@ C     ---- Read the science image into buffer 1, in double
      $     HEADBUF(1), IERR)
       IF (IERR .NE. 0) RETURN
       NPIX = INT(NCOL,8) * NROW
-C     memory: the image, its prepared copy for --residual, the logical
-C     mask, and the largest transient buffer (a double sky image, or
-C     the mask read in double with its flags)
+C     memory: the per-pixel arrays -- the image, its prepared copy for
+C     --residual, the logical mask, and the largest transient buffer
+C     (a double sky image, or the mask read in double with its flags);
+C     32 bytes per pixel with a mask and --residual.  A baseline, not
+C     the peak use: fit arrays, CFITSIO buffers, the header and the run
+C     time come on top.
       BYTES = 8D0*NPIX
       IF (RESFILE .NE. ' ') BYTES = BYTES + 8D0*NPIX
-      IF (MASKFILE .NE. ' ' .OR. RESFILE .NE. ' ')
-     $     BYTES = BYTES + 4D0*NPIX
+      IF (MASKFILE .NE. ' ' .OR. RESFILE .NE. ' ' .OR.
+     $     NONFIN .NE. 'keep') BYTES = BYTES + 4D0*NPIX
       IF (MASKFILE .NE. ' ') THEN
          BYTES = BYTES + 12D0*NPIX
       ELSE IF (SKYIMG .NE. ' ') THEN
@@ -81,7 +85,8 @@ C     the mask read in double with its flags)
       END IF
       IF (SHVERB) WRITE (6,'(3A)') ' Memory: about ',
      $     TRIM(MIBD(BYTES)),
-     $     ' MiB for the double-precision images'
+     $     ' MiB for the per-pixel arrays (baseline; peak use is '
+     $     //'higher)'
       ALLOCATE (PIX(NCOL,NROW), STAT=IST)
       IF (IST .NE. 0) THEN
          CALL FITSCLOSE(IUNIT)
@@ -173,12 +178,12 @@ C     ---- Sky, then mask: the order matters
          MSKDESC = MASKFILE
       END IF
       IF (NONFIN .EQ. 'mask') THEN
-         CALL NONFIND(PIX, NCOL, NROW, .TRUE., GOOD, NNF)
+         CALL NONFIND(PIX, NCOL, NROW, GOOD, NNAN, NPINF, NMINF)
       ELSE
-         CALL NONFCNTD(PIX, NCOL, NROW, NNF)
+         CALL NONFCNTD(PIX, NCOL, NROW, NNAN, NPINF, NMINF)
       END IF
-      CALL NONFINRPT(NNF, NONFIN, 'double')
-      IF (NNF .GT. 0 .AND. NONFIN .EQ. 'error') RETURN
+      CALL NONFINRPT(NNAN, NPINF, NMINF, NONFIN, NFREQ, 'double')
+      IF (NNAN+NPINF+NMINF .GT. 0 .AND. NONFIN .EQ. 'error') RETURN
 
 C     ---- The normalization exponent (applied after the prepared
 C     product is written, which stays in physical units)
@@ -216,6 +221,7 @@ C     can leave KNORM below it.  No safe k for LINEAR: an error.
       HIST(3) = 'elliprof normalization: fit on image x 2**(-k); '
      $     //'products physical'
       NHIST = 3
+      UNDLN = ' '
 
 C     ---- The prepared image, physical units: good(mask) x (science -
 C     sky), BITPIX -64
@@ -244,13 +250,38 @@ C     image (physical units) for the residual
 C     ---- The fit, on the normalized image
 
       CALL SCALEIMD(PIX, NPIX, -KNORM)
+      NUNDER = 0
       CALL ELLIPROFD(PIX, NROW, NCOL)
       IF (DOMODEL .AND. SHVERB) WRITE (0,*)
+C     Range failures of the double fit, never a silent success: an
+C     isophote intensity I0 that is +-Inf (an iterate beyond the double
+C     range), or a slope d ln I / d ln r that is +-Inf although its own
+C     I0 is finite and nonzero (the original's linear difference
+C     (I(k-1) - I(k+1)) / I(k) beyond the double range).  Other
+C     non-finite values are left as they are: the original algorithm
+C     gives NaN or Inf in degenerate fits (a 6th-order amplitude on a
+C     tiny isophote, ...).  In a log fit an I0 of exactly 0 is also a
+C     range failure: I0 is only ever multiplied by exp(c) there, so 0
+C     means exp(c) underflowed although f0*exp(c) may not.
+      CALL PRFINFD(K, J, LINEAR)
+      IF (K .GT. 0 .AND. J .EQ. 4) WRITE (0,'(A,I0,A)') 'elliprof: '
+     $     //'error (double precision, fit): the intensity I0 of '
+     $     //'isophote ', K, ' overflowed the double range during the '
+     $     //'fit'
+      IF (K .GT. 0 .AND. J .EQ. 0) WRITE (0,'(A,I0,A)') 'elliprof: '
+     $     //'error (double precision, fit): the intensity I0 of '
+     $     //'isophote ', K, ' underflowed to zero during the fit (an '
+     $     //'intermediate exp below the double range)'
+      IF (K .GT. 0 .AND. J .EQ. 11) WRITE (0,'(A,I0,A)') 'elliprof: '
+     $     //'error (double precision, fit): the slope dlnI/dlnr of '
+     $     //'isophote ', K, ' is beyond the double range '
+     $     //'(neighbouring intensities differ by more than DBL_MAX)'
       IF (XERR) THEN
          WRITE (0,'(A)') 'elliprof: error (double precision, fit): '
      $        //'ELLIPROF reported an error'
          RETURN
       END IF
+      IF (K .GT. 0) RETURN
       IF (N_PRF .LE. 0) THEN
          WRITE (0,'(A)') 'elliprof: error (double precision, fit): '
      $        //'no profile was computed'
@@ -265,6 +296,40 @@ C     flags are dimensionless), exactly
          PARAM_PRF(4,I) = SCALE(PARAM_PRF(4,I), KNORM)
  50   CONTINUE
       CALL PRFMARKD(KNORM, KPREF)
+
+C     ---- The model, which ELLIPROFD left in PIX (internal units):
+C     back to physical units, exactly.  A finite value that is beyond
+C     the double range there is an error, never a silent Inf.  (A NaN
+C     that the original model algorithm gives stays NaN, as in single.)
+C     Model pixels whose value underflows to zero -- exp(arg) below the
+C     double range in SYNTHESIZED (NUNDER), or a nonzero internal value
+C     too small in physical units -- are counted, for information.
+
+      NUNDT = 0
+      IF (DOMODEL) THEN
+         NOVER = 0
+         NUNDT = NUNDER
+         DO 60 J = 1, NROW
+            DO 61 I = 1, NCOL
+               V = PIX(I,J)
+               PIX(I,J) = SCALE(V, KNORM)
+               IF (FINITED(V) .AND. .NOT. FINITED(PIX(I,J)))
+     $              NOVER = NOVER + 1
+               IF (V .NE. 0 .AND. PIX(I,J) .EQ. 0) NUNDT = NUNDT + 1
+ 61         CONTINUE
+ 60      CONTINUE
+         IF (NOVER .GT. 0) THEN
+            WRITE (0,'(A,I0,A)') 'elliprof: error (double precision, '
+     $           //'model): the model is beyond the double range at ',
+     $           NOVER, ' pixel(s) in physical units'
+            RETURN
+         END IF
+         IF (NUNDT .GT. 0) WRITE (6,'(A,I0,A)') ' Model: ', NUNDT,
+     $        ' pixels underflowed to zero at double precision.'
+         WRITE (HIST(NHIST+1),'(A,I0,A)') 'elliprof model underflow '
+     $        //'to zero: ', NUNDT, ' pixel(s)'
+         WRITE (UNDLN,'(I0,A)') NUNDT, ' pixel(s)'
+      END IF
 
 C     A 6th-order term in the model and a PA wrap: as in main.f
       IF (DOMODEL .AND. N_PRF .GT. 1) THEN
@@ -324,7 +389,7 @@ C     ---- CSV table and DS9 regions
          L = LEN_TRIM(ORIGCOMMAND)
          CALL WRITECSVD(CSVFILE, FITSFILE, MSKDESC, SKYDESC,
      $        ORIGCOMMAND(10:MAX(10,L)), ISC, ISR, PRECLN, NORMLN,
-     $        IERR)
+     $        UNDLN, IERR)
          IF (IERR .NE. 0) RETURN
       END IF
       IF (REGFILE .NE. ' ') THEN
@@ -332,32 +397,10 @@ C     ---- CSV table and DS9 regions
          IF (IERR .NE. 0) RETURN
       END IF
 
-C     ---- The model, which ELLIPROFD left in PIX (internal units):
-C     back to physical units, exactly.  A finite value that is beyond
-C     the double range there is an error, never a silent Inf.  (A NaN
-C     that the original model algorithm gives stays NaN, as in single.)
-
-      IF (DOMODEL) THEN
-         NOVER = 0
-         DO 60 J = 1, NROW
-            DO 61 I = 1, NCOL
-               V = PIX(I,J)
-               PIX(I,J) = SCALE(V, KNORM)
-               IF (FINITED(V) .AND. .NOT. FINITED(PIX(I,J)))
-     $              NOVER = NOVER + 1
- 61         CONTINUE
- 60      CONTINUE
-         IF (NOVER .GT. 0) THEN
-            WRITE (0,'(A,I0,A)') 'elliprof: error (double precision, '
-     $           //'model): the model is beyond the double range at ',
-     $           NOVER, ' pixel(s) in physical units'
-            RETURN
-         END IF
-      END IF
       IF (MODFILE .NE. ' ') THEN
          CALL FITSWRITEPRODD(MODFILE, FITSFILE, NCOL, NROW, PIX,
-     $        'MODEL (galaxy model from the fitted isophotes)', NHIST,
-     $        HIST, IERR)
+     $        'MODEL (galaxy model from the fitted isophotes)',
+     $        NHIST+1, HIST, IERR)
          IF (IERR .NE. 0) RETURN
       END IF
 
@@ -385,8 +428,8 @@ C     good(mask) x (science - sky - model)
             RETURN
          END IF
          CALL FITSWRITEPRODD(RESFILE, FITSFILE, NCOL, NROW, PREP,
-     $        'RESIDUAL = mask x (science - sky - model)', NHIST, HIST,
-     $        IERR)
+     $        'RESIDUAL = mask x (science - sky - model)', NHIST+1,
+     $        HIST, IERR)
          IF (IERR .NE. 0) RETURN
       END IF
 
@@ -469,6 +512,38 @@ C     SYNTHESIZED (pi in double precision).
          D = PI * ANINT((TH - THPREV) / PI)
          IF (D .NE. 0 .AND. K .EQ. 0) K = I
          THPREV = TH - D
+ 10   CONTINUE
+      RETURN
+      END
+
+C     The first isophote K with a range failure (see the caller): J = 4
+C     if its I0 is +-Inf, J = 0 if its I0 is exactly 0 in a log fit
+C     (LINEAR false), J = 11 if its slope is +-Inf while its I0 is
+C     finite and nonzero; K = 0 if none.
+      SUBROUTINE PRFINFD(K, J, LINEAR)
+      INTEGER K, J, I
+      LOGICAL LINEAR
+      DOUBLE PRECISION A
+      INCLUDE 'profile_d.inc'
+      K = 0
+      J = 0
+      DO 10 I = 1, N_PRF
+         A = ABS(PARAM_PRF(4,I))
+         IF (A .GT. HUGE(A)) THEN
+            K = I
+            J = 4
+            RETURN
+         END IF
+         IF (A .EQ. 0 .AND. .NOT. LINEAR) THEN
+            K = I
+            J = 0
+            RETURN
+         END IF
+         IF (ABS(PARAM_PRF(11,I)) .GT. HUGE(A) .AND. A .GT. 0) THEN
+            K = I
+            J = 11
+            RETURN
+         END IF
  10   CONTINUE
       RETURN
       END

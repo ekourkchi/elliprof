@@ -5,5 +5,7 @@ C     chosen by the driver (src/shim/double/prep_d.f NORMEXPD); its
 C     intensities are converted back by 2**KNORM.  Intensity keywords
 C     (SKY=) and the fallback I0 are converted to these internal units.
 C     ----------------------------------------------------------------
-        INTEGER KNORM
-        COMMON /NORMD/ KNORM
+C     NUNDER counts model pixels whose exp(arg) underflowed to zero in
+C     SYNTHESIZED (informational).
+        INTEGER KNORM, NUNDER
+        COMMON /NORMD/ KNORM, NUNDER

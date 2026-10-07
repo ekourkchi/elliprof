@@ -685,6 +685,23 @@ C If fitting logarithms, normalize by the value itself
                f0 = par(4,k)
                nfit = 0
                do 120 i = 1,nstep
+C     PRECISION PORT: contour/f0 would exceed DBL_MAX/4 (only possible
+C     for f0 < 1, where HUGE/4*f0 is finite): log(contour/f0 + 1) is
+C     evaluated as log(contour) - log(f0) + log1p(f0/contour), with
+C     log1p(x) = x for x < 4/HUGE; a negative contour keeps the
+C     sentinel, as the direct expression would give it
+                  if(f0.gt.0 .and. f0.lt.1) then
+                     if(abs(contour(i)).gt.0.25D0*huge(1D0)*f0) then
+                        if(contour(i).gt.0) then
+                           contour(i) = log(contour(i)) - log(f0)
+     $                          + f0/contour(i)
+                           nfit = nfit + 1
+                        else
+                           contour(i) = -1D10
+                        end if
+                        goto 120
+                     end if
+                  end if
                   clog = contour(i)/f0 + 1
                   if(clog.gt.0) then
                      contour(i) = log(clog)
@@ -827,6 +844,8 @@ C Tell us about the latest...
 
       subroutine getcontourd(par,iterp,nstep,contour,nx,ny,data,navg)
       IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+C     PRECISION PORT: the AVG range test
+      LOGICAL SAFE
 C     PRECISION PORT: pi (and 1/3) in double precision; the original
 C     has 3.14159265 (and 0.33333333)
       parameter (pi=4D0*atan(1D0))
@@ -878,9 +897,23 @@ C Use X(Y) = IX(Y)-0.5 for exact center of pixel DATA(IX,IY)
 C Otherwise, when navg > 0, use a (2*navg + 1)^2 array ...
 C   ntot    = total number of weights
 C   nbadtot = total number of weights omitted from average
+C     PRECISION PORT: the historical sum below, unless M (the largest
+C     |nonzero pixel| of the box) times the largest possible weight
+C     sum exceeds HUGE/2; then the same sum of data/M, multiplied back
+C     by M after the division by the weights
+         pixmax = 0
+         do 13 j = -navg,navg
+            do 14 k= -navg,navg
+               if (abs(data(ix+j,iy+k)).gt.pixmax)
+     $              pixmax = abs(data(ix+j,iy+k))
+ 14         continue
+ 13      continue
+         wmax = dble(2*navg+1)**2 * (4*navg+1)
+         safe = pixmax.le.0.5D0*huge(1D0)/wmax
          ntot = 0
          nbadtot = 0
          pixtot = 0
+         if (safe) then
          do 11 j = -navg,navg
             do 12 k= -navg,navg
                nwght = 2*(2*navg - iabs(j) - iabs(k)) + 1
@@ -892,9 +925,26 @@ C   nbadtot = total number of weights omitted from average
                endif
  12         continue
  11      continue
+         else
+         do 15 j = -navg,navg
+            do 16 k= -navg,navg
+               nwght = 2*(2*navg - iabs(j) - iabs(k)) + 1
+               ntot = ntot + nwght
+               if (data(ix+j,iy+k).eq.0) then
+                  nbadtot = nbadtot + nwght
+               else
+                  pixtot = pixtot + nwght * (data(ix+j,iy+k)/pixmax)
+               endif
+ 16         continue
+ 15      continue
+         end if
 C Omit a contour if more than 20% of the weights are bad.
          if (dble(nbadtot)/ntot.le.0.2D0) then
+            if (safe) then
             contour(i) = pixtot/(ntot-nbadtot) - f0
+            else
+            contour(i) = pixmax*(pixtot/(ntot-nbadtot)) - f0
+            end if
          else
             contour(i) = -1D10
             write(6,*) 'GETCONTOUR: omitted contour(i), nbadtot/ntot=',
@@ -1445,6 +1495,8 @@ C      sky = amin1(skye,0.98*fn)
 * This is a BAAAAD point to return to, but if rmajor is screwed up, we have to.
       counter_666 = 1
  666  continue
+C     PRECISION PORT: a new synthesis pass counts afresh
+      nunder = 0
 
       do 5 i = 1,n
          r(i) = par(1,i)
@@ -1713,6 +1765,10 @@ C     undefined arg (NaN: the log of a non-positive isophote
 C     intensity) is handled as in the original.
             if(arg.le.log(huge(1D0))) then
                data(ix,iy) = exp(arg) + sky
+C     PRECISION PORT: count exp(arg) underflowing to zero
+               if(data(ix,iy).eq.0) then
+                  if(exp(arg).eq.0) nunder = nunder + 1
+               end if
             else if(arg.ne.arg) then
                write(6,4738) ix, iy, arg
  4738          format('Pixel at',2i5,' at exp ',1pg12.2,' set to 0')

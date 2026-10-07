@@ -102,6 +102,75 @@ C     is X * 2**K (src/shim/double/prep_d.f)
 """
 PI_NOTE = ("C     PRECISION PORT: pi (and 1/3) in double precision; the "
            "original\nC     has 3.14159265 (and 0.33333333)\n")
+LOGRATIO = """\
+C     PRECISION PORT: contour/f0 would exceed DBL_MAX/4 (only possible
+C     for f0 < 1, where HUGE/4*f0 is finite): log(contour/f0 + 1) is
+C     evaluated as log(contour) - log(f0) + log1p(f0/contour), with
+C     log1p(x) = x for x < 4/HUGE; a negative contour keeps the
+C     sentinel, as the direct expression would give it
+                  if(f0.gt.0 .and. f0.lt.1) then
+                     if(abs(contour(i)).gt.0.25D0*huge(1D0)*f0) then
+                        if(contour(i).gt.0) then
+                           contour(i) = log(contour(i)) - log(f0)
+     $                          + f0/contour(i)
+                           nfit = nfit + 1
+                        else
+                           contour(i) = -1D10
+                        end if
+                        goto 120
+                     end if
+                  end if
+"""
+AVGSAFE = """\
+C     PRECISION PORT: the historical sum below, unless M (the largest
+C     |nonzero pixel| of the box) times the largest possible weight
+C     sum exceeds HUGE/2; then the same sum of data/M, multiplied back
+C     by M after the division by the weights
+         pixmax = 0
+         do 13 j = -navg,navg
+            do 14 k= -navg,navg
+               if (abs(data(ix+j,iy+k)).gt.pixmax)
+     $              pixmax = abs(data(ix+j,iy+k))
+ 14         continue
+ 13      continue
+         wmax = dble(2*navg+1)**2 * (4*navg+1)
+         safe = pixmax.le.0.5D0*huge(1D0)/wmax
+         ntot = 0
+         nbadtot = 0
+         pixtot = 0
+         if (safe) then
+         do 11 j = -navg,navg
+            do 12 k= -navg,navg
+               nwght = 2*(2*navg - iabs(j) - iabs(k)) + 1
+               ntot = ntot + nwght
+               if (data(ix+j,iy+k).eq.0) then
+                  nbadtot = nbadtot + nwght
+               else
+                  pixtot = pixtot + nwght * data(ix+j,iy+k)
+               endif
+ 12         continue
+ 11      continue
+         else
+         do 15 j = -navg,navg
+            do 16 k= -navg,navg
+               nwght = 2*(2*navg - iabs(j) - iabs(k)) + 1
+               ntot = ntot + nwght
+               if (data(ix+j,iy+k).eq.0) then
+                  nbadtot = nbadtot + nwght
+               else
+                  pixtot = pixtot + nwght * (data(ix+j,iy+k)/pixmax)
+               endif
+ 16         continue
+ 15      continue
+         end if
+C Omit a contour if more than 20% of the weights are bad.
+         if (dble(nbadtot)/ntot.le.0.2D0) then
+            if (safe) then
+            contour(i) = pixtot/(ntot-nbadtot) - f0
+            else
+            contour(i) = pixmax*(pixtot/(ntot-nbadtot)) - f0
+            end if
+"""
 REVIEWED = {
     "elliprof.f": [
         (r"      if\(igc\.eq\.1\) goto 100\n", GC_REFUSE, "gc-refuse"),
@@ -186,6 +255,10 @@ REVIEWED = {
          "\nC     intensity) is handled as in the original.\n"
          "            if(arg.le.log(huge(1D0))) then\n"
          "               data(ix,iy) = exp(arg) + sky\n"
+         "C     PRECISION PORT: count exp(arg) underflowing to zero\n"
+         "               if(data(ix,iy).eq.0) then\n"
+         "                  if(exp(arg).eq.0) nunder = nunder + 1\n"
+         "               end if\n"
          "            else if(arg.ne.arg) then\n"
          "               write(6,4738) ix, iy, arg\n"
          " 4738          format('Pixel at',2i5,' at exp ',1pg12.2,"
@@ -200,6 +273,25 @@ REVIEWED = {
          "               xerr = .true.\n"
          "               return\n"
          "            end if\n", "synth-range"),
+        (r"( 666  continue\n)",
+         r"\1C     PRECISION PORT: a new synthesis pass counts afresh\n"
+         r"      nunder = 0\n", "underflow-reset"),
+        # contour/f0 can overflow for finite positive values whose ratio
+        # exceeds DBL_MAX.  Only then (detected without dividing:
+        # f0 < 1, so HUGE/4*f0 is finite) the logarithm is taken in the
+        # log domain; every other case keeps the historical expression
+        (r"(                  clog = contour\(i\)/f0 \+ 1\n)",
+         LOGRATIO + r"\1", "log-ratio"),
+        # the AVG box sum can overflow while the weighted average is
+        # finite: only then (M * max weight sum > HUGE/2) accumulate
+        # data/M and multiply back after the division
+        (r"         ntot = 0\n         nbadtot = 0\n         pixtot = 0\n"
+         r".*?            contour\(i\) = pixtot/\(ntot-nbadtot\) - f0\n",
+         AVGSAFE, "avg-sum"),
+        (r"(      subroutine getcontourd\(par,iterp,nstep,contour,nx,ny,"
+         r"data,navg\)\n      IMPLICIT DOUBLE PRECISION \(A-H,O-Z\)\n)",
+         r"\1C     PRECISION PORT: the AVG range test\n      LOGICAL SAFE\n",
+         "avg-logical"),
     ],
 }
 
