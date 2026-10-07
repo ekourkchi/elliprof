@@ -66,7 +66,11 @@ and the CSV records it (`# Precision:`). In Python,
    two changes no digit, and the fit is scale-invariant, so the
    result is the same as without it; intensities (`I0`, `SKY=`, the
    model) are converted back exactly. The summary, the CSV and the FITS
-   `HISTORY` record k.
+   `HISTORY` record k. Normalization alone never turns a representable
+   physical value into 0, a subnormal or infinity: where the normalized
+   model would leave the double range but the physical model would not,
+   the model pixel is computed at another exact power-of-two scale and
+   rounded once, in physical units.
 4. The fit and the model: the original routines in double precision,
    with π and 1/3 to double precision. The original model synthesis
    computes a pixel only where the natural log of its intensity lies
@@ -95,12 +99,18 @@ outermost isophotes by about as much as single and double differ.
 - **Extreme ratios inside one image.** When the brightest and the
   typical values of one image are more than about 10³⁰⁸ apart (for
   example a galaxy at 10⁻³⁰⁰ with a 10³⁰⁰ source), the normalization
-  cannot centre the data. Two quantities of the fit whose intermediate
-  could then overflow are computed safely, only in that case: the log
-  of an intensity ratio along an isophote (taken in the log domain when
-  the ratio itself would exceed the double range) and the `AVG` box sum
-  (accumulated in units of the box's largest value). Every ordinary
-  image keeps the original arithmetic, bit for bit.
+  cannot centre the data. The quantities of the fit whose intermediate
+  could then over- or underflow while the result itself is
+  representable are computed safely, only in that case: the log of an
+  intensity ratio along an isophote (taken in the log domain when the
+  ratio itself would exceed the double range), the `AVG` box sum
+  (accumulated in units of the box's largest value), the four-pixel
+  interpolation (pixels or isophote intensity within a factor 4 of the
+  largest double: evaluated at a quarter of the scale, the interpolated
+  value kept within its four pixels), and the update of an isophote
+  intensity by `exp(d)` when `exp(d)` alone is beyond the normal range
+  (as four factors `exp(d/4)`). Every ordinary image keeps the original
+  arithmetic, bit for bit.
 - If the fit itself still leaves the double range -- an isophote
   intensity overflowing or underflowing to 0 during the iteration, or a
   slope between neighbouring isophotes whose intensities differ by more
@@ -110,15 +120,16 @@ outermost isophotes by about as much as single and double differ.
   more than about 2¹⁵⁷³ with a clear error.
 - The **single** backend's parser limit (above) still applies with
   `--precision single`.
-- Pixels exactly at the largest double (1.8 × 10³⁰⁸) can make the
-  four-pixel interpolation round past the double range; such values do
-  not occur in ordinary data.
-- **Model underflow.** Far in the wings, the model's exponential can be
-  below the smallest double and becomes 0. This is counted, not an
-  error: `Model: N pixels underflowed to zero at double precision.`
-  in the summary, `# Model underflow to zero:` in the CSV, a `HISTORY`
-  card in the model and residual, `result.model_underflow_zero_count`
-  in Python.
+- **Model underflow.** Far in the wings, the physical model value can
+  be below the smallest double and becomes 0, or below the smallest
+  *normal* double and is kept as a subnormal number (fewer significant
+  bits). Both are counted, in physical units, not errors: `Model: N
+  pixels underflowed to zero at double precision.` and `Model: N pixels
+  are subnormal (nonzero, ...)` in the summary, `# Model underflow to
+  zero:` and `# Model subnormal (nonzero):` in the CSV, `HISTORY` cards
+  in the model and residual, `result.model_underflow_zero_count` and
+  `result.model_subnormal_count` in Python. A model pixel beyond the
+  largest double is an error.
 
 ## Memory
 

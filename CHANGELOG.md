@@ -23,7 +23,12 @@
   sums that would exceed the double range are computed safely (only
   then; ordinary images keep the original arithmetic bit for bit), and
   a fit that still leaves the double range stops with a clear error.
-  Model pixels that underflow to 0 are counted and reported.
+  The same holds for the four-pixel interpolation near the largest
+  double and for the multiplicative update of an isophote intensity by
+  `exp(d)`; and normalization alone never turns a representable
+  physical model value into 0, a subnormal or infinity. Model pixels
+  that underflow to 0, and those that are subnormal, are counted and
+  reported (`model_subnormal_count`).
 - `auto` also chooses double when the single backend's parser cannot
   read a `--sky` or `SKY=` value (0.1.4 failed on, e.g., `--sky 1e-40`).
 - `read_prf`/`read_profile` read double profiles exactly;

@@ -60,6 +60,7 @@ It returns an `ElliprofResult` with:
 | `normalization_exponent` | double backend: the fit ran on image × 2<sup>−k</sup>; k |
 | `nonfinite_policy`, `nonfinite_counts` | the non-finite policy applied, and the NaN / +Inf / −Inf / masked counts |
 | `model_underflow_zero_count` | double backend with a model: model pixels whose value underflowed to 0 |
+| `model_subnormal_count` | double backend with a model: model pixels whose value is subnormal (nonzero, below the normal double range) |
 
 Errors raise `ElliprofError` (the fit failed; `.result` holds the
 backend output), `ElliprofTimeoutError` (on timeout) or `GeometryError`
