@@ -163,3 +163,42 @@ C     The second image must match the science image exactly.
       END IF
       RETURN
       END
+
+C     --nonfinite: science pixels that are NaN or +-Inf after the sky and
+C     the mask (pixels the mask already excluded are 0 and never count).
+C     MASK true (--nonfinite mask): they become 0 and bad in GOOD, the
+C     effective mask (user mask AND finite science; a data-quality mask
+C     would be one more AND).  Otherwise they are only counted.
+      SUBROUTINE NONFINS(PIX, NCOL, NROW, MASK, GOOD, NNF)
+      INTEGER NCOL, NROW, NNF, I, J
+      REAL PIX(NCOL,NROW)
+      LOGICAL MASK, GOOD(NCOL,NROW)
+      NNF = 0
+      DO 10 J = 1, NROW
+         DO 11 I = 1, NCOL
+            IF (PIX(I,J) .NE. PIX(I,J) .OR.
+     $           ABS(PIX(I,J)) .GT. HUGE(PIX(I,J))) THEN
+               NNF = NNF + 1
+               IF (MASK) THEN
+                  PIX(I,J) = 0.0
+                  GOOD(I,J) = .FALSE.
+               END IF
+            END IF
+ 11      CONTINUE
+ 10   CONTINUE
+      RETURN
+      END
+
+C     The NaN/Inf count of NONFINS, without masking (keep, error).
+      SUBROUTINE NONFCNTS(PIX, NCOL, NROW, NNF)
+      INTEGER NCOL, NROW, NNF, I, J
+      REAL PIX(NCOL,NROW)
+      NNF = 0
+      DO 10 J = 1, NROW
+         DO 11 I = 1, NCOL
+            IF (PIX(I,J) .NE. PIX(I,J) .OR.
+     $           ABS(PIX(I,J)) .GT. HUGE(PIX(I,J))) NNF = NNF + 1
+ 11      CONTINUE
+ 10   CONTINUE
+      RETURN
+      END

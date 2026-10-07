@@ -10,10 +10,10 @@ C     physical units -> products.  ISTAT returns the exit status.
 
       SUBROUTINE ELLIPROFDRV(FITSFILE, PRFFILE, MODFILE, CSVFILE,
      $     REGFILE, MASKFILE, SKYIMG, SKYSTR, PREPFILE, RESFILE, ZGOOD,
-     $     PREPONLY, DOMODEL, PRECREQ, PRECWHY, ISTAT)
+     $     PREPONLY, DOMODEL, PRECREQ, PRECWHY, NONFIN, ISTAT)
       CHARACTER*(*) FITSFILE, PRFFILE, MODFILE, CSVFILE, REGFILE
       CHARACTER*(*) MASKFILE, SKYIMG, SKYSTR, PREPFILE, RESFILE
-      CHARACTER*(*) PRECREQ, PRECWHY
+      CHARACTER*(*) PRECREQ, PRECWHY, NONFIN
       LOGICAL ZGOOD, PREPONLY, DOMODEL
       INTEGER ISTAT
       INCLUDE 'vistalink.inc'
@@ -26,6 +26,7 @@ C     physical units -> products.  ISTAT returns the exit status.
       DOUBLE PRECISION SKYVAL, BYTES
       INTEGER NCOL, NROW, IUNIT, IERR, IBITPIX, MBITPIX, NBAD, NNONF
       INTEGER NOVER, IST, KPREF, KMIN, KMAX, I, J, K, NHIST, ICOS3X, L
+      INTEGER NNF
       INTEGER*8 NPIX, NUSED, NINEX
       LOGICAL LINEAR, SHVERB
       CHARACTER*1024 SKYDESC, MSKDESC
@@ -148,7 +149,8 @@ C     ---- Sky, then mask: the order matters
       END IF
 
       MSKDESC = 'none'
-      IF (MASKFILE .NE. ' ' .OR. RESFILE .NE. ' ') THEN
+      IF (MASKFILE .NE. ' ' .OR. RESFILE .NE. ' ' .OR.
+     $     NONFIN .NE. 'keep') THEN
          ALLOCATE (GOOD(NCOL,NROW), STAT=IST)
          IF (IST .NE. 0) THEN
             CALL NOMEMD('the logical mask', 4D0*NPIX)
@@ -170,6 +172,13 @@ C     ---- Sky, then mask: the order matters
      $        //'(0 = good, nonzero = bad)'
          MSKDESC = MASKFILE
       END IF
+      IF (NONFIN .EQ. 'mask') THEN
+         CALL NONFIND(PIX, NCOL, NROW, .TRUE., GOOD, NNF)
+      ELSE
+         CALL NONFCNTD(PIX, NCOL, NROW, NNF)
+      END IF
+      CALL NONFINRPT(NNF, NONFIN, 'double')
+      IF (NNF .GT. 0 .AND. NONFIN .EQ. 'error') RETURN
 
 C     ---- The normalization exponent (applied after the prepared
 C     product is written, which stays in physical units)

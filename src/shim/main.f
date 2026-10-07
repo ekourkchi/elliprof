@@ -22,7 +22,7 @@ C     coordinates); ELLIPROF refines it during the fit.
       CHARACTER*1024 ARG, FITSFILE, PRFFILE, MODFILE, CSVFILE, REGFILE
       CHARACTER*1024 MASKFILE, SKYIMG, SKYSTR, SKYDESC, MSKDESC
       CHARACTER*1024 PREPFILE, RESFILE, MCONV
-      CHARACTER*16 PRECREQ, PRECSEL
+      CHARACTER*16 PRECREQ, PRECSEL, NONFIN
       CHARACTER*256 PRECWHY
       CHARACTER*512 PRECLN
       CHARACTER*289 OSTRNG, LCSTRNG
@@ -30,7 +30,7 @@ C     coordinates); ELLIPROF refines it during the fit.
       LOGICAL PREPONLY, HASNIT, INTMODEL, ZGOOD, KWMODEL
       INTEGER UPPER, NARGS, IARG, IWORD, JCHAR, IB, ICON, NSKYOPT
       INTEGER NTYPE, NUM, NCHAR, NCOL, NROW, IUNIT, IERR, L, I, J
-      INTEGER ICOS3X, MBITPIX, NBAD, NNONF, IBITPIX, ISTAT
+      INTEGER ICOS3X, MBITPIX, NBAD, NNONF, IBITPIX, ISTAT, NNF
       REAL FNUM, SKYVAL, CFV, VX0, VY0, VR0, VR1, VNR, VNIT
 C     --verbose: row-by-row model progress (stubs.f TELLME) and the
 C     profile table even when it is written to a file
@@ -52,6 +52,7 @@ C     ---- Command line: image file, options, ELLIPROF words
       RESFILE = ' '
       MCONV = 'nonzero-good'
       PRECREQ = 'auto'
+      NONFIN = 'keep'
       PRECWHY = ' '
       PREPONLY = .FALSE.
       SHVERB = .FALSE.
@@ -82,7 +83,7 @@ C     CFITSIO reports its version as major + minor/100
      $        ARG .EQ. '--sc' .OR. ARG .EQ. '--sky-image' .OR.
      $        ARG .EQ. '--prepared' .OR. ARG .EQ. '--residual' .OR.
      $        ARG .EQ. '--mask-convention' .OR.
-     $        ARG .EQ. '--precision') THEN
+     $        ARG .EQ. '--precision' .OR. ARG .EQ. '--nonfinite') THEN
          IF (IARG .EQ. NARGS) THEN
             WRITE (0,'(3A)') 'elliprof: error: ', ARG(1:LEN_TRIM(ARG)),
      $           ' needs a value'
@@ -110,6 +111,8 @@ C     CFITSIO reports its version as major + minor/100
             CALL GET_COMMAND_ARGUMENT(IARG, MCONV)
          ELSE IF (ARG .EQ. '--precision') THEN
             CALL GET_COMMAND_ARGUMENT(IARG, PRECREQ)
+         ELSE IF (ARG .EQ. '--nonfinite') THEN
+            CALL GET_COMMAND_ARGUMENT(IARG, NONFIN)
          ELSE
             IF (ARG .EQ. '--sc') WRITE (0,'(A)')
      $           'elliprof: --sc is deprecated, use --sky'
@@ -165,6 +168,16 @@ C     (src/shim/double/auto_d.f).
          WRITE (0,'(3A)') 'elliprof: error: --precision must be single'
      $        //', double or auto, got "',
      $        PRECREQ(1:LEN_TRIM(PRECREQ)), '"'
+         CALL EXIT(1)
+      END IF
+
+C     --nonfinite: NaN/Inf science pixels left after the sky and the
+C     mask.  keep (default, as before 0.2.0): passed to ELLIPROF, with a
+C     warning; mask: excluded like masked pixels; error: refused.
+      IF (NONFIN .NE. 'keep' .AND. NONFIN .NE. 'mask' .AND.
+     $     NONFIN .NE. 'error') THEN
+         WRITE (0,'(3A)') 'elliprof: error: --nonfinite must be keep, '
+     $        //'mask or error, got "', NONFIN(1:LEN_TRIM(NONFIN)), '"'
          CALL EXIT(1)
       END IF
 
@@ -405,7 +418,8 @@ C     ---- Double precision: the double backend takes over from here
          END IF
          CALL ELLIPROFDRV(FITSFILE, PRFFILE, MODFILE, CSVFILE,
      $        REGFILE, MASKFILE, SKYIMG, SKYSTR, PREPFILE, RESFILE,
-     $        ZGOOD, PREPONLY, DOMODEL, PRECREQ, PRECWHY, ISTAT)
+     $        ZGOOD, PREPONLY, DOMODEL, PRECREQ, PRECWHY, NONFIN,
+     $        ISTAT)
          CALL EXIT(ISTAT)
       END IF
 
@@ -471,8 +485,10 @@ C     ---- Sky, then mask (prep.f): the order matters
       END IF
 
 C     The logical mask (all good without --mask) is kept for --residual
+C     and is the effective mask with --nonfinite mask
       MSKDESC = 'none'
-      IF (MASKFILE .NE. ' ' .OR. RESFILE .NE. ' ') THEN
+      IF (MASKFILE .NE. ' ' .OR. RESFILE .NE. ' ' .OR.
+     $     NONFIN .NE. 'keep') THEN
          ALLOCATE (GOOD(NCOL,NROW))
          GOOD = .TRUE.
       END IF
@@ -490,6 +506,13 @@ C     The logical mask (all good without --mask) is kept for --residual
      $        //'(0 = good, nonzero = bad)'
          MSKDESC = MASKFILE
       END IF
+      IF (NONFIN .EQ. 'mask') THEN
+         CALL NONFINS(PIX, NCOL, NROW, .TRUE., GOOD, NNF)
+      ELSE
+         CALL NONFCNTS(PIX, NCOL, NROW, NNF)
+      END IF
+      CALL NONFINRPT(NNF, NONFIN, 'single')
+      IF (NNF .GT. 0 .AND. NONFIN .EQ. 'error') CALL EXIT(1)
 
 C     ---- The prepared image, exactly as ELLIPROF receives it:
 C     good(mask) x (science - sky)
@@ -770,6 +793,31 @@ C     only for the test is removed again; an existing one is kept.
      $ '                    ELLIPROF), double (IEEE-754 binary64',
      $ '                    throughout) or auto (default: double',
      $ '                    for 64-bit data or values beyond float32)',
+     $ '  --nonfinite keep|mask|error',
+     $ '                    NaN/Inf science pixels left after the sky',
+     $ '                    and mask: keep (default; passed on, with a',
+     $ '                    warning), mask (excluded like masked',
+     $ '                    pixels) or error',
      $ '  --version         print the backend version'
+      RETURN
+      END
+
+C     The --nonfinite report, for both backends.
+      SUBROUTINE NONFINRPT(NNF, NONFIN, PREC)
+      INTEGER NNF
+      CHARACTER*(*) NONFIN, PREC
+      IF (NNF .EQ. 0) RETURN
+      IF (NONFIN .EQ. 'mask') THEN
+         WRITE (6,'(A,I0,A)') ' Non-finite: ', NNF, ' NaN/Inf science '
+     $        //'pixel(s) masked (--nonfinite mask)'
+      ELSE IF (NONFIN .EQ. 'error') THEN
+         WRITE (0,'(3A,I0,A)') 'elliprof: error (', PREC, ' precision,'
+     $        //' preparation): ', NNF, ' NaN/Inf science pixel(s) '
+     $        //'are not masked (--nonfinite error)'
+      ELSE
+         WRITE (0,'(A,I0,A)') 'elliprof: warning: ', NNF, ' NaN/Inf '
+     $        //'science pixel(s) are not masked; ELLIPROF meets them '
+     $        //'in its samples (--nonfinite mask excludes them)'
+      END IF
       RETURN
       END

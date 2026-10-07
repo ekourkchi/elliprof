@@ -31,6 +31,7 @@ UNSUPPORTED = ("OLD", "EDIT", "TV")  # interactive or stateful options
 DEFAULT_NITER = 5  # ELLIPROF's own default (src/original/elliprof.f)
 MASK_CONVENTIONS = ("nonzero-good", "zero-good")
 PRECISIONS = ("auto", "single", "double")
+NONFINITE = ("keep", "mask", "error")
 _PRECISION = re.compile(r"^\s*Precision: (single|double) \(.*?\); "
                         r"requested (\w+)(?: \(auto: (.*)\))?\s*$", re.M)
 _NORMALIZATION = re.compile(r"Normalization: fit on image x 2\*\*\(-k\), "
@@ -300,6 +301,7 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
                  model_harmonics=None, harmonic_mode=None,
                  sixth_order=False, mask_convention: str = "nonzero-good",
                  precision: str = "auto",
+                 nonfinite: str = "keep",
                  load_profile: bool = True,
                  output_dir: Optional[PathLike] = None,
                  prefix: Optional[str] = None,
@@ -366,6 +368,13 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
     processes 64-bit FITS data without reducing them to float32; it
     writes 64-bit products.
 
+    ``nonfinite``: what happens to science pixels that are NaN or +-Inf
+    after the sky and the mask (e.g. the no-data regions of JWST
+    images).  ``"keep"`` (the default, as before 0.2.0) passes them to
+    ELLIPROF, with a warning; ``"mask"`` excludes them like masked
+    pixels (0 in the prepared image and residual); ``"error"`` refuses
+    them.
+
     ``image`` may be stored with any FITS BITPIX (8, 16, 32, 64, -32,
     -64).  The single backend converts its pixels to 32-bit floating
     point; the double backend reads them as 64-bit floats.
@@ -410,6 +419,9 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
     if precision not in PRECISIONS:
         raise ValueError("precision must be 'auto', 'single' or 'double', "
                          f"got {precision!r}")
+    if nonfinite not in NONFINITE:
+        raise ValueError("nonfinite must be 'keep', 'mask' or 'error', "
+                         f"got {nonfinite!r}")
     if gc and precision == "double":
         raise ValueError("double-precision GC mode is not yet supported; "
                          "use precision='single'")
@@ -476,6 +488,8 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
     if prepared is not None:
         cmd += ["--prepared", str(Path(prepared).resolve())]
     cmd += ["--precision", precision]
+    if nonfinite != "keep":
+        cmd += ["--nonfinite", nonfinite]
     if backend_verbose:
         cmd.append("--verbose")
 
