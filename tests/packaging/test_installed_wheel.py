@@ -278,7 +278,9 @@ print("ok")
 def test_014_model_masks_niter_float64(tmp_path):
     """0.1.4 on the installed wheel: -m alone writes the model (same data
     as legacy MODEL -m), the zero-good mask convention, --niter, and a
-    BITPIX = -64 image."""
+    BITPIX = -64 image -- in the single backend, which converts it to the
+    same float32 values (--precision single; the default auto fits a
+    64-bit image in double)."""
     fits = pytest.importorskip("astropy.io.fits")   # test-only dependency
     data = fits.getdata(GALAXY).astype(np.float32)
     a = run(GALAXY, *FIT, "--sky", "100", "RMSTAR", "NITER=5",
@@ -304,7 +306,8 @@ def test_014_model_masks_niter_float64(tmp_path):
                             (tmp_path / "f64.fits", "A.fits", [])):
         out = tmp_path / f"m{len(outs)}.dat"
         p = run(img, *FIT, "--sky", "100", "--mask", tmp_path / mask,
-                *conv, "-o", out, "--residual", out.with_suffix(".fits"))
+                *conv, "--precision", "single", "-o", out, "--residual",
+                out.with_suffix(".fits"))
         assert p.returncode == 0, p.stderr
         assert f"{int(bad.sum())} pixels masked" in p.stdout
         outs.append((np.asarray(_read_prf(out)), fits.getdata(
@@ -312,6 +315,11 @@ def test_014_model_masks_niter_float64(tmp_path):
     for prof, res in outs[1:]:
         assert np.array_equal(prof, outs[0][0])
         assert np.array_equal(res, outs[0][1])
+    # 0.2.0: by default the 64-bit image is fitted in double precision
+    p = run(tmp_path / "f64.fits", *FIT, "--sky", "100", "-o",
+            tmp_path / "d.dat")
+    assert p.returncode == 0, p.stderr
+    assert "Precision: double" in p.stdout
 
 
 def _read_prf(path):
