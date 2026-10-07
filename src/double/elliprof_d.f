@@ -1181,7 +1181,31 @@ C     has 3.14159265 (and 0.33333333)
       if(ifitlog.eq.0) then
          f0 = f0 + gain*(fcoeff(1) + fcoeff(4))
       else
-         f0 = f0 * exp(gain*(fcoeff(1)+fcoeff(4)))
+C     PRECISION PORT (R5): f0*exp(d) as before when exp(d) is a finite
+C     normal number.  Otherwise (exp(d) = Inf, 0 or subnormal: only for
+C     |d| > 708) the product can still be representable, and a
+C     subnormal exp(d) holds too few bits: then f0*e*e*e*e with
+C     e = exp(d/4) (d/4 exact).  A nonzero representable result has
+C     |d| <= ln(DBL_MAX/2**-1074) < 1455, so |d/4| < 364 and e is a
+C     normal number; the partial products move monotonically from f0
+C     to the result, so none over- or underflows unless the result
+C     does (a genuine range error, reported as before).  f0 = 0,
+C     non-finite f0 or d keep the historical expression.  f0 > 0 in
+C     log fits (seeded from a positive pixel, only multiplied by
+C     exp); the fallback would keep any sign.
+         d = gain*(fcoeff(1)+fcoeff(4))
+         t = exp(d)
+         if(t.ge.tiny(1D0) .and. t.le.huge(1D0)) then
+            f0 = f0 * t
+         else if(d.eq.d .and. f0.ne.0 .and. abs(f0).le.huge(1D0)) then
+            e = exp(d/4)
+            f0 = f0*e
+            f0 = f0*e
+            f0 = f0*e
+            f0 = f0*e
+         else
+            f0 = f0 * t
+         end if
       end if
 
       par(2) = x0

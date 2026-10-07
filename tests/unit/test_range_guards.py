@@ -167,3 +167,81 @@ def test_r4_ordinary_inputs_unchanged(rangeprobe):
                       rng.choice((1, -1)) * 10 ** rng.uniform(-300, 300)))
     got = run(rangeprobe, [("B", c) for c in cases])
     assert all(same(g, bilinear_historical(*c)) for c, g in zip(cases, got))
+
+
+# ---- R5 -----------------------------------------------------------------
+
+def alter_historical(f0, d):
+    try:
+        t = math.exp(d)
+    except OverflowError:
+        t = math.inf
+    return f0 * t
+
+
+def times_exp(f0, d):
+    with localcontext() as ctx:
+        ctx.prec = 90
+        return to_double(Decimal(f0) * Decimal(d).exp())
+
+
+LN_TINY, LN_MAX = math.log(TINY), math.log(MAX)
+R5_F0 = [M, 1e300, 1e100, 1.0, 1e-100, 1e-300, TINY, 1e-310, SUB]
+R5_D = [-1500, -1454, -1400, -1000, -800, -745.2, -745.1, -740, -720, -709,
+        -708.4, -708, -700, -100, 0.0, 100, 700, 709, 709.78, 709.8, 720,
+        800, 1000, 1400, 1454, 1500,
+        math.nextafter(LN_TINY, -math.inf), LN_TINY,
+        math.nextafter(LN_TINY, math.inf), -745.13321910194122, -745.14,
+        math.nextafter(LN_MAX, -math.inf), LN_MAX,
+        math.nextafter(LN_MAX, math.inf), 1454.3, 1454.4, -1454.3, -1454.4,
+        2839, -2979]
+
+
+def test_r5_against_reference(rangeprobe):
+    """Every representable f0*exp(d) within 4 ulp (the historical update
+    gives Inf, 0 or a factor-2 error for 60 of these cases); genuine
+    overflow / underflow stay Inf / 0."""
+    cases = [(f0, float(d)) for f0 in R5_F0 for d in R5_D]
+    got = run(rangeprobe, [("A", (f0, 1.0, d, 0.0)) for f0, d in cases])
+    wrong_before = 0
+    for (f0, d), g in zip(cases, got):
+        r = times_exp(f0, d)
+        if r == 0 or not math.isfinite(r):
+            assert g == r, (f0, d, g, r)
+            continue
+        assert abs(g - r) <= 4 * math.ulp(r), (f0, d, g, r)
+        h_ = alter_historical(f0, d)
+        wrong_before += not (math.isfinite(h_) and h_ != 0
+                             and abs(h_ - r) <= 4 * math.ulp(r))
+        if LN_TINY <= d <= LN_MAX:
+            assert same(g, h_), (f0, d)            # historical path
+    assert wrong_before >= 44
+
+
+def test_r5_ordinary_updates_unchanged(rangeprobe):
+    rng = random.Random(5)
+    cases = [(10 ** rng.uniform(-300, 300), rng.uniform(-708, 708))
+             for _ in range(20000)]
+    got = run(rangeprobe, [("A", (f0, 1.0, d, 0.0)) for f0, d in cases])
+    assert all(same(g, alter_historical(f0, d))
+               for (f0, d), g in zip(cases, got))
+
+
+@pytest.mark.parametrize("f0,d", [
+    (0.0, -800), (0.0, 800), (0.0, math.nan), (math.nan, 10),
+    (math.nan, -800), (math.inf, -800), (-math.inf, 800), (1.0, math.nan),
+    (1e-300, math.inf), (1e300, -math.inf), (math.inf, 1.0)])
+def test_r5_invalid_inputs_keep_the_historical_result(rangeprobe, f0, d):
+    """f0 = 0, non-finite f0 or d: never turned into a number."""
+    assert same(run(rangeprobe, [("A", (f0, 1.0, d, 0.0))])[0],
+                alter_historical(f0, d))
+
+
+def test_r5_sign_is_kept(rangeprobe):
+    # f0 > 0 in log fits; the fallback would still keep a sign
+    g = run(rangeprobe, [("A", (-1e300, 1.0, -800.0, 0.0)),
+                         ("A", (-1e-300, 1.0, 800.0, 0.0))])
+    assert g[0] < 0 and abs(g[0] - times_exp(-1e300, -800.0)) <= \
+        4 * math.ulp(g[0])
+    assert g[1] < 0 and abs(g[1] - times_exp(-1e-300, 800.0)) <= \
+        4 * math.ulp(g[1])

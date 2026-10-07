@@ -7,7 +7,9 @@ dynamic range inside one image (not a global scale):
   accumulated scaled, only on that path;
 * an isophote intensity that still overflows: a clear error, never a
   silent NaN success;
-* model pixels that underflow to zero: counted and reported.
+* model pixels that underflow to zero: counted and reported;
+* R4, R5, R6 (see test_double_range_guards.py and
+  tests/unit/test_range_guards.py).
 
 Ordinary images never take the new paths: their double results are
 bit-identical with and without them (verified with the previous build
@@ -144,17 +146,23 @@ def test_ordinary_avg_unchanged_by_the_scaled_path(run_native, tmp_path):
 
 
 def test_intensity_overflow_is_an_error_not_nan(run_native, tmp_path):
-    """A core at 1.5e308 beside a 1e-300 background: the fit's iterate
-    for the core-edge isophote leaves the double range.  A clear error
-    (exit 1), never NaN isophotes with exit 0."""
+    """A core at 1.5e308 beside a 1e-300 background: the fit leaves the
+    double range -- a clear error (exit 1), never NaN isophotes with exit
+    0.  Before R5 the error was an I0 overflow that was avoidable (f0 =
+    2.19e-297, d = +1392.5: f0*exp(d) = 1.2e308 is representable, only
+    exp(d) is not).  Now the first error is a genuine one: the slope of
+    isophote 4, from I(3) = 1.8e210, I(5) = 0 (an exact underflow, 10**-409)
+    and I(4) = 2.6e-314, is ~10**524 (checked in exact arithmetic for
+    the candidate report)."""
     img = galaxy()
     j, i = np.indices(img.shape)
     img[np.hypot(i + 0.5 - 100.3, j + 0.5 - 99.6) < 4] = 1.5e308
     fits.PrimaryHDU(img).writeto(tmp_path / "b.fits")
     p = run_native(tmp_path / "b.fits", *FIT, "-o", tmp_path / "b.dat")
     assert p.returncode == 1
-    assert "error (double precision, fit): the intensity I0 of isophote" \
-        in p.stderr
+    assert "error (double precision, fit): the slope dlnI/dlnr of " \
+        "isophote 4 is beyond the double range" in p.stderr
+    assert "intensity I0" not in p.stderr
     assert not (tmp_path / "b.dat").exists()
 
 
