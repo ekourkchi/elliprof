@@ -37,6 +37,7 @@ def test_same_sources():
     assert make_var("ORIG") == cmake_set("ORIGINAL")
     assert make_var("SHIM") == cmake_set("SHIM")
     assert make_var("DOUBLE") == cmake_set("DOUBLE")
+    assert make_var("SHIMD") == cmake_set("SHIMD")
 
 
 def test_every_fortran_source_is_built():
@@ -44,7 +45,9 @@ def test_every_fortran_source_is_built():
     listed = {f"src/original/{f}.f" for f in make_var("ORIG")}
     listed |= {f"src/shim/{f}.f" for f in make_var("SHIM")}
     listed |= {f"src/double/{f}.f" for f in make_var("DOUBLE")}
-    found = {str(p.relative_to(ROOT)) for d in ("src/shim", "src/double")
+    listed |= {f"src/shim/double/{f}.f" for f in make_var("SHIMD")}
+    found = {str(p.relative_to(ROOT))
+             for d in ("src/shim", "src/double", "src/shim/double")
              for p in (ROOT / d).glob("*.f")}
     assert found <= listed
 

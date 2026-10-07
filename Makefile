@@ -42,7 +42,10 @@ SHIM = main stubs fitsio profout maskio prep
 # Double-precision backend: maintained precision ports of original
 # routines (src/double), with their own COMMON blocks (src/double/include)
 DOUBLE = elliprof_d jtutil_d
-OBJS = $(ORIG:%=build/%.o) $(SHIM:%=build/%.o) $(DOUBLE:%=build/%.o)
+# and its driver, image preparation and output (src/shim/double)
+SHIMD = main_d fitsio_d prep_d
+OBJS = $(ORIG:%=build/%.o) $(SHIM:%=build/%.o) $(DOUBLE:%=build/%.o) \
+       $(SHIMD:%=build/%.o)
 INCS = $(wildcard include/*.inc include/*.par) build/version.inc
 DINCS = $(wildcard src/double/include/*.inc)
 
@@ -62,6 +65,10 @@ build/%.o: src/shim/%.f $(INCS) | build
 	$(FC) $(FFLAGS) $(WARN) -Iinclude -Ibuild -c $< -o $@
 
 build/%.o: src/double/%.f $(INCS) $(DINCS) | build
+	$(FC) $(FFLAGS) $(WARN) -Iinclude -Isrc/double/include -Ibuild \
+	    -c $< -o $@
+
+build/%.o: src/shim/double/%.f $(INCS) $(DINCS) | build
 	$(FC) $(FFLAGS) $(WARN) -Iinclude -Isrc/double/include -Ibuild \
 	    -c $< -o $@
 

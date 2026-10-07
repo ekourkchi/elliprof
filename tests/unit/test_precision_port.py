@@ -32,7 +32,8 @@ def test_provenance_names_the_current_original():
 
 def test_fixed_form_line_length():
     for path in list((ROOT / "src" / "double").rglob("*.f")) + \
-            list((ROOT / "src" / "double").rglob("*.inc")):
+            list((ROOT / "src" / "double").rglob("*.inc")) + \
+            list((ROOT / "src" / "shim").rglob("*.f")):
         for n, line in enumerate(path.read_text().splitlines(), 1):
             if not re.match(r"[cC*!]", line):
                 assert len(line) <= 72, f"{path.name}:{n}"

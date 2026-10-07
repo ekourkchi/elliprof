@@ -76,8 +76,8 @@ LITERAL = re.compile(r"(?<![\w])(?<!\d\.)((?:\d+\.\d*|\.\d+)"
                      r"(?:[eE][+-]?\d+)?|\d+[eE][+-]?\d+)(?![\w])(?!\.\d)")
 
 # ---- explicitly reviewed edits ----------------------------------------
-# (regular expression on the generated text, replacement, label); each
-# must match exactly once.
+# (regular expression on the generated text, replacement (re.sub
+# syntax), label[, expected number of matches, default 1]).
 
 GC_REFUSE = """\
 C     PRECISION PORT: the globular-cluster (GC) branch of the original
@@ -94,11 +94,65 @@ GC_OMIT = """\
 C     PRECISION PORT: the GC branch (label 100 to MAKEGCMODEL) of the
 C     original is omitted here; see the GC guard above.
 """
+NORM_DECL = """\
+C     PRECISION PORT: the normalization exponent (norm_d.inc); POW2D(X,K)
+C     is X * 2**K (src/shim/double/prep_d.f)
+      include 'norm_d.inc'
+      DOUBLE PRECISION POW2D
+"""
 REVIEWED = {
     "elliprof.f": [
         (r"      if\(igc\.eq\.1\) goto 100\n", GC_REFUSE, "gc-refuse"),
         (r"C Fit concentric circles to a globular cluster\n.*?"
          r"     \$     ,width\)\n", GC_OMIT, "gc-omit"),
+        # normalization: declarations in ELLIPROFD, FITPROFILED and
+        # SYNTHESIZED
+        (r"(      include 'profile_d\.inc'\n)", r"\1" + NORM_DECL,
+         "norm-elliprofd"),
+        (r"(maxstep=360, maxrad=100\)\n      include 'vistalink\.inc'\n)",
+         r"\1" + NORM_DECL, "norm-fitprofiled"),
+        (r"(      external elliterpd\n)", r"\1" + NORM_DECL,
+         "norm-synthesized"),
+        # keywords: plain numbers converted exactly (KWVALD), not by
+        # the original parser (which scales by a REAL*4 power of ten)
+        (r"call assignd\(", "call kwvald(", "keywords", 17),
+        # SKY= is an intensity: physical -> internal units
+        (r"(            call kwvald\(word\(i\),sky,parm\)\n"
+         r"            if \(xerr\) return\n            isky = 1\n)",
+         r"\1C     PRECISION PORT: SKY= in internal units\n"
+         r"            sky = pow2d(sky, -knorm)\n", "sky-keyword"),
+        # the fallback I0 of an isophote without positive samples: 1000
+        # physical, i.e. 1000 * 2**(-k) internal (never beyond HUGE)
+        (r"         par\(4,k\) = 1000\n",
+         "C     PRECISION PORT: the fallback I0 = 1000 in physical units\n"
+         "         par(4,k) = min(pow2d(1000D0, -knorm), huge(1D0))\n",
+         "fallback-i0"),
+        # printed intensities in physical units, in formats that hold
+        # the whole double range
+        (r"      write\(6,2001\) reff, remin, feff, femin, sky, skymin\n"
+         r" 2001 format\(1x,'Re =',2f8\.1,4x,'Ie =',2f9\.1,4x,'Sky =',"
+         r"2f9\.1\)\n",
+         "C     PRECISION PORT: Ie and Sky printed in physical units\n"
+         "      write(6,2001) reff, remin, pow2d(feff,knorm),\n"
+         "     $     pow2d(femin,knorm), pow2d(sky,knorm),\n"
+         "     $     pow2d(skymin,knorm)\n"
+         " 2001 format(1x,'Re =',2f8.1,4x,'Ie =',2(1x,1pg15.8),4x,\n"
+         "     $     'Sky =',2(1x,1pg15.8))\n", "print-devauc"),
+        (r"WRITE\(6,\*\) K, PARAM\(1,K\), PARAM\(4,K\), FIT\+SKY\n",
+         "WRITE(6,*) K, PARAM(1,K), POW2D(PARAM(4,K),KNORM),\n"
+         "     $           POW2D(FIT+SKY,KNORM)\n", "print-test"),
+        (r"(     \$ +)par\(4,k\),par\(5,k\)-90,",
+         r"\1pow2d(par(4,k),knorm),par(5,k)-90,", "print-table", 2),
+        (r" 1000       format\(f6\.1,2f8\.2,f8\.0,",
+         " 1000       format(f6.1,2f8.2,1pg13.6,0p,", "print-table-fmt"),
+        (r"      write\(6,6725\) rmajor, exp\(flog\), sky, epsilon\n"
+         r" 6725 format\('Extrapolated outer isophote: r,f,sky,eps =',"
+         r"3f9\.1,f9\.3\)\n",
+         "C     PRECISION PORT: f and sky printed in physical units\n"
+         "      write(6,6725) rmajor, pow2d(exp(flog),knorm),\n"
+         "     $     pow2d(sky,knorm), epsilon\n"
+         " 6725 format('Extrapolated outer isophote: r,f,sky,eps =',\n"
+         "     $     f9.1,2(1x,1pg15.8),0p,f9.3)\n", "print-extrap"),
     ],
 }
 
@@ -238,11 +292,15 @@ def port(src):
         if m and m.group(2).lower() in routines:
             ported.append(port_unit(unit, m.group(2).lower()))
     text = "\n".join(ported) + "\n"
-    for pattern, new, label in REVIEWED.get(src, []):
+    for edit in REVIEWED.get(src, []):
+        pattern, new, label = edit[:3]
+        count = edit[3] if len(edit) > 3 else 1
         n = len(re.findall(pattern, text, re.S))
-        if n != 1:
-            raise SystemExit(f"reviewed edit {label!r} matched {n} times")
-        text = re.sub(pattern, lambda m: new, text, flags=re.S)
+        if n != count:
+            raise SystemExit(f"reviewed edit {label!r} matched {n} "
+                             f"times, expected {count}")
+        text = re.sub(pattern, new, text, flags=re.S)
+    text = "\n".join(wrap(x) for x in text.split("\n"))
     return target, HEADER.format(src=src, sha=sha) + text
 
 

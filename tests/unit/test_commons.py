@@ -14,7 +14,7 @@ import pytest
 from helpers import ROOT
 
 BUILD = ROOT / "build"
-DOUBLE_OBJECTS = ("elliprof_d", "jtutil_d")
+DOUBLE_OBJECTS = ("elliprof_d", "jtutil_d", "main_d", "fitsio_d", "prep_d")
 # precision-specific blocks: single name -> double name
 PAIRS = {"prf": "prfd", "prf_name": "prfnmd", "elltest": "elltstd",
          "ellizero": "ellzd"}

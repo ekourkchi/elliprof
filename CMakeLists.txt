@@ -76,6 +76,8 @@ set(ORIGINAL elliprof jtutil gcfit assign dissect value operate variable
 set(SHIM main stubs fitsio profout maskio prep)
 # Double-precision backend (precision ports of original routines)
 set(DOUBLE elliprof_d jtutil_d)
+# and its driver, image preparation and output
+set(SHIMD main_d fitsio_d prep_d)
 set(SOURCES "")
 foreach(f ${ORIGINAL})
   list(APPEND SOURCES "src/original/${f}.f")
@@ -85,6 +87,9 @@ foreach(f ${SHIM})
 endforeach()
 foreach(f ${DOUBLE})
   list(APPEND SOURCES "src/double/${f}.f")
+endforeach()
+foreach(f ${SHIMD})
+  list(APPEND SOURCES "src/shim/double/${f}.f")
 endforeach()
 
 # The legacy fixed-form sources must reach the compiler exactly as in the

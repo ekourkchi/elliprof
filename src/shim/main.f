@@ -22,12 +22,14 @@ C     coordinates); ELLIPROF refines it during the fit.
       CHARACTER*1024 ARG, FITSFILE, PRFFILE, MODFILE, CSVFILE, REGFILE
       CHARACTER*1024 MASKFILE, SKYIMG, SKYSTR, SKYDESC, MSKDESC
       CHARACTER*1024 PREPFILE, RESFILE, MCONV
+      CHARACTER*16 PRECREQ
+      CHARACTER*256 PRECWHY
       CHARACTER*289 OSTRNG, LCSTRNG
       LOGICAL ERR, DOMODEL, DOGC, HASX0, HASY0, HASR0, HASR1, HASNR
       LOGICAL PREPONLY, HASNIT, INTMODEL, ZGOOD, KWMODEL
       INTEGER UPPER, NARGS, IARG, IWORD, JCHAR, IB, ICON, NSKYOPT
       INTEGER NTYPE, NUM, NCHAR, NCOL, NROW, IUNIT, IERR, L, I, J
-      INTEGER ICOS3X, MBITPIX, NBAD, NNONF, IBITPIX
+      INTEGER ICOS3X, MBITPIX, NBAD, NNONF, IBITPIX, ISTAT
       REAL FNUM, SKYVAL, CFV, VX0, VY0, VR0, VR1, VNR, VNIT
 C     --verbose: row-by-row model progress (stubs.f TELLME) and the
 C     profile table even when it is written to a file
@@ -48,6 +50,8 @@ C     ---- Command line: image file, options, ELLIPROF words
       PREPFILE = ' '
       RESFILE = ' '
       MCONV = 'nonzero-good'
+      PRECREQ = 'single'
+      PRECWHY = ' '
       PREPONLY = .FALSE.
       SHVERB = .FALSE.
       INTMODEL = .FALSE.
@@ -76,7 +80,8 @@ C     CFITSIO reports its version as major + minor/100
      $        ARG .EQ. '--mask' .OR. ARG .EQ. '--sky' .OR.
      $        ARG .EQ. '--sc' .OR. ARG .EQ. '--sky-image' .OR.
      $        ARG .EQ. '--prepared' .OR. ARG .EQ. '--residual' .OR.
-     $        ARG .EQ. '--mask-convention') THEN
+     $        ARG .EQ. '--mask-convention' .OR.
+     $        ARG .EQ. '--precision') THEN
          IF (IARG .EQ. NARGS) THEN
             WRITE (0,'(3A)') 'elliprof: error: ', ARG(1:LEN_TRIM(ARG)),
      $           ' needs a value'
@@ -102,6 +107,8 @@ C     CFITSIO reports its version as major + minor/100
             CALL GET_COMMAND_ARGUMENT(IARG, RESFILE)
          ELSE IF (ARG .EQ. '--mask-convention') THEN
             CALL GET_COMMAND_ARGUMENT(IARG, MCONV)
+         ELSE IF (ARG .EQ. '--precision') THEN
+            CALL GET_COMMAND_ARGUMENT(IARG, PRECREQ)
          ELSE
             IF (ARG .EQ. '--sc') WRITE (0,'(A)')
      $           'elliprof: --sc is deprecated, use --sky'
@@ -145,6 +152,15 @@ C     convention before 0.1.4.
          WRITE (0,'(3A)') 'elliprof: error: --mask-convention must be '
      $        //'nonzero-good or zero-good, got "',
      $        MCONV(1:LEN_TRIM(MCONV)), '"'
+         CALL EXIT(1)
+      END IF
+
+C     --precision: the backend.  single is ELLIPROF compiled unchanged
+C     (REAL*4); double is the precision port (src/double) with its own
+C     driver (src/shim/double/main_d.f).
+      IF (PRECREQ .NE. 'single' .AND. PRECREQ .NE. 'double') THEN
+         WRITE (0,'(3A)') 'elliprof: error: --precision must be single'
+     $        //' or double, got "', PRECREQ(1:LEN_TRIM(PRECREQ)), '"'
          CALL EXIT(1)
       END IF
 
@@ -331,7 +347,8 @@ C     would treat them like one of these.
       CALL CHKMODE('COS3X', -3, 2, IERR)
       IF (IERR .EQ. 0) CALL CHKMODE('COS4X', 0, 2, IERR)
       IF (IERR .NE. 0) CALL EXIT(1)
-      IF (SKYSTR .NE. ' ') THEN
+C     (the double driver parses --sky itself, exactly, in double)
+      IF (SKYSTR .NE. ' ' .AND. PRECREQ .EQ. 'single') THEN
          CALL PARSENUM(SKYSTR, SKYVAL, IERR)
          IF (IERR .NE. 0) THEN
             WRITE (0,'(2A)') 'elliprof: error: --sky needs one '
@@ -363,6 +380,20 @@ C     variable names come from the unchanged include files)
       MONSTA = 1
       TTYLUN = 6
       REDIRLUN = 6
+
+C     ---- --precision double: the double backend takes over from here
+
+      IF (PRECREQ .EQ. 'double') THEN
+         IF (DOGC) THEN
+            WRITE (0,'(A)') 'elliprof: error: double-precision GC '
+     $           //'mode is not yet supported (use --precision single)'
+            CALL EXIT(1)
+         END IF
+         CALL ELLIPROFDRV(FITSFILE, PRFFILE, MODFILE, CSVFILE,
+     $        REGFILE, MASKFILE, SKYIMG, SKYSTR, PREPFILE, RESFILE,
+     $        ZGOOD, PREPONLY, DOMODEL, PRECREQ, PRECWHY, ISTAT)
+         CALL EXIT(ISTAT)
+      END IF
 
 C     ---- Read the image into buffer 1 (what RD 1 file does)
 
@@ -716,6 +747,10 @@ C     only for the test is removed again; an existing one is kept.
      $ '  --prepare-only    stop after writing --prepared (no fit)',
      $ '  --verbose         model progress, and the profile table',
      $ '                    even when it is written to a file',
+     $ '  --precision single|double',
+     $ '                    the backend: single (REAL*4, the original',
+     $ '                    ELLIPROF; default) or double (IEEE-754',
+     $ '                    binary64 throughout)',
      $ '  --version         print the backend version'
       RETURN
       END

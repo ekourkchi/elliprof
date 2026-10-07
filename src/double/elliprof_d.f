@@ -77,6 +77,10 @@ C (not implemented)     ALPHA=a         Force position angle to the value a
       include 'vistalink.inc'
       include 'imagelink.inc'
       include 'profile_d.inc'
+C     PRECISION PORT: the normalization exponent (norm_d.inc); POW2D(X,K)
+C     is X * 2**K (src/shim/double/prep_d.f)
+      include 'norm_d.inc'
+      DOUBLE PRECISION POW2D
       double precision data(ncol,nrow)
 
 C       The profile calculations are held in the PRF common block.  The
@@ -219,49 +223,49 @@ C Load up old values for the parameters
          if (word(i) .eq. 'GC') igc = 1
 
          if (word(i)(1:5) .eq. 'DUMP=') then
-            call assignd(word(i),f,parm)
+            call kwvald(word(i),f,parm)
             if (xerr) return
             ktest = nint(f)
          end if
 
          if (word(i)(1:4) .eq. 'AVG=') then
-            call assignd(word(i),f,parm)
+            call kwvald(word(i),f,parm)
             if (xerr) return
             navg = nint(f)
          end if
 
          if (word(i)(1:4) .eq. 'TIE=') then
-            call assignd(word(i),f,parm)
+            call kwvald(word(i),f,parm)
             if (xerr) return
             itie = nint(f)
          end if
 
          if (word(i)(1:3) .eq. 'NR=') then
-            call assignd(word(i),f,parm)
+            call kwvald(word(i),f,parm)
             if (xerr) return
             nrad = nint(f)
          end if
 
          if (word(i)(1:6) .eq. 'COS3X=') then
-            call assignd(word(i),f,parm)
+            call kwvald(word(i),f,parm)
             if (xerr) return
             icos3 = nint(f)
          end if
 
          if (word(i)(1:6) .eq. 'COS4X=') then
-            call assignd(word(i),f,parm)
+            call kwvald(word(i),f,parm)
             if (xerr) return
             icos4 = nint(f)
          end if
 
          if (word(i)(1:6) .eq. 'NITER=') then
-            call assignd(word(i),f,parm)
+            call kwvald(word(i),f,parm)
             if (xerr) return
             niter = nint(f)
          end if
 
          if (word(i)(1:5) .eq. 'RLAW=') then
-            call assignd(word(i),f,parm)
+            call kwvald(word(i),f,parm)
             if (xerr) return
             irlaw = nint(f)
          end if
@@ -269,50 +273,52 @@ C Load up old values for the parameters
          if (word(i) .eq. 'RMSTAR') irmstar = 1
 
          if (word(i)(1:7) .eq. 'FIXCTR=') then
-            call assignd(word(i),f,parm)
+            call kwvald(word(i),f,parm)
             if (xerr) return
             ifixctr = nint(f)
          end if
 
          if (word(i)(1:6) .eq. 'SCALE=') then
-            call assignd(word(i),scale,parm)
+            call kwvald(word(i),scale,parm)
             if (xerr) return
          end if
 
          if (word(i)(1:4) .eq. 'SKY=') then
-            call assignd(word(i),sky,parm)
+            call kwvald(word(i),sky,parm)
             if (xerr) return
             isky = 1
+C     PRECISION PORT: SKY= in internal units
+            sky = pow2d(sky, -knorm)
          end if
 
          if (word(i)(1:3) .eq. 'X0=') then
-            call assignd(word(i),x0,parm)
+            call kwvald(word(i),x0,parm)
             if (xerr) return
          end if
 
          if (word(i)(1:3) .eq. 'Y0=') then
-            call assignd(word(i),y0,parm)
+            call kwvald(word(i),y0,parm)
             if (xerr) return
          end if
 
          if (word(i)(1:3) .eq. 'R0=') then
-            call assignd(word(i),r0,parm)
+            call kwvald(word(i),r0,parm)
             if (xerr) return
          end if
 
          if (word(i)(1:3) .eq. 'R1=') then
-            call assignd(word(i),r1,parm)
+            call kwvald(word(i),r1,parm)
             if (xerr) return
          end if
 
          if (word(i)(1:6) .eq. 'ELLIP=') then
-            call assignd(word(i),f,parm)
+            call kwvald(word(i),f,parm)
             if (xerr) return
             ellip = f
          end if
 
          if (word(i)(1:5) .eq. 'GAIN=') then
-            call assignd(word(i),gain,parm)
+            call kwvald(word(i),gain,parm)
             if (xerr) return
          end if
 
@@ -436,14 +442,19 @@ C      end if
 
       call dvfitd(nrad,buf(1,1),buf(1,3),isky,reff,feff,sky)
       call dvfitd(nrad,buf(1,2),buf(1,3),isky,remin,femin,skymin)
-      write(6,2001) reff, remin, feff, femin, sky, skymin
- 2001 format(1x,'Re =',2f8.1,4x,'Ie =',2f9.1,4x,'Sky =',2f9.1)
+C     PRECISION PORT: Ie and Sky printed in physical units
+      write(6,2001) reff, remin, pow2d(feff,knorm),
+     $     pow2d(femin,knorm), pow2d(sky,knorm),
+     $     pow2d(skymin,knorm)
+ 2001 format(1x,'Re =',2f8.1,4x,'Ie =',2(1x,1pg15.8),4x,
+     $     'Sky =',2(1x,1pg15.8))
 
       IF(ITEST.EQ.1) THEN
          ALPHA = 7.669D0
          DO 21 K = 1,NRAD
             FIT = FEFF*EXP(ALPHA*(1-(PARAM(1,K)/REFF)**.25D0))
-            WRITE(6,*) K, PARAM(1,K), PARAM(4,K), FIT+SKY
+            WRITE(6,*) K, PARAM(1,K), POW2D(PARAM(4,K),KNORM),
+     $           POW2D(FIT+SKY,KNORM)
  21      CONTINUE
       END IF
 
@@ -510,6 +521,10 @@ C     CONST is REAL in /VISCON/ (vistalink.inc) for every unit
       DOUBLE PRECISION AMEDIAND, BCD
       parameter (pi=3.14159265D0, maxstep=360, maxrad=100)
       include 'vistalink.inc'
+C     PRECISION PORT: the normalization exponent (norm_d.inc); POW2D(X,K)
+C     is X * 2**K (src/shim/double/prep_d.f)
+      include 'norm_d.inc'
+      DOUBLE PRECISION POW2D
       double precision data(nx,ny)
       double precision flags(20), par(11,1)
       double precision contour(maxstep), fcoeff(9)
@@ -601,7 +616,8 @@ C Establish the values for the radii, and fill in initial parameters
          end if
          par(2,k) = x0
          par(3,k) = y0
-         par(4,k) = 1000
+C     PRECISION PORT: the fallback I0 = 1000 in physical units
+         par(4,k) = min(pow2d(1000D0, -knorm), huge(1D0))
          do 14 i = 1,10
             angle = alpha + 2.D0*pi*dble(i-1)/10
             ix = min(nx,max(1,nint(par(1,k)*cos(angle) + x0)+1))
@@ -637,8 +653,9 @@ C      end if
          end if
          do 18 k = 1,nrad
             write(6,1000) par(1,k),par(2,k)+ix0,par(3,k)+iy0,
-     $           par(4,k),par(5,k)-90,1-par(6,k),(par(i,k),i=7,11)
- 1000       format(f6.1,2f8.2,f8.0,f7.2,f6.3,2(f7.4,f7.2),f6.2)
+     $           pow2d(par(4,k),knorm),par(5,k)-90,1-par(6,k),(par(i,k),
+     $     i=7,11)
+ 1000       format(f6.1,2f8.2,1pg13.6,0p,f7.2,f6.3,2(f7.4,f7.2),f6.2)
  18      continue
       end if
  1001 format('   r      x0      y0      I0    alpha  ellip',
@@ -791,7 +808,8 @@ C We will NOT accept non-monotonic decreasing profiles
 C Tell us about the latest...
             if(n.eq.niter.or.iverbose.ne.0) then
                write(6,1000) par(1,k),par(2,k)+ix0,par(3,k)+iy0,
-     $              par(4,k),par(5,k)-90,1-par(6,k),(par(i,k),i=7,11)
+     $              pow2d(par(4,k),knorm),par(5,k)-90,1-par(6,k),(par(i,
+     $     k),i=7,11)
             end if
  130     continue
  100  continue
@@ -1332,6 +1350,10 @@ C 1    F12.4,' (+/-',F10.4,')'/)
       common /ellzd/ x0z,x1z,y0z,y1z,thz,dtz,ez0,ez1,r0z,r1z,
      $     xpt,ypt,x0mid,y0mid,camid,samid,epsmid,xp,yp,rmid, neval
       external elliterpd
+C     PRECISION PORT: the normalization exponent (norm_d.inc); POW2D(X,K)
+C     is X * 2**K (src/shim/double/prep_d.f)
+      include 'norm_d.inc'
+      DOUBLE PRECISION POW2D
 
 C     Flags: (1) x0              Param: (1) r (semimajor axis a)
 C          (2) y0                     (2) x0
@@ -1511,8 +1533,11 @@ C      epsilon = eps(n-1) + frac*(eps(n)-eps(n-1))
 
 
 
-      write(6,6725) rmajor, exp(flog), sky, epsilon
- 6725 format('Extrapolated outer isophote: r,f,sky,eps =',3f9.1,f9.3)
+C     PRECISION PORT: f and sky printed in physical units
+      write(6,6725) rmajor, pow2d(exp(flog),knorm),
+     $     pow2d(sky,knorm), epsilon
+ 6725 format('Extrapolated outer isophote: r,f,sky,eps =',
+     $     f9.1,2(1x,1pg15.8),0p,f9.3)
       f0(n+1) = flog
       eps(n+1) = epsilon
 
