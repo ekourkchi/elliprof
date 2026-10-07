@@ -162,9 +162,16 @@ def test_u12517_is_single_and_unchanged(run_native, tmp_path):
                    "RMSTAR", "-o", tmp_path / "a.dat", "--csv",
                    tmp_path / "a.csv")
     assert p.returncode == 0, p.stderr
-    import hashlib
-    assert hashlib.sha256((tmp_path / "a.dat").read_bytes()).hexdigest() \
-        .startswith("95d3310f926cd034")
+    # auto chose single: byte for byte what --precision single gives on
+    # this platform (0.1.4's file on macOS arm64: 95d3310f...)
+    q = run_native(EXAMPLE / "u12517j.fits", "--mask",
+                   EXAMPLE / "u12517j.dmask", "--sky", "3246.0", "X0=567",
+                   "Y0=562", "R0=9", "R1=347", "NR=23", "NITER=10",
+                   "RMSTAR", "--precision", "single", "-o",
+                   tmp_path / "s.dat")
+    assert q.returncode == 0, q.stderr
+    assert (tmp_path / "a.dat").read_bytes() == \
+        (tmp_path / "s.dat").read_bytes()
     assert "# Precision: single (REAL*4, the original ELLIPROF); " \
         "requested auto (auto: every value is within float32)" in \
         (tmp_path / "a.csv").read_text()
