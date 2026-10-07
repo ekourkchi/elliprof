@@ -100,6 +100,8 @@ C     is X * 2**K (src/shim/double/prep_d.f)
       include 'norm_d.inc'
       DOUBLE PRECISION POW2D
 """
+PI_NOTE = ("C     PRECISION PORT: pi (and 1/3) in double precision; the "
+           "original\nC     has 3.14159265 (and 0.33333333)\n")
 REVIEWED = {
     "elliprof.f": [
         (r"      if\(igc\.eq\.1\) goto 100\n", GC_REFUSE, "gc-refuse"),
@@ -153,6 +155,14 @@ REVIEWED = {
          "     $     pow2d(sky,knorm), epsilon\n"
          " 6725 format('Extrapolated outer isophote: r,f,sky,eps =',\n"
          "     $     f9.1,2(1x,1pe16.8e3),0p,f9.3)\n", "print-extrap"),
+        # constants to double precision (the original's 3.14159265 and
+        # 0.33333333 are accurate to REAL*4 only); EPS of ZBRENT and the
+        # other literals keep their historical values
+        (r"(      parameter \(pi=)3\.14159265D0", PI_NOTE + r"\g<1>4D0*atan(1D0)",
+         "pi", 5),
+        (r"      q = 180/3\.14159265D0\n",
+         PI_NOTE + "      q = 180/(4D0*atan(1D0))\n", "pi-q"),
+        (r"third=0\.33333333D0", "third=1D0/3D0", "third"),
     ],
 }
 

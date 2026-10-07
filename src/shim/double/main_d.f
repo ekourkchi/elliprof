@@ -354,11 +354,11 @@ C     double from 4.9E-324 to 1.8E+308 is written readably.
       END
 
 C     PAWRAP (main.f) for the double profile, with the arithmetic of
-C     SYNTHESIZED.
+C     SYNTHESIZED (pi in double precision).
       SUBROUTINE PAWRAPD(N, PRM, K)
       INTEGER N, K, I
       DOUBLE PRECISION PRM(12,*), TH, THPREV, D, PI, Q
-      PARAMETER (PI=3.14159265D0)
+      PARAMETER (PI=4D0*ATAN(1D0))
       Q = 180/PI
       K = 0
       THPREV = (PRM(5,1) + 90) / Q

@@ -134,7 +134,9 @@ C         (17) gain
 
 C       Initialize parameters and look for keywords
 
-      q = 180/3.14159265D0
+C     PRECISION PORT: pi (and 1/3) in double precision; the original
+C     has 3.14159265 (and 0.33333333)
+      q = 180/(4D0*atan(1D0))
       ktest = -1
       itest = 0
       iverbose = 0
@@ -519,7 +521,9 @@ C     original is omitted here; see the GC guard above.
 C     CONST is REAL in /VISCON/ (vistalink.inc) for every unit
       REAL CONST
       DOUBLE PRECISION AMEDIAND, BCD
-      parameter (pi=3.14159265D0, maxstep=360, maxrad=100)
+C     PRECISION PORT: pi (and 1/3) in double precision; the original
+C     has 3.14159265 (and 0.33333333)
+      parameter (pi=4D0*atan(1D0), maxstep=360, maxrad=100)
       include 'vistalink.inc'
 C     PRECISION PORT: the normalization exponent (norm_d.inc); POW2D(X,K)
 C     is X * 2**K (src/shim/double/prep_d.f)
@@ -823,7 +827,9 @@ C Tell us about the latest...
 
       subroutine getcontourd(par,iterp,nstep,contour,nx,ny,data,navg)
       IMPLICIT DOUBLE PRECISION (A-H,O-Z)
-      parameter (pi=3.14159265D0)
+C     PRECISION PORT: pi (and 1/3) in double precision; the original
+C     has 3.14159265 (and 0.33333333)
+      parameter (pi=4D0*atan(1D0))
       double precision contour(nstep), data(nx,ny), par(11)
 C Fill in the contour array at evenly spaced theta
 C Use DATA = 0 as a flag for non-existent data
@@ -959,7 +965,9 @@ C Omit a contour if more than 20% of the weights are bad.
 
       subroutine fitcontourd(nstep,contour,icos3,fcoeff)
       IMPLICIT DOUBLE PRECISION (A-H,O-Z)
-      parameter (pi=3.14159265D0)
+C     PRECISION PORT: pi (and 1/3) in double precision; the original
+C     has 3.14159265 (and 0.33333333)
+      parameter (pi=4D0*atan(1D0))
       parameter (nterm=9)
       double precision contour(nstep), fcoeff(nterm)
       double precision v(nterm), term(nterm), a(nterm,nterm)
@@ -1061,7 +1069,9 @@ C Back substitute to solve for parameters
       subroutine alterd(par,ifixctr,ifitlog,ellip,fcoeff,gain)
       IMPLICIT DOUBLE PRECISION (A-H,O-Z)
       DOUBLE PRECISION AMODDERD
-      parameter (pi=3.14159265D0)
+C     PRECISION PORT: pi (and 1/3) in double precision; the original
+C     has 3.14159265 (and 0.33333333)
+      parameter (pi=4D0*atan(1D0))
       double precision par(11), fcoeff(9)
       q = 180/pi
       r = par(1)
@@ -1336,7 +1346,9 @@ C 1    F12.4,' (+/-',F10.4,')'/)
      $     icos3,icos4,nx,ny,data,navg)
       IMPLICIT DOUBLE PRECISION (A-H,O-Z)
       DOUBLE PRECISION AMEDIAND, ZBRENTD, ELLITERPD
-      parameter (pi=3.14159265D0, maxr=360, third=0.33333333D0,
+C     PRECISION PORT: pi (and 1/3) in double precision; the original
+C     has 3.14159265 (and 0.33333333)
+      parameter (pi=4D0*atan(1D0), maxr=360, third=1D0/3D0,
      $     maxiter=10)
       double precision data(nx,ny)
       double precision contour(maxr)
