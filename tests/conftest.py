@@ -41,6 +41,16 @@ def maskinfo():
     return path
 
 
+@pytest.fixture(scope="session")
+def rangeprobe():
+    """build/rangeprobe: the double backend's range-protected routines."""
+    name = "rangeprobe.exe" if os.name == "nt" else "rangeprobe"
+    path = ROOT / "build" / name
+    if not path.is_file():
+        pytest.skip("build/rangeprobe not built (run `make tools`)")
+    return path
+
+
 @pytest.fixture
 def run_native(native):
     """Run the backend; returns the CompletedProcess."""

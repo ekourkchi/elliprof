@@ -171,6 +171,43 @@ C Omit a contour if more than 20% of the weights are bad.
             contour(i) = pixmax*(pixtot/(ntot-nbadtot)) - f0
             end if
 """
+BILINEAR = """\
+C     PRECISION PORT (R4): the historical sum below, unless the four
+C     pixels and f0 are finite and one of them exceeds HUGE/4.  Below
+C     that every partial sum is at most HUGE/4 + HUGE/4*(1+4 eps), so
+C     the historical arithmetic cannot overflow; above it, it can
+C     (weights rounded to a sum just over 1 with pixels at +-DBL_MAX,
+C     or -f0 added first).  Then: the same weighted sum P of the
+C     pixels/4 (an exact scaling), clamped to [min, max] of the four
+C     pixels/4 -- P is a convex combination, so only the rounding of
+C     the weights can move it outside -- minus f0/4, times 4 (exact).
+C     A contour beyond the double range stays +-Inf, as before.
+            p00 = data(ix,iy)
+            p10 = data(ix+1,iy)
+            p01 = data(ix,iy+1)
+            p11 = data(ix+1,iy+1)
+            if(finited(p00).and.finited(p10).and.finited(p01).and.
+     $           finited(p11).and.finited(f0)) then
+               pbig = max(abs(p00),abs(p10),abs(p01),abs(p11),abs(f0))
+            else
+               pbig = 0
+            end if
+            if(pbig.le.0.25D0*huge(1D0)) then
+            contour(i) = -f0 +
+     $           (x-ix+0.5D0)*(y-iy+0.5D0)*data(ix+1,iy+1) +
+     $           (ix+0.5D0-x)*(y-iy+0.5D0)*data(ix,iy+1) +
+     $           (x-ix+0.5D0)*(iy+0.5D0-y)*data(ix+1,iy) +
+     $           (ix+0.5D0-x)*(iy+0.5D0-y)*data(ix,iy)
+            else
+               pint = (x-ix+0.5D0)*(y-iy+0.5D0)*(0.25D0*p11) +
+     $              (ix+0.5D0-x)*(y-iy+0.5D0)*(0.25D0*p01) +
+     $              (x-ix+0.5D0)*(iy+0.5D0-y)*(0.25D0*p10) +
+     $              (ix+0.5D0-x)*(iy+0.5D0-y)*(0.25D0*p00)
+               pint = max(pint, 0.25D0*min(p00,p10,p01,p11))
+               pint = min(pint, 0.25D0*max(p00,p10,p01,p11))
+               contour(i) = 4*(pint - 0.25D0*f0)
+            end if
+"""
 REVIEWED = {
     "elliprof.f": [
         (r"      if\(igc\.eq\.1\) goto 100\n", GC_REFUSE, "gc-refuse"),
@@ -290,8 +327,22 @@ REVIEWED = {
          AVGSAFE, "avg-sum"),
         (r"(      subroutine getcontourd\(par,iterp,nstep,contour,nx,ny,"
          r"data,navg\)\n      IMPLICIT DOUBLE PRECISION \(A-H,O-Z\)\n)",
-         r"\1C     PRECISION PORT: the AVG range test\n      LOGICAL SAFE\n",
-         "avg-logical"),
+         r"\1C     PRECISION PORT: the AVG range test, the R4 finite test\n"
+         r"      LOGICAL SAFE, FINITED\n", "avg-logical"),
+        # R4: the bilinear sum (NAVG = 0) can overflow for finite pixels
+        # within HUGE/4 of DBL_MAX while the interpolation is finite:
+        # only there (predicted, before any Inf) the same sum on the
+        # pixels/4, clamped to their hull, minus f0/4, times 4
+        (r"            contour\(i\) = -f0 \+ \n"
+         r"     \$           \(x-ix\+0\.5D0\)\*\(y-iy\+0\.5D0\)\*"
+         r"data\(ix\+1,iy\+1\) \+ \n"
+         r"     \$           \(ix\+0\.5D0-x\)\*\(y-iy\+0\.5D0\)\*"
+         r"data\(ix,iy\+1\) \+ \n"
+         r"     \$           \(x-ix\+0\.5D0\)\*\(iy\+0\.5D0-y\)\*"
+         r"data\(ix\+1,iy\) \+ \n"
+         r"     \$           \(ix\+0\.5D0-x\)\*\(iy\+0\.5D0-y\)\*"
+         r"data\(ix,iy\)\n",
+         lambda m: BILINEAR, "bilinear-range"),
     ],
 }
 
