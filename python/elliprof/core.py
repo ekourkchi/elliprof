@@ -27,6 +27,8 @@ NCON = 16      # ELLIPROF reads at most 16 keywords
 NR_MAX = 100   # ELLIPROF's fitting arrays hold at most 100 isophotes
 NITER_MAX = 1000
 UNSUPPORTED = ("OLD", "EDIT", "TV")  # interactive or stateful options
+DEFAULT_NITER = 5  # ELLIPROF's own default (src/original/elliprof.f)
+MASK_CONVENTIONS = ("nonzero-good", "zero-good")
 
 
 class ElliprofError(RuntimeError):
@@ -121,8 +123,13 @@ def _parse_words(words: Sequence[str]) -> Dict[str, Optional[str]]:
     return out
 
 
-def validate_keywords(words: Sequence[str]) -> None:
-    """Refuse anything ELLIPROF would handle badly, before it runs."""
+def validate_keywords(words: Sequence[str], wants_model: bool = False
+                      ) -> None:
+    """Refuse anything ELLIPROF would handle badly, before it runs.
+
+    ``wants_model``: a model image will be written (``-m`` or
+    ``--residual``), for which the backend adds ELLIPROF's MODEL keyword
+    itself; it counts towards the keyword limit."""
     kw = _parse_words(words)
     for key in UNSUPPORTED:
         if key in kw:
@@ -130,9 +137,14 @@ def validate_keywords(words: Sequence[str]) -> None:
                              "stateful option)")
     if "X0" in kw or "Y0" in kw:
         raise ValueError("give the centre as x0=, y0=, not as keywords")
-    if len(words) + 2 > NCON:
+    if "MODEL" in kw and kw["MODEL"] is not None:
+        raise ValueError("MODEL takes no value; write the model image "
+                         "with -m FILE (Python API: model_path=...)")
+    n = len(words) + 2 + (1 if wants_model and "MODEL" not in kw else 0)
+    if n > NCON:
         raise ValueError(f"ELLIPROF accepts at most {NCON} keywords "
-                         f"including X0 and Y0; got {len(words) + 2}")
+                         f"including X0 and Y0 (and MODEL, which -m and "
+                         f"--residual add); got {n}")
     gc = "GC" in kw
     need = ("NR",) if gc else ("R0", "R1", "NR")
     missing = [k for k in need if k not in kw]
@@ -258,7 +270,8 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
                  cos4x=None, tie=None, avg=None, gain=None, gc=False,
                  verbose=False, extra: Iterable[str] = (),
                  model_harmonics=None, harmonic_mode=None,
-                 sixth_order=False, load_profile: bool = True,
+                 sixth_order=False, mask_convention: str = "nonzero-good",
+                 load_profile: bool = True,
                  output_dir: Optional[PathLike] = None,
                  prefix: Optional[str] = None,
                  prf_path: Optional[PathLike] = None,
@@ -279,8 +292,16 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
     x = i - 0.5.  ELLIPROF refines the centre of every isophote.
 
     Preparation, in this order: subtract ``sky`` (a number) or
-    ``sky_image`` (a FITS image of the same size), then multiply by
-    ``mask`` (0 = masked, 1 = good; legacy BITPIX=1 masks supported).
+    ``sky_image`` (a FITS image of the same size), then set the bad
+    pixels of ``mask`` to 0.  The mask is logical.  With
+    ``mask_convention="nonzero-good"`` (the default) a pixel is good if
+    its value is finite and nonzero (0 = masked); with ``"zero-good"`` it
+    is good if its value is exactly 0 (any nonzero value = masked).  NaN,
+    Inf and undefined pixels are bad in both.  Legacy BITPIX=1 masks
+    (.dmask) are supported with the default convention.
+
+    ``niter`` (ELLIPROF's NITER, default 5): the number of iterations
+    of the isophote fit.
 
     ``r0``, ``r1``, ``nr`` are required (0 < r0 < r1, 2 <= nr <= 100).
     ``elliprof_sky`` is ELLIPROF's own ``SKY=`` keyword, used only in its
@@ -296,18 +317,24 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
     those original values can be given directly as ``cos3x``/``cos4x``
     instead (see :mod:`elliprof.harmonics`).
 
-    Output files (.prf, .csv, .reg, and the model FITS with
-    ``model=True``) go to ``output_dir`` (a new temporary directory by
-    default), named after ``prefix`` (default: the image name), unless
-    explicit paths are given.
+    Output files (the text profile, .csv, .reg, and the model FITS)
+    go to ``output_dir`` (a new temporary directory by default), named
+    after ``prefix`` (default: the image name), unless explicit paths
+    are given.  The model image is computed and written whenever
+    ``model_path`` is given (``model=True`` alone writes it to
+    ``<prefix>_model.fits``); no separate MODEL keyword is needed.
+    File names are free: extensions are never checked or added.
+
+    ``image`` may be stored with any FITS BITPIX (8, 16, 32, 64, -32,
+    -64); its pixels are converted to 32-bit floating point, the
+    precision ELLIPROF works in.
 
     ``image``, ``mask`` and ``sky_image`` may select a FITS extension with
     CFITSIO syntax, e.g. ``"galaxy.fits[SCI]"`` or ``"galaxy.fits[1]"``;
     the selected HDU is fitted and its header (WCS included) is given to
     every image written: the model (``model``/``model_path``), the
     prepared image (``prepared``) and the residual (``residual_path``, =
-    mask x (science - sky - model), which implies the model).  Masks are
-    logical: 0, NaN, Inf or undefined = bad, any other value = good.
+    mask x (science - sky - model), which implies the model).
 
     ``result.profile`` is a pandas DataFrame; ``load_profile=False`` skips
     it (and never imports pandas), for callers that only need the files.
@@ -334,6 +361,11 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
         sky_path, sky_sel = _fits_spec(sky_image, "sky image")
     if mask is not None:
         mask_path, mask_sel = _fits_spec(mask, "mask")
+    if mask_convention not in MASK_CONVENTIONS:
+        raise ValueError("mask_convention must be 'nonzero-good' or "
+                         f"'zero-good', got {mask_convention!r}")
+    if mask_convention != "nonzero-good" and mask is None:
+        raise ValueError("mask_convention needs a mask")
     if timeout is not None and not _finite(timeout, "timeout") > 0:
         raise ValueError("timeout must be positive (or None)")
     extra = list(extra)
@@ -346,12 +378,16 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
                              "an option)")
     cos3x, cos4x = harmonic_settings(model_harmonics, harmonic_mode,
                                      sixth_order, cos3x=cos3x, cos4x=cos4x)
+    # The model is requested by giving its file (model_path, or
+    # model=True for a default name); the backend then adds ELLIPROF's
+    # MODEL keyword itself, so it is never passed here.
     words = elliprof_keywords(
         r0=r0, r1=r1, nr=nr, niter=niter, rlaw=rlaw, linear=linear,
         fixctr=fixctr, ellip=ellip, scale=scale, elliprof_sky=elliprof_sky,
-        model=model, rmstar=rmstar, cos3x=cos3x, cos4x=cos4x, tie=tie,
+        model=False, rmstar=rmstar, cos3x=cos3x, cos4x=cos4x, tie=tie,
         avg=avg, gain=gain, gc=gc, verbose=verbose, extra=extra)
-    validate_keywords(words)
+    validate_keywords(words, wants_model=bool(
+        model or model_path is not None or residual_path is not None))
 
     # ---- output files
     made_tmp = output_dir is None
@@ -384,6 +420,8 @@ def run_elliprof(image: PathLike, x0: float, y0: float, *,
         cmd += ["--sky-image", str(sky_path) + sky_sel]
     if mask is not None:
         cmd += ["--mask", str(mask_path) + mask_sel]
+        if mask_convention != "nonzero-good":
+            cmd += ["--mask-convention", mask_convention]
     for flag, path in (("-o", prf), ("--csv", csv), ("--reg", reg),
                        ("-m", mdl), ("--residual", res)):
         if path is not None:

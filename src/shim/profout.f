@@ -88,8 +88,12 @@ C     MASK and SKY describe the preparation ('none' if not used).
      $ 'ix-0.5,'//
      $ ' plus image origin (DS9 image x = x0 - CNPIX1 + 0.5)',
      $ '# alpha: position angle; major axis at alpha+90 deg CCW '//
-     $ 'from +x',
-     $ '#'
+     $ 'from +x'
+C     6th-order mode (COS3X < 0): the I3/A3 columns hold the 6th order
+      IF (PARAM_PRF(12,15) .LT. 0) WRITE (7,'(A)')
+     $ '# Harmonic order: 6 (COS3X < 0): I3 = 6th-order amplitude, '//
+     $ 'A3 = 2 x 6th-order phase (deg); there is no 3rd-order term'
+      WRITE (7,'(A)') '#'
       WRITE (7,1002) '#', 'Rmaj', 'x0', 'y0', 'I0', 'alpha', 'ellip',
      $     'I3', 'A3', 'I4', 'A4', 'slope'
  1002 FORMAT (A1,A9,', ',A10,', ',A10,', ',A15,', ',A10,', ',A10,

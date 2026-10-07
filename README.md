@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://ekourkchi.github.io/elliprof/"><img src="docs/assets/elliprof_banner.png" width="100%" alt="ELLIPROF: an HST image of the elliptical galaxy UGC 12517 with its fitted elliptical isophotes drawn over it, fading into the residual image left after the model is subtracted, next to the words ELLIPROF, galaxy isophote fitting"></a>
+  <a href="https://ekourkchi.github.io/elliprof/"><img src="https://raw.githubusercontent.com/ekourkchi/elliprof/main/docs/assets/elliprof_banner.png" width="100%" alt="ELLIPROF: an HST image of the elliptical galaxy UGC 12517 with its fitted elliptical isophotes drawn over it, fading into the residual image left after the model is subtracted, next to the words ELLIPROF, galaxy isophote fitting"></a>
 </p>
 
 <p align="center">
@@ -38,6 +38,34 @@ It describes a galaxy as a set of nested ellipses, so it is not necessarily the 
 
 **You supply the initial galaxy centre** (`X0`, `Y0`). elliprof does not find the galaxy centre for you. Starting from your centre, ELLIPROF refines the centre of every isophote as part of its normal fit.
 
+## Example: UGC 12517 (HST WFC3/IR)
+
+A real elliptical galaxy, fitted with the command in [examples/u12517](https://github.com/ekourkchi/elliprof/tree/main/examples/u12517): the observed image, the fitted isophotes, the ELLIPROF model (`-m`) and the residual (`--residual`, image − sky − model; masked pixels grey).
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ekourkchi/elliprof/main/docs/assets/hero_u12517.png" width="100%" alt="Four panels for UGC 12517: the observed galaxy with foreground stars and background galaxies; the same image with the fitted elliptical isophotes drawn over it; the smooth ELLIPROF model of the galaxy; and the residual image in red and blue, with masked stars and galaxies in grey.">
+</p>
+
+The model shown with the same brightness scale as the sky-subtracted image. It contains only the galaxy, and it also covers the masked regions:
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ekourkchi/elliprof/main/docs/assets/model_vs_science.png" width="75%" alt="Left: the sky-subtracted image of UGC 12517 with stars and background galaxies. Right: the ELLIPROF model, a smooth elliptical light distribution, on the same brightness scale.">
+</p>
+
+The residual, over the whole image and in the central 320 × 320 pixels. What is left is pixel noise, the galaxy's surface-brightness fluctuations, faint sources that the mask did not cover, and a small pattern at the very centre:
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ekourkchi/elliprof/main/docs/assets/residual_zoom.png" width="75%" alt="Left: the whole residual image of UGC 12517 in red and blue, with masked regions grey and a box around the centre. Right: the central 320 by 320 pixels enlarged, showing grainy fluctuations and a few unmasked faint sources.">
+</p>
+
+The fitted profile: intensity, ellipticity, position angle and the 4th-order (boxy/disky) amplitude against semi-major axis:
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ekourkchi/elliprof/main/docs/assets/hero_profiles.png" width="100%" alt="Four plots against semi-major axis in pixels, for UGC 12517: the isophote intensity I0 falling from about 4.5 times 10 to the 5 to about 1500 image units; the ellipticity between about 0.17 and 0.26; the position angle within a few degrees; and the 4th-order amplitude I4 between 0.001 and 0.011.">
+</p>
+
+The image is in measured detector units; no calibrated surface brightness is implied.
+
 ## Installation
 
 ```sh
@@ -54,6 +82,15 @@ elliprof            # a short introduction
 elliprof -v         # version (also --version)
 elliprof -h         # full help: parameters, options and examples (also --help)
 ```
+
+### Updating
+
+```sh
+elliprof --check-update   # is a newer version on PyPI? (installs nothing)
+elliprof --update         # install it (also: elliprof -u)
+```
+
+`elliprof --update` runs `python -m pip install --upgrade elliprof` with the same Python that runs elliprof. In a conda environment or a system Python that pip may not change ("externally managed"), update elliprof the way it was installed. After a fit in an interactive terminal, elliprof checks PyPI at most once a day, in the background, and prints one line when a newer version exists. It never installs anything by itself, never delays a fit, and stays silent offline and in scripts. Set `ELLIPROF_NO_UPDATE_CHECK=1` to turn the check off.
 
 ### Compatibility
 
@@ -154,39 +191,48 @@ For a heavily aged environment, the safest solution is a fresh environment for e
 ## Quick start
 
 ```sh
-elliprof galaxy.fits \
-    X0=500 Y0=500 \
-    R0=5 R1=200 NR=30 \
-    --csv profile.csv \
-    --reg profile.reg
+elliprof n1234j.fits \
+    RMSTAR \
+    X0=514 Y0=514 \
+    R0=10 R1=450 NR=25 NITER=5 \
+    -o n1234.dat \
+    -m n1234.prf
 ```
 
 - `X0`, `Y0`: initial galaxy centre, in pixels (see [Coordinates](#coordinates)).
 - `R0`, `R1`: the range of semi-major axes to fit, in pixels (0 < R0 < R1).
 - `NR`: number of isophotes (2–100), including R0 and R1, spaced evenly in r^¼ by default (`RLAW=1` for logarithmic, `RLAW=0` for linear spacing).
-- `profile.csv`: the radial profile, one row per isophote.
-- `profile.reg`: the fitted ellipses as a DS9 region file. View them with `ds9 galaxy.fits -regions profile.reg`.
+- `NITER`: number of fitting iterations (default 5; `--niter 5` is the same).
+- `RMSTAR`: ignore star-like bright samples along each ellipse.
+- `-o n1234.dat`: the profile, a text table with one set of values per isophote.
+- `-m n1234.prf`: the galaxy **model image** (FITS). Giving `-m FILE` is all that is needed to compute and write the model.
+
+The names follow the traditional ELLIPROF convention, `.dat` for the profile and `.prf` for the FITS model. They are only names: elliprof never checks or adds file extensions, so `-m model.fits` works just as well.
+
+Add `--csv n1234.csv` for the profile as a CSV table, and `--reg n1234.reg` for the fitted ellipses as a DS9 region file (`ds9 n1234j.fits -regions n1234.reg`).
 
 ### Profile files and images
 
 elliprof produces two different kinds of result:
 
-- **The profile** (`-o profile.prf`, `--csv profile.csv`): numbers, one set per fitted isophote (radius, centre, intensity, position angle, ellipticity, harmonic terms, slope). The `.prf` is ELLIPROF's native profile format at full precision, with the run settings. **It is a table of numbers, not an image.** The CSV holds the same profile as a readable table.
-- **Images** (FITS, float32):
-  - **model** (`MODEL -m model.fits`): the galaxy reconstructed from the fitted isophotes. It follows the fitted intensity, centre, ellipticity and position angle with radius, plus the harmonic terms chosen with `--model-harmonics`. It is relative to the subtracted sky, and it covers masked pixels too.
+- **The profile** (`-o n1234.dat`, `--csv n1234.csv`): numbers, one set per fitted isophote (radius, centre, intensity, position angle, ellipticity, harmonic terms, slope). The `-o` file is ELLIPROF's native text profile format at full precision, with the run settings. **It is a table of numbers, not an image.** (Older elliprof documentation called this file `.prf`; in the traditional naming used here, `.prf` is the model image.) The CSV holds the same profile as a readable table.
+- **Images** (FITS, 32-bit floating point):
+  - **model** (`-m n1234.prf`): the galaxy reconstructed from the fitted isophotes. It follows the fitted intensity, centre, ellipticity and position angle with radius, plus the harmonic terms chosen with `--model-harmonics`. It is relative to the subtracted sky, and it covers masked pixels too. The model is computed after the fit, so it never changes the profile.
   - **prepared** (`--prepared prepared.fits`): `mask × (science − sky)`, the image exactly as ELLIPROF fits it.
   - **residual** (`--residual residual.fits`): `mask × (science − sky − model)`. It is science − sky − model on good pixels and exactly 0 on masked ones. It uses the same model as `-m`; `-m` is not needed.
 
 ```sh
-elliprof galaxy.fits \
-    --mask mask.fits \
+elliprof n1234j.fits \
+    --mask n1234_mask.fits \
     --sky 1234.5 \
-    X0=500 Y0=500 R0=5 R1=200 NR=30 \
-    MODEL -m galaxy_model.fits \
-    --prepared galaxy_prepared.fits \
-    --residual galaxy_residual.fits \
-    -o galaxy.prf
+    X0=514 Y0=514 R0=10 R1=450 NR=25 \
+    -o n1234.dat \
+    -m n1234.prf \
+    --prepared n1234_prepared.fits \
+    --residual n1234_residual.fits
 ```
+
+**The `MODEL` keyword is no longer needed.** Before version 0.1.4 the model needed both `MODEL` and `-m FILE`. Now `-m FILE` alone computes and writes the model. A bare `MODEL` in an old command is still accepted and has no effect (a note says so). `MODEL=filename` is an error: the model file is named only with `-m`.
 
 All three images carry the header of the science image, including its WCS (`CTYPE`, `CRPIX`, `CRVAL`, `CD`/`PC`/`CDELT`, distortion terms), `BUNIT` and the other keywords. Only the cards that describe how the science data were stored are left out, such as `BITPIX`, `BSCALE`, `BZERO` and `BLANK`. The science, model, prepared and residual images therefore overlay exactly in DS9 and other WCS-aware software.
 
@@ -200,10 +246,14 @@ An image in an extension is selected with CFITSIO syntax, by name or number. Quo
 elliprof 'galaxy.fits[SCI]' \
   X0=500 Y0=500 \
   R0=5 R1=200 NR=30 \
-  -o galaxy.prf
+  -o galaxy.dat
 ```
 
-Only the selected HDU is fitted, and its header and WCS go into the model, prepared and residual images. elliprof never falls back to another HDU; if the selected one is not a 2-D image, it stops with an error. `--mask` and `--sky-image` accept the same syntax, for example `--mask 'products.fits[MASK]'`.
+Only the selected HDU is fitted, and its header and WCS go into the model, prepared and residual images. elliprof never falls back to another HDU; if the selected one is not a 2-D image, it stops with an error. `--mask` and `--sky-image` accept the same syntax, for example `--mask 'products.fits[MASK]'`. Tile-compressed images are read too.
+
+### Image data types, including 64-bit
+
+The science image may be stored with any FITS data type: integers (`BITPIX` 8, 16, 32, 64) or floating point (`BITPIX` −32, −64), with `BSCALE`/`BZERO` applied. ELLIPROF itself computes in 32-bit floating point, and that is not changed, so the pixel values are converted to the nearest 32-bit float as they are read. The same values stored as 32-bit or 64-bit therefore give identical results. A 64-bit value that a 32-bit float cannot hold exactly is used as its nearest 32-bit float, and a value beyond the 32-bit range (about 3.4 × 10³⁸) is refused with an error. The summary notes the conversion for 64-bit images. The model, residual and prepared images are always written as 32-bit floating point.
 
 ### Sky and masks
 
@@ -235,63 +285,56 @@ elliprof galaxy.fits \
     R0=5 R1=200 NR=30
 ```
 
-- The mask is **logical**. **0 = bad / ignored**; any other finite value (1, 2, −1, 0.5, …) = good; NaN, ±Inf and undefined (`BLANK`) pixels = bad. The values are never used as weights: bad pixels become exactly 0 and good pixels keep their value.
-- Masks may be FITS images of any type (`BITPIX` 8, 16, 32, 64, −32, −64) or legacy `.dmask` bitmaps (`BITPIX = 1`). The type is recognised from the file itself, not from its name.
+The mask is **logical**: each pixel is either good (used) or bad (ignored). Its values are never used as weights: bad pixels become exactly 0 and good pixels keep their value. Two conventions are supported.
+
+| Mask value | default: `--mask-convention nonzero-good` | `--mask-convention zero-good` |
+|---|---|---|
+| 0 | **bad** (ignored) | **good** (used) |
+| any other finite value (1, 2, −1, 0.5, …) | **good** | **bad** |
+| NaN, ±Inf, undefined (`BLANK`) | bad | bad |
+
+The default is ELLIPROF's convention, unchanged. `zero-good` is the opposite convention, common for bad-pixel maps, data-quality arrays and segmentation maps, where 0 marks a clean pixel:
+
+```sh
+elliprof galaxy.fits \
+    --mask segmentation.fits --mask-convention zero-good \
+    X0=500 Y0=500 R0=5 R1=200 NR=30
+```
+
+- Masks may be FITS images of any type (`BITPIX` 8, 16, 32, 64, −32, −64) or legacy `.dmask` bitmaps (`BITPIX = 1`). The type is recognised from the file itself, not from its name. The test for 0 is made on the value as stored, at full precision.
+- A legacy `.dmask` bitmap always means 1 = good, so `--mask-convention zero-good` is refused for it.
 - The mask and the sky image must have exactly the same dimensions as the science image. Nothing is ever resized, interpolated, cropped, padded, shifted or reprojected.
 - The image is prepared as `mask × (science − sky)`, and ELLIPROF ignores pixels that are exactly 0.
 
-## Harmonic terms: boxy and disky isophotes
+## Harmonic analysis
 
-Along each fitted ellipse, ELLIPROF fits the intensity with a constant plus cos/sin terms of 1, 2, 3 and 4 times the angle around the ellipse. The 1st- and 2nd-order terms move the centre and change the ellipticity and position angle until the ellipse follows the isophote. The **3rd- and 4th-order terms are always fitted and reported** (`I3`, `A3`, `I4`, `A4`). They measure how the isophote departs from a pure ellipse, but they never change the ellipse itself.
+Along each fitted ellipse, ELLIPROF also measures how the isophote departs from a pure ellipse, as harmonic terms of the eccentric angle θ: `I/I0 ≈ 1 + In cos n(θ − An)`.
 
-The 4th-order term is the familiar measure of **boxy** or **disky** isophotes:
+- **4th order** (`I4`, `A4`): always measured. The classic **boxy/disky** term: `A4` near 0° (≡ 90°) is disky, near 45° boxy. To first order, `a4/a ≈ I4 × cos(4 × A4) / (−slope)`.
+- **3rd order** (`I3`, `A3`): measured by default, for lopsided (egg-shaped) isophotes.
+- **6th order**, optional, measured *instead of* the 3rd. There are no I6/A6 columns: `I3` then holds the 6th-order amplitude and `A3` twice its phase.
 
-- `A4` near **0°** (or 90°, which is the same phase): extra light along the major and minor axes, so the isophote is pointed along its axes: **disky**.
-- `A4` near **45°**: extra light along the diagonals: **boxy**.
-- `I4` is the size of the deviation.
+Separately, you choose which measured terms go into the **model image**: none, the median over all isophotes, or each isophote's own. This changes only the model and the residual, never the profile. Both the original concise settings and descriptive options are supported and run the same code:
 
-`I4` is an intensity amplitude, **not** the conventional radial a4/a (and not B4). To first order, the conventional radial coefficient is
+| Original | Measured | In the model | Modern equivalent of this value |
+|---|---|---|---|
+| `COS3X=2` | 3rd order | each isophote | 3 in `--model-harmonics` (default) |
+| `COS3X=1` | 3rd order | median | 3 in `--model-harmonics`, with `--harmonic-mode median` |
+| `COS3X=0` | 3rd order | none | 3 not in `--model-harmonics` |
+| `COS3X=-2` | 6th order | each isophote | `--sixth-order`, 6 in `--model-harmonics` (default) |
+| `COS3X=-1` | 6th order | median | `--sixth-order`, 6 in `--model-harmonics`, with `--harmonic-mode median` |
+| `COS3X=-3` | 6th order | none | `--sixth-order`, 6 not in `--model-harmonics` |
+| `COS4X=2` / `1` / `0` | 4th order | each / median / none | 4 in `--model-harmonics` / with `--harmonic-mode median` / 4 not in it |
 
-```text
-a4/a  ≈  I4 × cos(4 × A4) / (−slope)
-```
+The modern options set both values at once (for example `--model-harmonics 4` is `COS3X=0 COS4X=2`, and `--sixth-order --model-harmonics none` is `COS3X=-3 COS4X=0`); the documentation lists every pair.
 
-This is positive for disky and negative for boxy isophotes. On synthetic galaxies with a4/a = ±0.030 it gives ±0.030.
+A 6th-order term *in the model* has a known limitation of the original code when the fitted position angle wraps across 0°/180° (elliprof warns). `COS3X=-3` measures the 6th order without modelling it.
 
-### Choosing which harmonic terms go into the model image
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ekourkchi/elliprof/main/docs/assets/model_harmonics.png" width="85%" alt="Three panels for UGC 12517: the model with no harmonic terms; the difference between the model with the 4th-order term and the pure-ellipse model, a four-fold pattern near the centre; and the same for the 3rd- and 4th-order terms together.">
+</p>
 
-The original ELLIPROF controls the harmonics through `COS3X` and `COS4X`. These choose which measured terms are included when ELLIPROF builds a **model image** (`MODEL`, `-m model.fits`). They do not change the fitted profile. elliprof exposes them as options:
-
-| Option | Model image contains | ELLIPROF setting |
-|---|---|---|
-| (default) | 3rd- and 4th-order terms, each isophote's own values | `COS3X=2 COS4X=2` |
-| `--model-harmonics none` | pure ellipses, no harmonic terms | `COS3X=0 COS4X=0` |
-| `--model-harmonics 3` | 3rd-order term only | `COS3X=2 COS4X=0` |
-| `--model-harmonics 4` | 4th-order term only (boxy/disky shape) | `COS3X=0 COS4X=2` |
-| `--model-harmonics 3,4` | both (same as the default) | `COS3X=2 COS4X=2` |
-| add `--harmonic-mode median` | the median of each term over all isophotes, instead of each isophote's own | 1 instead of 2 |
-
-Examples:
-
-```sh
-# model of pure ellipses
-elliprof galaxy.fits X0=500 Y0=500 R0=5 R1=200 NR=30 \
-    MODEL -m model.fits --model-harmonics none
-
-# model with the boxy/disky (4th-order) structure only
-elliprof galaxy.fits X0=500 Y0=500 R0=5 R1=200 NR=30 \
-    MODEL -m model.fits --model-harmonics 4
-```
-
-Subtracting such a model from the image shows the structure that the chosen terms do not describe. For example, a residual made with the pure-ellipse model reveals boxy or disky light directly.
-
-**6th order instead of 3rd.** `--sixth-order` (ELLIPROF's `COS3X < 0`) fits and models the 6th-order term in place of the 3rd. This is the only harmonic setting that changes the fit. The `I3` and `A3` columns then hold the 6th-order amplitude, and a phase equal to twice the 6th-order phase (0–120°).
-
-```sh
-elliprof galaxy.fits X0=500 Y0=500 R0=5 R1=200 NR=30 --sixth-order
-```
-
-The original keywords work too, for those who know them from the original program: `COS3X=` (−2 to 2) and `COS4X=` (0 to 2). Use either the keywords or the options, not both.
+The full treatment is on the documentation site: conventions, phases, the a4/a conversion, sixth order, synthetic tests, the UGC 12517 harmonic profile and the SBF context. See [Harmonic analysis with ELLIPROF](https://ekourkchi.github.io/elliprof/concepts/harmonics/).
 
 ## Python
 
@@ -310,24 +353,26 @@ result = run_elliprof(
 print(result.profile)        # pandas DataFrame, one row per isophote
 ```
 
-With a sky, a mask, and a model image that contains only the 4th-order harmonic term:
+With a sky, a mask, 10 iterations, and a model image that contains only the 4th-order harmonic term:
 
 ```python
 result = run_elliprof(
-    image="galaxy.fits", x0=500, y0=500, r0=5, r1=200, nr=30,
+    image="galaxy.fits", x0=500, y0=500, r0=5, r1=200, nr=30, niter=10,
     sky_image="background.fits", mask="mask.fits",
-    model=True, model_harmonics=(4,),       # (), (3,), (4,) or (3, 4)
+    prf_path="galaxy.dat",                  # the text profile (-o)
+    model_path="galaxy.prf",                # the model image (-m)
+    model_harmonics=(4,),                   # (), (3,), (4,) or (3, 4)
 )
 print(result.model_path)
 ```
 
-`harmonic_mode="median"` and `sixth_order=True` correspond to the command-line options. `cos3x=` and `cos4x=` set the original ELLIPROF values directly. The command line and the Python API run exactly the same backend with the same settings.
+`model_path=` alone computes and writes the model (`model=True` writes it under a default name). `mask_convention="zero-good"` selects the second mask convention. `harmonic_mode="median"` and `sixth_order=True` correspond to the command-line options. `cos3x=` and `cos4x=` set the original ELLIPROF values directly. The command line and the Python API run exactly the same backend with the same settings.
 
 `python -m elliprof` is the same as the `elliprof` command. A worked example on a real HST image is in [examples/u12517](https://github.com/ekourkchi/elliprof/tree/main/examples/u12517) and [notebooks/elliprof_example.ipynb](https://github.com/ekourkchi/elliprof/blob/main/notebooks/elliprof_example.ipynb).
 
 ## The profile
 
-One row per isophote (`result.profile`, the CSV file, and the `.prf` file):
+One row per isophote (`result.profile`, the CSV file, and the text profile written by `-o`):
 
 | Column | Meaning |
 |---|---|
@@ -352,32 +397,35 @@ One row per isophote (`result.profile`, the CSV file, and the `.prf` file):
 | `R0=` `R1=` `NR=` | `r0` `r1` `nr` | radius range and number of isophotes (**required**) |
 | `--sky V` | `sky` | subtract a constant |
 | `--sky-image F` | `sky_image` | subtract an image |
-| `--mask F` | `mask` | 0 = ignored, 1 = good |
-| `NITER=` | `niter` | iterations (default 5, at most 1000); each one samples every isophote once, fits it and moves the ellipse towards the isophote |
+| `--mask F` | `mask` | logical mask; by default 0 (and NaN) = ignored, any other value = good |
+| `--mask-convention zero-good` | `mask_convention` | read the mask the other way: 0 = good, any nonzero value (and NaN) = ignored |
+| `NITER=`, `--niter N` | `niter` | iterations (default 5, at most 1000); each one samples every isophote once, fits it and moves the ellipse towards the isophote |
 | `RLAW=` | `rlaw` | radius spacing: 0 linear, 1 logarithmic, 2 r^¼ (default) |
 | `LINEAR` | `linear` | fit intensities instead of log intensities |
 | `FIXCTR=` | `fixctr` | 0 free centres (default), 1 fixed at X0/Y0, 2 median centre |
 | `ELLIP=` | `ellip` | force this ellipticity |
 | `RMSTAR` | `rmstar` | along each ellipse, ignore samples brighter than median + 4 × (upper quartile − median); rejects bright outliers point by point, so mask larger contaminants |
-| `MODEL`, `-m F` | `model`, `model_path` | build a model image |
+| `-m F` | `model_path` (or `model=True`) | compute the model image and write it as FITS |
 | `--model-harmonics` | `model_harmonics` | harmonic terms in the model (above) |
 | `--harmonic-mode` | `harmonic_mode` | `each` (default) or `median` |
-| `--sixth-order` | `sixth_order` | 6th- instead of 3rd-order term |
-| `COS3X=` `COS4X=` | `cos3x` `cos4x` | the original harmonic settings |
+| `--sixth-order` | `sixth_order` | measure the 6th- instead of the 3rd-order term |
+| `COS3X=` `COS4X=` | `cos3x` `cos4x` | the original harmonic settings: COS3X −3 to 2, COS4X 0 to 2 |
 | `TIE=` | `tie` | smooth the parameters with radius |
 | `AVG=` | `avg` | average a (2n+1)² box when sampling |
 | `GAIN=` | `gain` | iteration gain (default 1) |
 | `SCALE=` | `scale` | arcsec/pixel, recorded in the profile |
 | `SKY=` | `elliprof_sky` | sky used only in ELLIPROF's de Vaucouleurs fit (it does not change the image) |
 | `GC` | `gc` | globular-cluster mode: circular annuli |
-| `-o F` `--csv F` `--reg F` | `prf_path` `csv_path` `reg_path` | output files |
+| `-o F` `--csv F` `--reg F` | `prf_path` `csv_path` `reg_path` | profile (text), profile (CSV), DS9 regions |
 | `--residual F` | `residual_path` | residual image, `mask × (science − sky − model)` |
 | `--verbose` | `backend_verbose` | show ELLIPROF's full output (iteration tables, model progress) |
 | `--prepared F` | `prepared` | write the prepared image (after sky and mask) as ELLIPROF fits it |
 | `--sc V` | – | deprecated alias of `--sky` |
 | `--timeout S` | `timeout` | stop a run after S seconds (default 1800; exit status 124) |
+| `--check-update` | – | report whether a newer elliprof is on PyPI |
+| `-u`, `--update` | – | install the newest elliprof with this Python's pip |
 
-`OLD`, `EDIT` and `TV` (interactive options) are not supported. Invalid input fails immediately with a clear message, and the program never waits for keyboard input.
+`MODEL` is no longer needed (it is accepted and ignored; `MODEL=value` is an error). `OLD`, `EDIT` and `TV` (interactive options) are not supported. Invalid input fails immediately with a clear message, and the program never waits for keyboard input.
 
 A normal run prints a short summary: the image, sky and mask, the number of isophotes, notes about anything unusual, and the files written. The profile table is printed only when no profile file (`-o`, `--csv`) is asked for. `--verbose` shows ELLIPROF's full output. The legacy keyword `VERBOSE` still prints the parameters after every iteration, and also shows the full output. Errors are always shown in full. `elliprof -h` describes every parameter and option. `elliprof -v` prints the version, and `elliprof --diagnostics` prints version, platform and backend information for bug reports.
 

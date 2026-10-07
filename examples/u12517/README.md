@@ -25,9 +25,11 @@ elliprof u12517j.fits \
     --sky 3246.0 \
     X0=567 Y0=562 \
     R0=9 R1=347 NR=23 NITER=10 RMSTAR \
-    -o u12517j.prf \
-    --csv u12517j.csv \
-    --reg u12517j.reg
+    -o u12517.dat \
+    -m u12517.prf \
+    --residual u12517_residual.fits \
+    --csv u12517.csv \
+    --reg u12517.reg
 ```
 
 | Option | Meaning |
@@ -36,22 +38,27 @@ elliprof u12517j.fits \
 | `--mask u12517j.dmask` | Then multiply by the mask, so masked pixels become exactly 0. ELLIPROF ignores pixels that are exactly 0, which is why the sky must be subtracted first. |
 | `X0=567 Y0=562` | Initial centre, in ELLIPROF image coordinates. ELLIPROF refines the centre of every isophote. |
 | `R0=9 R1=347 NR=23` | 23 isophotes with semi-major axes from 9 to 347 pixels, spaced evenly in r^¼ by default. |
-| `NITER=10 RMSTAR` | 10 iterations; reject star-like outliers along each isophote. |
+| `NITER=10 RMSTAR` | 10 iterations (the default is 5); reject star-like outliers along each isophote. |
+| `-o u12517.dat` | The profile, a text table (traditional name `.dat`). |
+| `-m u12517.prf` | Compute the galaxy model and write it as a FITS image (traditional name `.prf`). No `MODEL` keyword is needed. |
+| `--residual u12517_residual.fits` | mask × (science − sky − model), FITS. |
 
 ## Output
 
 | File | Contents |
 |---|---|
-| `u12517j.prf` | The profile, full precision. |
-| `u12517j.csv` | The same profile as commented, fixed-width CSV: `Rmaj, x0, y0, I0, alpha, ellip, I3, A3, I4, A4, slope`. |
-| `u12517j.reg` | One DS9 ellipse per isophote. |
+| `u12517.dat` | The profile, full precision (a table of numbers, not an image). |
+| `u12517.prf` | The model image (FITS, 32-bit float, with the science header and WCS). |
+| `u12517_residual.fits` | The residual image: science − sky − model on good pixels, 0 on masked ones. |
+| `u12517.csv` | The same profile as commented, fixed-width CSV: `Rmaj, x0, y0, I0, alpha, ellip, I3, A3, I4, A4, slope`. |
+| `u12517.reg` | One DS9 ellipse per isophote. |
 
 The innermost isophote (r = 9) lies almost entirely inside the masked nucleus. ELLIPROF prints `FITCONTOUR: quitting, nused = 0` and keeps its starting values for that isophote. This is expected.
 
 ## Viewing the ellipses in DS9
 
 ```sh
-ds9 u12517j.fits -regions u12517j.reg
+ds9 u12517j.fits -regions u12517.reg
 ```
 
 Or open the image in DS9 and use **Region → Open…**. The regions are in DS9 `image` coordinates, so they line up with the pixels.

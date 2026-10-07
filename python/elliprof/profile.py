@@ -1,4 +1,6 @@
-"""Reading ELLIPROF profiles (.prf and CSV).
+"""Reading ELLIPROF profiles: the text profile written by -o
+(traditionally named n1234.dat; also called the ".prf format" in older
+elliprof documentation) and the CSV table.
 
 Column meanings, as ELLIPROF stores them in ``PARAM_PRF(J,K)`` at the
 end of the fit and as the original profile printout shows them (the comments
@@ -50,7 +52,8 @@ NPROFILE = 250  # PARAMETER NPROFILE in profile.inc
 
 
 def read_prf(path: str) -> Dict[str, object]:
-    """Read a ``.prf`` profile (``-o``), the original profile file format.
+    """Read the text profile written by ``-o`` (the original ELLIPROF
+    profile format; any file name, traditionally ``n1234.dat``).
 
     The file holds, list-directed: ``N_PRF, PRF_SC, PARAM_PRF(12,250)``
     (Fortran column order) and the FITS header text.  Returns ``n``,
@@ -62,7 +65,7 @@ def read_prf(path: str) -> Dict[str, object]:
     tokens = text.split(None, 2 + 12 * NPROFILE)
     need = 2 + 12 * NPROFILE
     if len(tokens) < need:
-        raise ValueError(f"{path} is not an ELLIPROF .prf file "
+        raise ValueError(f"{path} is not an ELLIPROF text profile (-o output) "
                          f"({len(tokens)} values, need {need})")
     try:
         n = int(tokens[0])
@@ -72,7 +75,7 @@ def read_prf(path: str) -> Dict[str, object]:
         values = np.array([float(t) for t in tokens[2:need]],
                           dtype=np.float32).astype(np.float64)
     except ValueError as exc:
-        raise ValueError(f"{path} is not an ELLIPROF .prf file: {exc}") \
+        raise ValueError(f"{path} is not an ELLIPROF text profile (-o output): {exc}") \
             from None
     if not 0 <= n <= NPROFILE:
         raise ValueError(f"{path}: invalid contour count {n}")
@@ -83,7 +86,7 @@ def read_prf(path: str) -> Dict[str, object]:
 
 
 def read_profile(path: str) -> pd.DataFrame:
-    """The fitted profile from a .prf file as a DataFrame with columns
+    """The fitted profile from a text profile (-o) as a DataFrame with columns
     ``Rmaj, x0, y0, I0, alpha, ellip, I3, A3, I4, A4, slope`` (exact
     REAL*4 values).  ``df.attrs`` holds ``scale`` and the run ``flags``.
     """

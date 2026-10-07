@@ -46,7 +46,8 @@ each ellipse it measures:
 - the **centre**, **ellipticity** and **position angle**;
 - the **logarithmic slope** of the intensity profile;
 - the **3rd- and 4th-order deviations** from a pure ellipse, including the
-  classic **boxy/disky** term.
+  classic **boxy/disky** term (optionally the 6th order instead of the
+  3rd); see [Harmonic analysis](concepts/harmonics.md).
 
 From the fit it can build a **model image** of the galaxy and a **residual
 image** (data − sky − model). The residual shows what the smooth model
@@ -56,6 +57,24 @@ smallest scales, the pixel-to-pixel brightness fluctuations that
 
 ELLIPROF works best for smooth light distributions: elliptical galaxies,
 lenticulars, bulges and other early-type systems.
+
+### How it works, in one picture
+
+```mermaid
+flowchart LR
+    A["FITS image<br/>+ sky, mask"] --> B["fit an ellipse<br/>at each radius"]
+    B --> C["harmonics:<br/>3rd (or 6th), 4th order"]
+    C -- "repeat NITER times<br/>(default 5)" --> B
+    C --> D["radial profile<br/>-o n1234.dat"]
+    D --> E["smooth 2-D model<br/>-m n1234.prf"]
+    E --> F["residual<br/>--residual"]
+```
+
+The isophote fit, the harmonic analysis and the model are the original
+ELLIPROF, compiled unchanged. Reading any FITS image, subtracting the
+sky, applying the mask and writing the profile, model and residual files
+are done by the elliprof package around it. The full, step-by-step
+diagram is on [How ELLIPROF fits a galaxy](concepts/how-it-works.md#the-workflow).
 
 <div class="scope-box" markdown>
 **ELLIPROF is not an SBF pipeline.** It fits isophotes and produces a
@@ -87,7 +106,7 @@ No compiler is needed. See [Install](install.md), then the
 !!! researcher "You know surface photometry"
     Go to [How ELLIPROF fits a galaxy](concepts/how-it-works.md) for the
     exact conventions, then [The profile](outputs/profile.md),
-    [Boxy and disky isophotes](concepts/harmonics.md) and the
+    [Harmonic analysis](concepts/harmonics.md) and the
     [command-line reference](reference/cli.md).
 
 !!! advanced "You are preparing SBF data"

@@ -19,6 +19,26 @@ elliprof -h         # full help: every parameter, option and example
 `python -m elliprof` does the same as `elliprof`. That helps when the
 command is not on your `PATH`.
 
+## Updating
+
+```sh
+elliprof --check-update   # is a newer version on PyPI? (installs nothing)
+elliprof --update         # install it; elliprof -u is the same
+```
+
+`elliprof --update` runs `python -m pip install --upgrade elliprof` with
+the same Python that runs elliprof, so the new version lands where the
+old one was. In a conda environment, or a system Python that pip may not
+change ("externally managed"), update elliprof the way you installed it.
+A source checkout or editable install is updated with git, not with
+`--update`.
+
+After a fit in an interactive terminal, elliprof asks PyPI at most once a
+day, in the background, whether a newer version exists, and prints one
+line if so. It never installs anything by itself, never delays a fit,
+and is silent offline and in scripts or batch jobs. Set
+`ELLIPROF_NO_UPDATE_CHECK=1` to turn the check off.
+
 ## Supported systems
 
 | | |

@@ -79,14 +79,33 @@ lanes, bad columns, cosmic rays, image edges.
 elliprof galaxy.fits --mask mask.fits --sky 1234.5 ...
 ```
 
-- **The mask is logical.** 0 = bad (ignored). Any other finite value (1,
-  2, −1, 0.5, ...) = good. NaN, ±Inf and undefined (`BLANK`) pixels =
-  bad.
+**The mask is logical**: each pixel is either good (used) or bad
+(ignored). Two conventions are supported:
+
+| Mask value | default: `--mask-convention nonzero-good` | `--mask-convention zero-good` |
+|---|---|---|
+| 0 | **bad** (ignored) | **good** (used) |
+| any other finite value (1, 2, −1, 0.5, ...) | **good** | **bad** |
+| NaN, ±Inf, undefined (`BLANK`) | bad | bad |
+
+In symbols: by default, good = finite and value ≠ 0; with `zero-good`,
+good = finite and value = 0. The default is the original ELLIPROF
+convention. `zero-good` suits bad-pixel maps, data-quality arrays and
+segmentation maps, where 0 marks a clean pixel:
+
+```sh
+elliprof galaxy.fits --mask segmap.fits --mask-convention zero-good ...
+```
+
 - **The values are never weights.** Bad pixels become exactly 0, and good
   pixels keep their value.
 - The mask may be a FITS image of any type (`BITPIX` 8, 16, 32, 64, −32,
   −64), or a historical ELLIPROF `.dmask` bitmap (`BITPIX = 1`). The type
-  is recognised from the file itself.
+  is recognised from the file itself. The test for 0 uses the value as
+  stored, at full precision (so a tiny 64-bit value such as 10⁻³⁰⁰ is not
+  0).
+- A `.dmask` bitmap always means 1 = good, 0 = bad; `--mask-convention
+  zero-good` is refused for it.
 - It must have exactly the same dimensions as the science image. Nothing
   is ever resized, interpolated, cropped, shifted or reprojected.
 - A mask in a FITS extension is chosen like an image:
@@ -108,7 +127,7 @@ elliprof galaxy.fits --mask mask.fits --sky 1234.5 ...
 ## The prepared image
 
 `--prepared FILE` writes the image exactly as ELLIPROF fits it:
-`mask × (science − sky)`, as float32 FITS with the science image's
+`mask × (science − sky)`, as 32-bit floating-point FITS with the science image's
 header and WCS. Look at it whenever a fit behaves oddly. Most problems
 (a wrong sky, a mask that is too small, an inverted mask) are obvious in
 the prepared image.

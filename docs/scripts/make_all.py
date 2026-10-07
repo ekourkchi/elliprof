@@ -16,6 +16,7 @@ SCRIPTS = (
     "make_profile_plots.py",
     "make_isophote_diagram.py",
     "make_boxy_disky_diagram.py",
+    "make_harmonic_figures.py",
     "make_sbf_workflow.py",
     "make_sbf_power_spectrum_schematic.py",
     "make_readme_banner.py",

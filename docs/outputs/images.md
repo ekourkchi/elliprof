@@ -4,20 +4,24 @@ Besides the [profile](profile.md), elliprof can write three images:
 
 | Option | Image | Definition |
 |---|---|---|
-| `MODEL -m FILE` | **model** | the galaxy rebuilt from the fitted isophotes |
+| `-m FILE` | **model** | the galaxy rebuilt from the fitted isophotes |
 | `--residual FILE` | **residual** | mask × (science − sky − model) |
 | `--prepared FILE` | **prepared** | mask × (science − sky): exactly what ELLIPROF fits |
 
 ```sh
-elliprof galaxy.fits --mask mask.fits --sky 1234.5 \
-    X0=500 Y0=500 R0=5 R1=200 NR=30 \
-    MODEL -m galaxy_model.fits \
-    --residual galaxy_residual.fits \
-    --prepared galaxy_prepared.fits
+elliprof n1234j.fits --mask n1234_mask.fits --sky 1234.5 \
+    X0=514 Y0=514 R0=10 R1=450 NR=25 \
+    -o n1234.dat \
+    -m n1234.prf \
+    --residual n1234_residual.fits \
+    --prepared n1234_prepared.fits
 ```
 
-`--residual` implies `MODEL`. It uses the same model as `-m`, and `-m`
-is only needed if you also want the model itself.
+`-m FILE` alone computes the model and writes it; no `MODEL` keyword is
+needed (since 0.1.4). The traditional ELLIPROF name for the model image is
+`n1234.prf` (and `n1234.dat` for the text profile), but any name works:
+the file is FITS whatever it is called. `--residual` uses the same model
+as `-m`, and `-m` is only needed if you also want the model itself.
 
 ## The model
 
@@ -86,7 +90,8 @@ the sky and the mask. See [Sky and masks](../concepts/sky-and-masks.md).
 
 ## Headers and WCS
 
-All three images are **float32 FITS** and carry the **header of the
+All three images are **32-bit floating-point FITS** (also when the
+science image is stored as 64-bit) and carry the **header of the
 science image**, including its WCS (`CTYPE`, `CRPIX`, `CRVAL`,
 `CD`/`PC`/`CDELT`, distortion terms), `BUNIT` and the other keywords. Only
 the cards that describe how the science data were stored are left out,
@@ -114,7 +119,7 @@ in HST files). Select it with CFITSIO syntax, quoted for the shell:
 
 ```sh
 elliprof 'galaxy.fits[SCI]' X0=500 Y0=500 R0=5 R1=200 NR=30 \
-    MODEL -m galaxy_model.fits
+    -m galaxy.prf
 elliprof 'galaxy.fits[1]'   X0=500 Y0=500 R0=5 R1=200 NR=30
 ```
 

@@ -1,9 +1,15 @@
 # Common mistakes
 
-**Opening the `.prf` file in DS9.**
-The `.prf` is a table of numbers, not an image. Use `--reg` for the
-ellipses on the image, and `MODEL -m` / `--residual` for images. See
-[The profile](../outputs/profile.md).
+**Opening the profile (`-o`) in DS9.**
+The profile written by `-o` (traditionally `n1234.dat`) is a table of
+numbers, not an image. Use `--reg` for the ellipses on the image, and
+`-m` / `--residual` for images. See [The profile](../outputs/profile.md).
+(In the traditional naming, `n1234.prf` is the model *image* from `-m`,
+which DS9 does open.)
+
+**Adding `MODEL` or `MODEL=file` to get a model.**
+Since 0.1.4, `-m FILE` alone computes and writes the model. A bare
+`MODEL` is ignored; `MODEL=file` is an error. Name the file with `-m`.
 
 **A centre off by half a pixel.**
 ELLIPROF coordinates are FITS/DS9 pixel numbers minus 0.5. A galaxy at
@@ -25,9 +31,11 @@ profile is then wrong, and masked pixels (set to 0) are no longer
 distinguishable from sky-level pixels.
 
 **An inverted mask.**
-In elliprof masks, **0 = bad**. If your mask has 1 for bad pixels,
-invert it first. elliprof reports how many pixels are masked. If that
-number is most of the image, the mask is probably inverted.
+By default, in elliprof masks **0 = bad**. If your mask has 0 for good
+pixels and nonzero values for bad ones (common for bad-pixel maps and
+segmentation maps), add `--mask-convention zero-good` instead of
+inverting the file. elliprof reports how many pixels are masked. If that
+number is most of the image, the convention is probably the wrong one.
 
 **Treating mask values as weights.**
 The mask is logical. 0.5 means "good", not "half weight".
@@ -43,7 +51,7 @@ are a shell pattern. Write `'galaxy.fits[SCI]'`.
 **Reading `A4` as a position angle.**
 `A3`/`A4` are phases around the ellipse, measured from the major axis.
 The position angle is `alpha`. See
-[Boxy and disky isophotes](../concepts/harmonics.md).
+[Harmonic analysis](../concepts/harmonics.md).
 
 **Comparing `I4` with a4/a from another program.**
 `I4` is an intensity amplitude. Convert:

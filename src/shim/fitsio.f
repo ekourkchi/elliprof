@@ -133,6 +133,34 @@ C     integer images, NaN in floating-point ones) flagged; then close.
       RETURN
       END
 
+C     Mask pixels as REAL*8, with CFITSIO's undefined pixels flagged;
+C     then close.  Double precision keeps every stored value's sign and
+C     zero-ness exactly (a REAL*4 copy would turn a tiny 64-bit value
+C     into 0 and a huge one into an overflow).
+      SUBROUTINE FITSREADFLAGD(IUNIT, NPIX, PIX, UNDEF, IERR)
+      INTEGER IUNIT, NPIX, IERR
+      DOUBLE PRECISION PIX(NPIX)
+      LOGICAL UNDEF(NPIX), ANYNUL
+      INTEGER STATUS
+
+      STATUS = 0
+      CALL FTGPFD(IUNIT, 1, 1, NPIX, PIX, UNDEF, ANYNUL, STATUS)
+      IF (STATUS .NE. 0) CALL FITSERR('reading pixels', STATUS)
+      IERR = STATUS
+      CALL FITSCLOSE(IUNIT)
+      RETURN
+      END
+
+C     BITPIX of the open image HDU (as stored, e.g. -64 or 64).
+      SUBROUTINE FITSBITPIX(IUNIT, IBITPIX)
+      INTEGER IUNIT, IBITPIX, STATUS
+      STATUS = 0
+      IBITPIX = 0
+      CALL FTGIDT(IUNIT, IBITPIX, STATUS)
+      IF (STATUS .NE. 0) IBITPIX = 0
+      RETURN
+      END
+
 C     Write a generated REAL*4 image (MODEL, PREPARED or RESIDUAL) to
 C     FNAME, replacing any existing file.  Its header is that of the
 C     science image TMPL -- the HDU the fit used, e.g. file.fits[SCI]:

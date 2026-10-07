@@ -1,26 +1,28 @@
 """Harmonic settings: the original ELLIPROF ``COS3X=`` / ``COS4X=`` modes.
 
-What ELLIPROF does (src/original/elliprof.f, the original code):
+What ELLIPROF does (src/original/elliprof.f; see docs/concepts/harmonics.md):
 
-* Every isophote is fitted with a constant plus the cos/sin of 1, 2, 3
-  and 4 times the eccentric angle along the ellipse -- always all nine
-  terms.  Orders 1-2 update the centre, ellipticity and angle; orders 3
-  and 4 are measured and reported (I3, A3, I4, A4) but never change the
-  ellipse.  No setting leaves the 3rd- or 4th-order terms out of the fit.
-* ``COS3X`` and ``COS4X`` (integers, default 2) choose how those measured
-  terms go into the MODEL image: 0 = not at all, 1 = the median over all
-  isophotes, 2 = each isophote's own value.
-* A negative ``COS3X`` (-1, -2) fits and models the 6th-order term in
-  place of the 3rd: this is the only setting that changes the fit.  The
-  I3/A3 columns then hold the 6th-order amplitude and phase.
+* Every isophote is fitted by least squares with nine terms at once: a
+  constant, cos/sin of 1, 2 and 4 times the eccentric angle, and cos/sin
+  of either 3 times it (``COS3X >= 0``) or 6 times it (``COS3X < 0``;
+  FITCONTOUR).  Only orders 0-2 move the ellipse (ALTER); the 3rd/6th
+  and 4th orders are measured and reported (I3, A3, I4, A4).  Because
+  all nine terms are solved together, the 3rd/6th-order choice can still
+  shift the fitted geometry slightly where an ellipse is poorly sampled.
+* ``|COS3X|`` and ``COS4X`` choose how the measured term goes into the
+  model image (SYNTHESIZE): 0 = not at all, 1 = the median over all
+  isophotes, 2 = each isophote's own value.  They never change the fit.
+* Supported values: COS3X 2, 1, 0 (3rd order) and -2, -1, -3 (6th
+  order: each, median, none); COS4X 2, 1, 0.  In 6th-order mode the I3/A3
+  columns hold the 6th-order amplitude and twice its phase.
 
-The friendlier options below translate into exactly these values.
+The descriptive options below translate into exactly these values.
 """
 
 from typing import Iterable, Optional, Tuple, Union
 
 MODES = {"each": 2, "median": 1}
-COS3X_RANGE = (-2, 2)
+COS3X_RANGE = (-3, 2)
 COS4X_RANGE = (0, 2)
 
 
@@ -35,10 +37,13 @@ def _int_in(value, name, lo, hi) -> int:
     return int(f)
 
 
-def parse_model_harmonics(value: Union[None, str, Iterable]) -> Optional[
+def parse_model_harmonics(value: Union[None, str, Iterable],
+                          sixth_order: bool = False) -> Optional[
         Tuple[int, ...]]:
     """``"none"``, ``"3"``, ``"4"``, ``"3,4"`` or a sequence of 3/4 ->
-    a sorted tuple of harmonic orders (``()`` for none)."""
+    a sorted tuple of harmonic orders (``()`` for none).  With
+    ``sixth_order`` the 6th order takes the place of the 3rd, and may be
+    written 6 (``"6"``, ``"4,6"``); 3 then means the same slot."""
     if value is None:
         return None
     if isinstance(value, str):
@@ -54,9 +59,15 @@ def parse_model_harmonics(value: Union[None, str, Iterable]) -> Optional[
             order = int(str(item).strip())
         except ValueError:
             order = None
+        if order == 6 and sixth_order:
+            order = 3                   # the 6th order uses the 3rd's slot
         if order not in (3, 4):
+            if order == 6:
+                raise ValueError("model harmonic 6 needs --sixth-order "
+                                 "(sixth_order=True)")
             raise ValueError("model harmonics must be 'none', 3, 4 or 3,4 "
-                             f"(ELLIPROF has only these), got {value!r}")
+                             "(with --sixth-order: 6, 4 or 4,6), got "
+                             f"{value!r}")
         orders.add(order)
     return tuple(sorted(orders))
 
@@ -71,7 +82,8 @@ def harmonic_settings(model_harmonics=None, harmonic_mode=None,
     ``model_harmonics`` (which measured terms go into the model image:
     ``()``, ``(3,)``, ``(4,)``, ``(3, 4)``; default ``(3, 4)``),
     ``harmonic_mode`` (``"each"``, default, or ``"median"``) and
-    ``sixth_order`` (fit the 6th-order term instead of the 3rd).
+    ``sixth_order`` (fit the 6th-order term instead of the 3rd; with no
+    3rd/6th order in the model this is ``COS3X=-3``, measurement only).
     """
     friendly = (model_harmonics is not None or harmonic_mode is not None
                 or bool(sixth_order))
@@ -82,7 +94,7 @@ def harmonic_settings(model_harmonics=None, harmonic_mode=None,
         c3 = None if cos3x is None else _int_in(cos3x, "COS3X", *COS3X_RANGE)
         c4 = None if cos4x is None else _int_in(cos4x, "COS4X", *COS4X_RANGE)
         return c3, c4
-    orders = parse_model_harmonics(model_harmonics)
+    orders = parse_model_harmonics(model_harmonics, bool(sixth_order))
     if orders is None:
         orders = (3, 4)
     mode = "each" if harmonic_mode is None else str(harmonic_mode).lower()
@@ -93,10 +105,5 @@ def harmonic_settings(model_harmonics=None, harmonic_mode=None,
     c3 = m if 3 in orders else 0
     c4 = m if 4 in orders else 0
     if sixth_order:
-        if c3 == 0:
-            raise ValueError(
-                "the 6th-order term takes the place of the 3rd-order one, "
-                "and ELLIPROF has no setting that fits it but leaves it out "
-                "of the model: include 3 in the model harmonics")
-        c3 = -c3
+        c3 = -3 if c3 == 0 else -c3     # -3: measure the 6th order only
     return c3, c4

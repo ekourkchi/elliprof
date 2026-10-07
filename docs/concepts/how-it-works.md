@@ -19,13 +19,62 @@ lower case, in Python.
     - sample the image along the current ellipse (up to 360 points);
     - optionally reject bright star-like samples (`RMSTAR`);
     - fit the intensity around the ellipse with a constant plus harmonics
-      of orders 1–4;
+      of orders 1, 2, 4 and 3 (or 6), all at once;
     - use the 1st- and 2nd-order terms to move the centre and to change
       the ellipticity and position angle, so that the ellipse follows the
       isophote.
 
     Then update the logarithmic slopes of all the isophotes.
-5. **Write** the profile and, with `MODEL`, build the model image.
+
+5. **Write** the profile and, when `-m` (or `--residual`) asks for it,
+   build the model image.
+
+## The workflow
+
+```mermaid
+flowchart TD
+    subgraph PKG ["elliprof package: preparation"]
+        A["Science FITS image<br/>any BITPIX, read as 32-bit float"] --> B["subtract the sky<br/>--sky or --sky-image"]
+        B --> C["apply the mask: bad pixels set to 0<br/>--mask, --mask-convention"]
+    end
+    C --> P[("prepared image<br/>--prepared")]
+    subgraph ORIG ["original ELLIPROF: unchanged Fortran"]
+        D["starting geometry: X0, Y0 given;<br/>PA and ellipticity estimated at (R0+R1)/2<br/>(or ELLIP=)"]
+        E["radial grid: NR semi-major axes<br/>from R0 to R1, spaced by RLAW"]
+        F["for each isophote: sample up to 360 points<br/>at equal steps of eccentric angle<br/>(pixels = 0 skipped; AVG; RMSTAR)"]
+        G["least squares, 9 terms at once:<br/>constant, 1θ, 2θ, 4θ, and<br/>3θ (COS3X ≥ 0) or 6θ (COS3X < 0)"]
+        H["move the ellipse with orders 0–2:<br/>centre, ellipticity, PA, I0;<br/>record I3, A3, I4, A4"]
+        I["after every isophote is done:<br/>TIE smoothing, FIXCTR=2 median centre,<br/>logarithmic slopes"]
+        J["radial profile"]
+        K["model synthesis, only with -m or --residual:<br/>ellipses interpolated between isophotes,<br/>times (1 + harmonic terms chosen by<br/>COS3X and COS4X)"]
+        D --> E --> F --> G --> H
+        H -- "next isophote" --> F
+        H -- "last isophote" --> I
+        I -- "repeat: NITER iterations (default 5)" --> F
+        I -- "after NITER iterations" --> J
+        J --> K
+    end
+    P --> D
+    J --> O1["profile: -o (text, n1234.dat),<br/>--csv, --reg"]
+    K --> O2["model image: -m (FITS, n1234.prf)"]
+    K --> R["residual = mask × (prepared − model)<br/>--residual"]
+    P --> R
+```
+
+The steps in the first box, and the files written at the end, are done
+by the **elliprof package** around the original program: reading any
+FITS data type, subtracting the sky, applying the mask, and writing the
+profile, model, prepared and residual files. The steps in the second box
+are the **original ELLIPROF** routines (FITPROFILE,
+GETCONTOUR, TRIMIT, FITCONTOUR, ALTER and SYNTHESIZE in
+`src/original/elliprof.f`), compiled unchanged. Between the fit and the
+model, ELLIPROF also fits a de Vaucouleurs law to the profile and prints
+the result; it is not used for the model.
+
+**One iteration** visits every isophote once (sample, fit, move the
+ellipse), then smooths the parameters if `TIE` is set and updates the
+slopes. `NITER=n` or `--niter n` sets how many iterations are run; the
+default, 5, is the original program's own.
 
 ## 1. The initial centre and the fitted centres
 
@@ -105,20 +154,25 @@ reports it in a note.
 
 ## 4. Fitting the harmonics
 
-The samples around the ellipse are fitted with
+The samples around the ellipse are fitted by least squares, all nine
+terms at once, with
 
-$$ \ln I(\theta) = c_0 + \sum_{n=1}^{4}\left[a_n\cos n\theta + b_n\sin n\theta\right] $$
+$$ \ln I(\theta) = c_0 + \sum_{n=1,2,4}\left[a_n\cos n\theta + b_n\sin n\theta\right] + \left[a_m\cos m\theta + b_m\sin m\theta\right] $$
 
-by default. With `LINEAR`, $I$ itself is fitted instead of $\ln I$.
+by default, where m = 3, or m = 6 with `--sixth-order` (`COS3X` < 0).
+With `LINEAR`, $I$ itself is fitted instead of $\ln I$.
 
 - **Orders 1 and 2** measure how the ellipse is off: a 1st-order term
   means the centre is off, and a 2nd-order term means the ellipticity or
   position angle is off. ELLIPROF converts them into corrections and
-  moves the ellipse. `GAIN=g` scales the corrections, and `ELLIP=e` holds
-  the ellipticity fixed.
-- **Orders 3 and 4** are measured and reported as `I3`, `A3`, `I4`, `A4`,
-  but they never change the ellipse. See
-  [Boxy and disky isophotes](harmonics.md).
+  moves the ellipse. The constant and the cos 2θ term update `I0`.
+  `GAIN=g` scales the corrections, and `ELLIP=e` holds the ellipticity
+  fixed.
+- **Orders 3 (or 6) and 4** are measured and reported as `I3`, `A3`,
+  `I4`, `A4`, and are not used to move the ellipse. Because all nine terms
+  are solved together, the 3rd/6th-order choice can still shift the
+  fitted geometry slightly where an ellipse is poorly sampled. See
+  [Harmonic analysis](harmonics.md).
 
 After each iteration, the **logarithmic slope** of every isophote is
 updated from its neighbours:
@@ -130,12 +184,18 @@ Positive values (intensity increasing outwards) are replaced by −2.
 
 ## 5. Iterations: NITER
 
-One iteration visits every isophote once. `NITER` (default 5, at most
-1000) sets how many iterations are run. Increase it when the parameters
-are still changing between the last iterations, for example after a poor
-starting centre. `--verbose` or the keyword `VERBOSE` prints the
-parameters after every iteration, so you can see whether they have
-settled.
+One iteration visits every isophote once. `NITER` (default 5, 1 to
+1000) sets how many iterations are run; on the command line `--niter N`
+is the same as `NITER=N`, and in Python it is `niter=`. The default of 5
+is the original ELLIPROF's own. Increase it when the parameters are still
+changing between the last iterations, for example after a poor starting
+centre. The keyword `VERBOSE` prints the parameters after every
+iteration, so you can see whether they have settled.
+
+`NITER` is the only iteration count of the isophote fit. The original
+code has fixed internal limits elsewhere (for example in the
+de Vaucouleurs fit it prints at the end), but they do not affect the
+profile, the model or the residual, and they are not parameters.
 
 `TIE=k` smooths the parameters with radius after each iteration. With
 k ≥ 0 it fits a weighted polynomial of order k in $r^{1/4}$. With k < −1
@@ -174,8 +234,10 @@ $$ \text{median} + 4\times(Q_3 - \text{median}) $$
 
 ## 7. The model image
 
-With `MODEL` (and `-m FILE` to write it), ELLIPROF builds a 2-D model of
-the galaxy from the fitted isophotes. The model follows the fitted
+With `-m FILE`, ELLIPROF builds a 2-D model of the galaxy from the fitted
+isophotes and elliprof writes it as FITS (no `MODEL` keyword is needed
+since 0.1.4). The model is built after the fit is finished, so asking for
+it never changes the profile. The model follows the fitted
 intensity, centre, ellipticity and position angle with radius, plus the
 3rd- and 4th-order terms you choose ([model harmonics](harmonics.md#the-harmonics-in-the-model-image)).
 It covers the whole image, masked pixels included.

@@ -93,7 +93,7 @@ low wavenumbers.
     `--model-harmonics 3,4`), so that boxy or disky isophotes do not
     leave a 4-fold pattern in the residual. Compare with
     `--model-harmonics none` to see how much they matter for your galaxy.
-    See [Boxy and disky isophotes](../concepts/harmonics.md#the-harmonics-in-the-model-image).
+    See [Harmonic analysis](../concepts/harmonics.md#the-harmonics-in-the-model-image).
 
 ## The residual ELLIPROF provides
 
@@ -111,7 +111,7 @@ low wavenumbers.
 ```sh
 elliprof galaxy.fits --mask mask.fits --sky SKY \
     X0=... Y0=... R0=... R1=... NR=... NITER=10 \
-    MODEL -m galaxy_model.fits --residual galaxy_residual.fits
+    -m galaxy.prf --residual galaxy_residual.fits
 ```
 
 What you get:

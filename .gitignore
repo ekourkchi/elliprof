@@ -23,3 +23,5 @@ notebooks/elliprof_output/
 # documentation build
 /site/
 docs/scripts/_work/
+/examples/u12517/u12517.dat
+/examples/u12517/u12517_residual.fits

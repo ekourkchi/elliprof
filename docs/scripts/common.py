@@ -58,14 +58,14 @@ def run_elliprof(*args, sky=None):
 def products():
     """The u12517 products used by the figures (made once)."""
     if not (WORK / "u12517j_residual.fits").exists():
-        run_elliprof("MODEL", "-m", "u12517j_model.fits", "--prepared",
+        run_elliprof("-m", "u12517j_model.fits", "--prepared",
                      "u12517j_prepared.fits", "--residual",
                      "u12517j_residual.fits", "-o", "u12517j.prf",
                      "--csv", "u12517j.csv", "--reg", "u12517j.reg")
         for name, opts in (("none", ["--model-harmonics", "none"]),
                            ("h4", ["--model-harmonics", "4"]),
                            ("h34", ["--model-harmonics", "3,4"])):
-            run_elliprof("MODEL", "-m", f"model_{name}.fits",
+            run_elliprof("-m", f"model_{name}.fits",
                          "-o", f"p_{name}.prf", *opts)
     from astropy.io import fits
     from elliprof import read_profile

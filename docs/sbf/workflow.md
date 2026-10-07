@@ -62,7 +62,11 @@
     - Fit out to where the galaxy is still well above the sky noise, and
       analyse only the annuli between R0 and R1. Outside that range the
       model is extrapolated, not fitted.
-    - Keep the 3rd- and 4th-order terms in the model (the default).
+    - Keep the 3rd- and 4th-order terms in the model (the default), and
+      check what they do to the residual; see
+      [Harmonics and SBF distances](../concepts/harmonics.md#harmonics-and-sbf-distances).
+      If you use the 6th order, read its
+      [known model limitation](../concepts/harmonics.md#sixth-order).
     - Use enough isophotes (`NR`) that the model follows the profile
       smoothly, and enough iterations (`NITER`) for the parameters to
       settle.

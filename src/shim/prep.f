@@ -5,8 +5,9 @@ C        --sky-image F  A = A - B
 C        --mask F       A = 0 where the mask is bad, else unchanged
 C
 C     So the prepared image is  good(mask) x (science - sky).  The mask
-C     is logical: good = finite nonzero, bad = 0, NaN, Inf or undefined
-C     (maskio.f); its values are never used as weights.  All arithmetic
+C     is logical: by default good = finite nonzero, bad = 0, NaN, Inf or
+C     undefined; with --mask-convention zero-good, good = finite zero
+C     (maskio.f).  Its values are never used as weights.  All arithmetic
 C     is REAL*4, element by element.  The sky is removed first, and bad
 C     pixels then set to exactly 0, which ELLIPROF treats as missing.  A sky image or
 C     mask must have exactly the size and origin of the science image;
@@ -115,21 +116,23 @@ C     --sky-image F: subtract it pixel by pixel.
       RETURN
       END
 
-C     --mask F: set bad pixels to 0.  Returns the logical mask GOOD,
-C     the mask BITPIX (1 = legacy bitmap), the number of bad pixels and,
-C     of those, how many were NaN, Inf or undefined.
-      SUBROUTINE APPLYMASK(FNAME, PIX, NCOL, NROW, ISC, ISR, GOOD,
-     $     MBITPIX, NBAD, NNONF, IERR)
+C     --mask F: set bad pixels to 0.  ZGOOD selects the zero-good
+C     convention (--mask-convention zero-good; see MASKGOOD).  Returns
+C     the logical mask GOOD, the mask BITPIX (1 = legacy bitmap), the
+C     number of bad pixels and, of those, how many were NaN, Inf or
+C     undefined.
+      SUBROUTINE APPLYMASK(FNAME, PIX, NCOL, NROW, ISC, ISR, ZGOOD,
+     $     GOOD, MBITPIX, NBAD, NNONF, IERR)
       CHARACTER*(*) FNAME
       INTEGER NCOL, NROW, ISC, ISR, MBITPIX, NBAD, NNONF, IERR
       REAL PIX(NCOL,NROW)
-      LOGICAL GOOD(NCOL,NROW)
+      LOGICAL ZGOOD, GOOD(NCOL,NROW)
       INTEGER I, J
 
       CALL CHKMASK(FNAME, NCOL, NROW, ISC, ISR, IERR)
       IF (IERR .NE. 0) RETURN
-      CALL MASKGOOD(FNAME, NCOL, NROW, GOOD, MBITPIX, NBAD, NNONF,
-     $     IERR)
+      CALL MASKGOOD(FNAME, NCOL, NROW, ZGOOD, GOOD, MBITPIX, NBAD,
+     $     NNONF, IERR)
       IF (IERR .NE. 0) RETURN
       DO 10 J = 1, NROW
          DO 11 I = 1, NCOL
