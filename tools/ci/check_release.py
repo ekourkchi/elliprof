@@ -18,12 +18,13 @@ from typing import List, Tuple
 NAME = "elliprof"
 
 # Supported platforms (README "Platforms"): one py3-none wheel each.
-# Experimental targets (linux riscv64, Windows ARM64) must not appear.
+# The Experimental target (Windows ARM64) must not appear.
 EXPECTED_TAGS = {
     "py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64",
     "py3-none-manylinux_2_27_aarch64.manylinux_2_28_aarch64",
     "py3-none-manylinux_2_27_ppc64le.manylinux_2_28_ppc64le",
     "py3-none-manylinux_2_27_s390x.manylinux_2_28_s390x",
+    "py3-none-manylinux_2_38_riscv64.manylinux_2_39_riscv64",
     "py3-none-musllinux_1_2_x86_64",
     "py3-none-musllinux_1_2_aarch64",
     "py3-none-macosx_11_0_arm64",

@@ -41,6 +41,11 @@
 - The CSV header has a `# Precision:` line, and the backend summary a
   `Precision:` line.
 - `parse_elliprof_csv` parses numbers round-trip exactly.
+- Linux riscv64 (manylinux_2_39) is a Supported platform, like ppc64le
+  and s390x validated under QEMU emulation (not yet on native
+  hardware). Windows ARM64 stays Experimental: CFITSIO, its Fortran ABI
+  probe and the backend work there, but PyPI has no Windows ARM64
+  pyerfa wheel, so Astropy and the full Python test cannot install.
 
 ### Fixed
 

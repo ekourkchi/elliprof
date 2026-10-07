@@ -464,15 +464,15 @@ A normal run prints a short summary: the image, sky and mask, the number of isop
 | Platform | Status |
 |---|---|
 | Linux x86_64, aarch64 (manylinux_2_28) | Supported |
-| Linux ppc64le, s390x (manylinux_2_28) | Supported (wheels tested under QEMU emulation) |
+| Linux ppc64le, s390x (manylinux_2_28) | Supported (validated under QEMU emulation; not yet validated on native ppc64le/s390x hardware) |
+| Linux riscv64 (manylinux_2_39) | Supported (validated under QEMU emulation; not yet validated on native riscv64 hardware) |
 | Linux x86_64, aarch64 (musllinux_1_2, e.g. Alpine) | Supported |
 | macOS 10.13+ x86_64 (Intel) | Supported |
 | macOS 11+ arm64 (Apple Silicon) | Supported |
 | Windows x86_64 | Supported |
-| Linux riscv64 (manylinux_2_39) | Experimental: the wheel builds, but its tests have not completed |
-| Windows ARM64 | Experimental: no wheel (no GNU Fortran toolchain yet) |
+| Windows ARM64 | Experimental: no wheel. CFITSIO builds, its Fortran ABI probe passes, and the backend builds and runs (LLVM flang); the full Python-package test cannot complete because PyPI has no Windows ARM64 wheel of pyerfa, which Astropy needs. Not an ELLIPROF numerical or backend failure |
 
-Python 3.6 to 3.14. The Intel macOS wheel is built for macOS 10.13 throughout: the program, its CFITSIO, and the bundled Fortran runtime libraries. Supported means the wheel was installed and passed the installed-wheel and regression tests in a clean environment without a compiler or CFITSIO. On ppc64le and s390x, PyPI has no numpy or pandas wheels, so install those from your Linux distribution or conda. 32-bit systems, Intel Macs older than macOS 10.13, and Apple Silicon Macs older than macOS 11 are not supported.
+Python 3.6 to 3.14. The Intel macOS wheel is built for macOS 10.13 throughout: the program, its CFITSIO, and the bundled Fortran runtime libraries. Supported means the wheel was installed and passed the installed-wheel and regression tests in a clean environment without a compiler or CFITSIO. On ppc64le, s390x and riscv64, PyPI has no numpy or pandas wheels, so install those from your Linux distribution or conda. 32-bit systems, Intel Macs older than macOS 10.13, and Apple Silicon Macs older than macOS 11 are not supported.
 
 ## Development
 

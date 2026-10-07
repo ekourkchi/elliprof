@@ -3,10 +3,11 @@
 # platform and test it.  Artifacts only -- nothing is published.
 #
 # ppc64le, s390x and riscv64 are built and tested under QEMU on x86_64
-# runners; musllinux natively.  Those five are tested outside
-# cibuildwheel, in clean containers (test-linux).
-# Experimental, non-blocking (continue-on-error): Linux riscv64, and the
-# Windows ARM64 probe, which builds no wheel.
+# runners (validated under emulation, not on native hardware); musllinux
+# natively.  Those five are tested outside cibuildwheel, in clean
+# containers (test-linux).
+# Experimental, non-blocking (continue-on-error): the Windows ARM64
+# probe, which builds no wheel.
 name: wheels
 
 # Release/platform validation: manual only (Actions > wheels > Run
@@ -19,7 +20,8 @@ jobs:
     name: wheel ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
-    # experimental targets (riscv64) never fail the workflow
+    # experimental targets (matrix `experimental: true`; none at present)
+    # never fail the workflow
     continue-on-error: ${{ matrix.experimental == true }}
     strategy:
       fail-fast: false
@@ -29,7 +31,7 @@ jobs:
           - {name: linux-aarch64, os: ubuntu-24.04-arm, archs: aarch64}
           - {name: linux-ppc64le, os: ubuntu-24.04,     archs: ppc64le, qemu: true}
           - {name: linux-s390x,   os: ubuntu-24.04,     archs: s390x,   qemu: true}
-          - {name: linux-riscv64, os: ubuntu-24.04,     archs: riscv64, qemu: true, experimental: true}
+          - {name: linux-riscv64, os: ubuntu-24.04,     archs: riscv64, qemu: true}
           - {name: musllinux-x86_64,  os: ubuntu-24.04,     archs: x86_64,  build: "cp312-musllinux_*"}
           - {name: musllinux-aarch64, os: ubuntu-24.04-arm, archs: aarch64, build: "cp312-musllinux_*"}
           - {name: macos-arm64,   os: macos-15,         archs: arm64,  target: "11.0",
@@ -214,7 +216,7 @@ jobs:
         include:
           - {name: linux-ppc64le, os: ubuntu-24.04, platform: linux/ppc64le, image: "debian:trixie-slim", mode: apt, qemu: true}
           - {name: linux-s390x,   os: ubuntu-24.04, platform: linux/s390x,   image: "debian:trixie-slim", mode: apt, qemu: true}
-          - {name: linux-riscv64, os: ubuntu-24.04, platform: linux/riscv64, image: "debian:trixie-slim", mode: apt, qemu: true, experimental: true}
+          - {name: linux-riscv64, os: ubuntu-24.04, platform: linux/riscv64, image: "debian:trixie-slim", mode: apt, qemu: true}
           - {name: musllinux-x86_64,  os: ubuntu-24.04,     platform: linux/amd64, image: "python:3.12-alpine", mode: pip}
           - {name: musllinux-aarch64, os: ubuntu-24.04-arm, platform: linux/arm64, image: "python:3.12-alpine", mode: pip, prebuild: astropy}
     steps:
@@ -264,8 +266,13 @@ jobs:
   # EXPERIMENTAL (non-blocking): Windows ARM64.  MSYS2 has no gfortran for ARM64, only
   # LLVM flang, which the wheel build does not accept (CMakeLists.txt
   # requires GNU Fortran).  This job only records what the toolchain can
-  # do -- the numerical flags, a CFITSIO build, a flang-built backend
-  # and its regression outputs -- and builds no wheel.  Allowed to fail.
+  # do -- the numerical flags, a CFITSIO build (Fortran ABI probe), a
+  # flang-built backend and its regression outputs -- and builds no
+  # wheel.  Allowed to fail.  As of 2026-10-07 CFITSIO builds, the probe
+  # passes and the backend runs; the regression step stops at
+  # `pip install astropy` because PyPI has no Windows ARM64 wheel of
+  # pyerfa (an Astropy dependency) -- a Python-ecosystem gap, not an
+  # ELLIPROF failure.  Do not weaken or vendor dependencies to change that.
   windows-arm64-probe:
     name: experimental windows-arm64 (toolchain probe)
     runs-on: windows-11-arm

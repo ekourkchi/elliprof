@@ -44,7 +44,7 @@ and is silent offline and in scripts or batch jobs. Set
 | | |
 |---|---|
 | Python | 3.6 through 3.14 |
-| Linux | x86_64, aarch64, ppc64le, s390x (glibc, "manylinux"); x86_64, aarch64 (musl, e.g. Alpine) |
+| Linux | x86_64, aarch64, ppc64le, s390x, riscv64 (glibc, "manylinux"); x86_64, aarch64 (musl, e.g. Alpine). ppc64le, s390x and riscv64 are validated under QEMU emulation, not yet on native hardware |
 | macOS | Intel (x86_64): 10.13 High Sierra or newer. Apple Silicon (arm64): 11 Big Sur or newer |
 | Windows | x86_64 |
 
