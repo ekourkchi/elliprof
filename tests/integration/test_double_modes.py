@@ -178,3 +178,43 @@ def test_values_single_refuses_are_fitted(run_native, tmp_path):
     p = run_native(tmp_path / "h.fits", *FIT, "--precision", "single",
                    "-o", tmp_path / "s.dat")
     assert p.returncode != 0 and "CFITSIO status" in p.stderr
+
+
+def test_linear_sentinels_and_squares(run_native, tmp_path):
+    """LINEAR fits intensities directly.  In single, real values below
+    -1e5 look like ELLIPROF's skip sentinel and large values overflow
+    their squares; the double backend's normalization keeps every
+    internal value below 1 in size, so neither happens."""
+    data = fits.getdata(GAL).astype(np.float64)
+    fits.PrimaryHDU(-10 * data).writeto(tmp_path / "inv.fits")
+    p = run_native(tmp_path / "inv.fits", *FIT, "LINEAR", "--precision",
+                   "single", "-o", tmp_path / "s.dat")
+    assert p.returncode == 0 and "FITCONTOUR: quitting" in p.stdout
+    p = run_native(tmp_path / "inv.fits", *FIT, "LINEAR", "--precision",
+                   "double", "-o", tmp_path / "d.dat")
+    assert p.returncode == 0 and "FITCONTOUR" not in p.stdout
+    ref = tmp_path / "r.dat"
+    run_native(GAL, *FIT, "LINEAR", "--precision", "double", "-o", ref)
+    fits.PrimaryHDU(data * 1e30).writeto(tmp_path / "big.fits")
+    p = run_native(tmp_path / "big.fits", *FIT, "LINEAR", "-o",
+                   tmp_path / "b.dat")
+    assert p.returncode == 0 and "FITCONTOUR" not in p.stdout
+    b, r = read_dat(tmp_path / "b.dat"), read_dat(ref)
+    np.testing.assert_allclose(b[:, 1:3], r[:, 1:3], atol=1e-9)
+    np.testing.assert_allclose(b[:, 3], r[:, 3] * 1e30, rtol=1e-9)
+
+
+def test_linear_beyond_its_safe_range_is_an_error(run_native, tmp_path):
+    """Values from 1e-320 to 1e285 in one image: no exponent keeps
+    LINEAR's squares in range -- a clear error (the log fit works)."""
+    data = fits.getdata(GAL).astype(np.float64) * 1e280
+    data[0, 0] = 1e-320
+    fits.PrimaryHDU(data).writeto(tmp_path / "x.fits")
+    p = run_native(tmp_path / "x.fits", *FIT, "LINEAR", "-o",
+                   tmp_path / "x.dat")
+    assert p.returncode == 1
+    assert "error (double precision, normalization): LINEAR needs" in \
+        p.stderr
+    p = run_native(tmp_path / "x.fits", *FIT, "-o", tmp_path / "y.dat")
+    assert p.returncode == 0
+    assert np.all(np.isfinite(read_dat(tmp_path / "y.dat")[:, :11]))

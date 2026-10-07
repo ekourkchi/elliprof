@@ -195,6 +195,19 @@ C     product is written, which stays in physical units)
       IF (NINEX .GT. 0) WRITE (6,'(A,I0,A)') ' Normalization: ',
      $     NINEX, ' value(s) below the normal double range '
      $     //'internally, rounded'
+C     LINEAR fits intensities, squares and sums them (variances, the
+C     least-squares sums over up to 360 samples): every internal value
+C     must stay below 2**500.  KPREF is the exponent of the largest
+C     value; only clamping (a range of values beyond about 2**1073)
+C     can leave KNORM below it.  No safe k for LINEAR: an error.
+      IF (LINEAR .AND. KPREF - KNORM .GT. 500) THEN
+         WRITE (0,'(A,I0,A)') 'elliprof: error (double precision, '
+     $        //'normalization): LINEAR needs the nonzero |values| '
+     $        //'within a factor 2**', 1573, ' of each other; this '
+     $        //'image spans more (use the default log fit, or mask '
+     $        //'the extreme pixels)'
+         RETURN
+      END IF
       HIST(1) = 'elliprof precision: double (IEEE-754 binary64)'
       YESNO = 'no'
       IF (KNORM .NE. KPREF) YESNO = 'yes'
