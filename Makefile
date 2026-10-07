@@ -39,8 +39,12 @@ endif
 
 ORIG = elliprof jtutil gcfit assign dissect value operate variable upper
 SHIM = main stubs fitsio profout maskio prep
-OBJS = $(ORIG:%=build/%.o) $(SHIM:%=build/%.o)
+# Double-precision backend: maintained precision ports of original
+# routines (src/double), with their own COMMON blocks (src/double/include)
+DOUBLE = elliprof_d jtutil_d
+OBJS = $(ORIG:%=build/%.o) $(SHIM:%=build/%.o) $(DOUBLE:%=build/%.o)
 INCS = $(wildcard include/*.inc include/*.par) build/version.inc
+DINCS = $(wildcard src/double/include/*.inc)
 
 all: elliprof_native elliprof
 
@@ -56,6 +60,10 @@ build/%.o: src/original/%.f $(INCS) | build
 
 build/%.o: src/shim/%.f $(INCS) | build
 	$(FC) $(FFLAGS) $(WARN) -Iinclude -Ibuild -c $< -o $@
+
+build/%.o: src/double/%.f $(INCS) $(DINCS) | build
+	$(FC) $(FFLAGS) $(WARN) -Iinclude -Isrc/double/include -Ibuild \
+	    -c $< -o $@
 
 build/version.inc: VERSION | build
 	printf "      CHARACTER*(*) VERSTR\n      PARAMETER (VERSTR='%s')\n" \

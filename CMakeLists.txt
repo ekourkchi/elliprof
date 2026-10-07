@@ -74,12 +74,17 @@ endif()
 set(ORIGINAL elliprof jtutil gcfit assign dissect value operate variable
              upper)
 set(SHIM main stubs fitsio profout maskio prep)
+# Double-precision backend (precision ports of original routines)
+set(DOUBLE elliprof_d jtutil_d)
 set(SOURCES "")
 foreach(f ${ORIGINAL})
   list(APPEND SOURCES "src/original/${f}.f")
 endforeach()
 foreach(f ${SHIM})
   list(APPEND SOURCES "src/shim/${f}.f")
+endforeach()
+foreach(f ${DOUBLE})
+  list(APPEND SOURCES "src/double/${f}.f")
 endforeach()
 
 # The legacy fixed-form sources must reach the compiler exactly as in the
@@ -89,7 +94,8 @@ set_source_files_properties(${SOURCES} PROPERTIES Fortran_PREPROCESS OFF)
 
 add_executable(elliprof_native ${SOURCES})
 target_include_directories(elliprof_native PRIVATE
-  "${PROJECT_SOURCE_DIR}/include" "${PROJECT_BINARY_DIR}")
+  "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/src/double/include"
+  "${PROJECT_BINARY_DIR}")
 target_compile_options(elliprof_native PRIVATE ${ELLIPROF_FFLAGS})
 target_link_libraries(elliprof_native PRIVATE ${CFITSIO_LIBRARY}
                       ${_extra_libs})
