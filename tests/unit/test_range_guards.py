@@ -245,3 +245,38 @@ def test_r5_sign_is_kept(rangeprobe):
         4 * math.ulp(g[0])
     assert g[1] < 0 and abs(g[1] - times_exp(-1e-300, 800.0)) <= \
         4 * math.ulp(g[1])
+
+
+# ---- R6 -----------------------------------------------------------------
+
+def exp_times_pow2(arg, k):
+    with localcontext() as ctx:
+        ctx.prec = 90
+        return to_double(Decimal(arg).exp() * Decimal(2) ** k)
+
+
+def test_expsc2d_against_reference(rangeprobe):
+    """exp(arg)*2**k for k = 0, +-1, odd, large of both signs, near the
+    normalization limits (|k| <= 1073), and results near DBL_MAX, near
+    the smallest normal, subnormal and below the smallest subnormal."""
+    ks = [0, 1, -1, 2, -2, 3, -3, 5, -7, 101, -101, 500, -500, 802, -802,
+          997, -997, 1023, -1023, 1024, -1073, 1073]
+    cases = []
+    for k in ks:
+        base = -k * math.log(2)
+        for target in (709.7, 709.78, 709.79, 300, 1, 0, -300, -708.3,
+                       -708.4, -720, -744.4, -745.1, -745.2, -800):
+            cases.append((base + target, k))
+    rng = random.Random(6)
+    cases += [(rng.uniform(-1500, 1500), rng.randint(-1073, 1073))
+              for _ in range(5000)]
+    got = run(rangeprobe, [("E", (a, float(k))) for a, k in cases])
+    for (a, k), g in zip(cases, got):
+        r = exp_times_pow2(a, k)
+        if r == 0 or not math.isfinite(r):
+            # beyond the range (or rounding to its edge)
+            assert g == r or abs(g) <= 2 * SUB or abs(g) >= M1, (a, k, g, r)
+        elif abs(r) < TINY:
+            assert abs(g - r) <= 2 * SUB, (a, k, g, r)     # subnormal
+        else:
+            assert abs(g - r) <= 5 * math.ulp(r), (a, k, g, r)

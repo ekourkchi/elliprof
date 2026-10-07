@@ -35,6 +35,7 @@ NONFINITE = ("auto", "mask", "keep", "error")
 _NONFIN = re.compile(r"Non-finite: policy (\w+)(?: \(auto\))?; NaN (\d+), "
                      r"\+Inf (\d+), -Inf (\d+); masked (\d+)")
 _UNDERFLOW = re.compile(r"Model: (\d+) pixels underflowed to zero")
+_SUBNORMAL = re.compile(r"Model: (\d+) pixels are subnormal")
 _PRECISION = re.compile(r"^\s*Precision: (single|double) \(.*?\); "
                         r"requested (\w+)(?: \(auto: (.*)\))?\s*$", re.M)
 _NORMALIZATION = re.compile(r"Normalization: fit on image x 2\*\*\(-k\), "
@@ -91,6 +92,9 @@ class ElliprofResult:
     nonfinite_counts: Optional[Dict[str, int]] = None
     #: double backend with a model: model pixels that underflowed to 0
     model_underflow_zero_count: Optional[int] = None
+    #: double backend with a model: model pixels that are subnormal
+    #: (nonzero, below the normal double range: reduced precision)
+    model_subnormal_count: Optional[int] = None
 
     @property
     def ok(self) -> bool:
@@ -306,6 +310,11 @@ def _precision_info(stdout: str, model: bool = False) -> dict:
         info["model_underflow_zero_count"] = int(u.group(1))
     elif info.get("precision") == "double" and model:
         info["model_underflow_zero_count"] = 0
+    s = _SUBNORMAL.search(stdout)
+    if s:
+        info["model_subnormal_count"] = int(s.group(1))
+    elif info.get("precision") == "double" and model:
+        info["model_subnormal_count"] = 0
     return info
 
 

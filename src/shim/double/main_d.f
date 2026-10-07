@@ -33,8 +33,8 @@ C     physical units -> products.  ISTAT returns the exit status.
       CHARACTER*72 HIST(5)
       CHARACTER*3 YESNO
       CHARACTER*16 MIBD
-      CHARACTER*512 PRECLN, NORMLN, UNDLN
-      INTEGER NUNDT
+      CHARACTER*512 PRECLN, NORMLN, UNDLN, SUBLN
+      INTEGER NUNDT, NSUBT, NHM
       DOUBLE PRECISION V
       LOGICAL FINITED
       COMMON /SHIMOPT/ SHVERB
@@ -222,6 +222,7 @@ C     can leave KNORM below it.  No safe k for LINEAR: an error.
      $     //'products physical'
       NHIST = 3
       UNDLN = ' '
+      SUBLN = ' '
 
 C     ---- The prepared image, physical units: good(mask) x (science -
 C     sky), BITPIX -64
@@ -251,6 +252,9 @@ C     ---- The fit, on the normalized image
 
       CALL SCALEIMD(PIX, NPIX, -KNORM)
       NUNDER = 0
+      NSUBN = 0
+      NOVERM = 0
+      MODPHY = .FALSE.
       CALL ELLIPROFD(PIX, NROW, NCOL)
       IF (DOMODEL .AND. SHVERB) WRITE (0,*)
 C     Range failures of the double fit, never a silent success: an
@@ -297,16 +301,24 @@ C     flags are dimensionless), exactly
  50   CONTINUE
       CALL PRFMARKD(KNORM, KPREF)
 
-C     ---- The model, which ELLIPROFD left in PIX (internal units):
-C     back to physical units, exactly.  A finite value that is beyond
-C     the double range there is an error, never a silent Inf.  (A NaN
-C     that the original model algorithm gives stays NaN, as in single.)
-C     Model pixels whose value underflows to zero -- exp(arg) below the
-C     double range in SYNTHESIZED (NUNDER), or a nonzero internal value
-C     too small in physical units -- are counted, for information.
+C     ---- The model in physical units.  SYNTHESIZED returns it so
+C     (MODPHY, R6: normalization never turns a representable physical
+C     model into 0 or Inf) and counts, in physical units, the pixels
+C     whose model underflowed to zero, is subnormal, or is beyond the
+C     double range.  Otherwise PIX is in internal units and is scaled
+C     here, exactly, as before.  A finite value beyond the double range
+C     is an error, never a silent Inf.  (A NaN that the original model
+C     algorithm gives stays NaN, as in single.)  Underflow to zero and
+C     subnormal values are reported, for information.
 
       NUNDT = 0
-      IF (DOMODEL) THEN
+      NSUBT = 0
+      NHM = NHIST
+      IF (DOMODEL .AND. MODPHY) THEN
+         NOVER = NOVERM
+         NUNDT = NUNDER
+         NSUBT = NSUBN
+      ELSE IF (DOMODEL) THEN
          NOVER = 0
          NUNDT = NUNDER
          DO 60 J = 1, NROW
@@ -316,8 +328,12 @@ C     too small in physical units -- are counted, for information.
                IF (FINITED(V) .AND. .NOT. FINITED(PIX(I,J)))
      $              NOVER = NOVER + 1
                IF (V .NE. 0 .AND. PIX(I,J) .EQ. 0) NUNDT = NUNDT + 1
+               IF (PIX(I,J) .NE. 0 .AND. ABS(PIX(I,J)) .LT. TINY(V))
+     $              NSUBT = NSUBT + 1
  61         CONTINUE
  60      CONTINUE
+      END IF
+      IF (DOMODEL) THEN
          IF (NOVER .GT. 0) THEN
             WRITE (0,'(A,I0,A)') 'elliprof: error (double precision, '
      $           //'model): the model is beyond the double range at ',
@@ -326,9 +342,16 @@ C     too small in physical units -- are counted, for information.
          END IF
          IF (NUNDT .GT. 0) WRITE (6,'(A,I0,A)') ' Model: ', NUNDT,
      $        ' pixels underflowed to zero at double precision.'
+         IF (NSUBT .GT. 0) WRITE (6,'(A,I0,A)') ' Model: ', NSUBT,
+     $        ' pixels are subnormal (nonzero, below the normal double'
+     $        //' range: reduced precision).'
          WRITE (HIST(NHIST+1),'(A,I0,A)') 'elliprof model underflow '
      $        //'to zero: ', NUNDT, ' pixel(s)'
+         WRITE (HIST(NHIST+2),'(A,I0,A)') 'elliprof model subnormal '
+     $        //'(nonzero): ', NSUBT, ' pixel(s)'
+         NHM = NHIST + 2
          WRITE (UNDLN,'(I0,A)') NUNDT, ' pixel(s)'
+         WRITE (SUBLN,'(I0,A)') NSUBT, ' pixel(s)'
       END IF
 
 C     A 6th-order term in the model and a PA wrap: as in main.f
@@ -389,7 +412,7 @@ C     ---- CSV table and DS9 regions
          L = LEN_TRIM(ORIGCOMMAND)
          CALL WRITECSVD(CSVFILE, FITSFILE, MSKDESC, SKYDESC,
      $        ORIGCOMMAND(10:MAX(10,L)), ISC, ISR, PRECLN, NORMLN,
-     $        UNDLN, IERR)
+     $        UNDLN, SUBLN, IERR)
          IF (IERR .NE. 0) RETURN
       END IF
       IF (REGFILE .NE. ' ') THEN
@@ -400,7 +423,7 @@ C     ---- CSV table and DS9 regions
       IF (MODFILE .NE. ' ') THEN
          CALL FITSWRITEPRODD(MODFILE, FITSFILE, NCOL, NROW, PIX,
      $        'MODEL (galaxy model from the fitted isophotes)',
-     $        NHIST+1, HIST, IERR)
+     $        NHM, HIST, IERR)
          IF (IERR .NE. 0) RETURN
       END IF
 
@@ -428,7 +451,7 @@ C     good(mask) x (science - sky - model)
             RETURN
          END IF
          CALL FITSWRITEPRODD(RESFILE, FITSFILE, NCOL, NROW, PREP,
-     $        'RESIDUAL = mask x (science - sky - model)', NHIST+1,
+     $        'RESIDUAL = mask x (science - sky - model)', NHM,
      $        HIST, IERR)
          IF (IERR .NE. 0) RETURN
       END IF

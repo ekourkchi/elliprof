@@ -134,6 +134,50 @@ C     X * 2**K, exactly when the result is a normal number (SCALE).
       RETURN
       END
 
+C     EXP(ARG) * 2**K without forming EXP(ARG) or 2**K alone (R6;
+C     SYNTHESIZED calls it with K chosen so that the result is near 1).
+C     K = K1+K2+K3+K4 (differing by at most one, exact for any sign),
+C     B = EXP(ARG/4) (ARG/4 exact), result (B*2**K1 * B*2**K2) *
+C     (B*2**K3 * B*2**K4) with SCALE (exact).  Each factor is the
+C     fourth root of the result times at most 2, each pair its square
+C     root times at most 4: when the result is a normal number of
+C     magnitude 2**-1000 to 2**1000, B is normal (|ARG| < 2832) and no
+C     intermediate leaves the normal range; only the final product is
+C     rounded.  |ARG| >= 2832 gives 0 or Inf (B), the true value being
+C     beyond any representable model.  Error: a few ulp (B to the 4th
+C     power, three products).
+      DOUBLE PRECISION FUNCTION EXPSC2D(ARG, K)
+      IMPLICIT NONE
+      DOUBLE PRECISION ARG, B
+      INTEGER K, KQ, KR
+      B = EXP(ARG/4)
+      KR = MODULO(K, 4)
+      KQ = (K - KR) / 4
+      EXPSC2D = (SCALE(B, KQ + MIN(KR,1)) * SCALE(B, KQ + MIN(KR,2)/2))
+     $     * (SCALE(B, KQ + KR/3) * SCALE(B, KQ))
+      RETURN
+      END
+
+C     SYNTHESIZED stopped early (no convergence; R6): the pixels from
+C     (IX,IY) on, not modelled, to physical units as well -- exactly as
+C     the driver scales a whole internal array -- so that the model is
+C     uniformly in physical units (MODPHY).
+      SUBROUTINE PHYSRESTD(DATA, NX, NY, IX, IY)
+      IMPLICIT NONE
+      INTEGER NX, NY, IX, IY, I, J, I0
+      DOUBLE PRECISION DATA(NX,NY)
+      INCLUDE 'norm_d.inc'
+      DO 20 J = IY, NY
+         I0 = 1
+         IF (J .EQ. IY) I0 = IX
+         DO 10 I = I0, NX
+            DATA(I,J) = SCALE(DATA(I,J), KNORM)
+ 10      CONTINUE
+ 20   CONTINUE
+      MODPHY = .TRUE.
+      RETURN
+      END
+
 C     True for a finite double (not NaN, not +-Inf).
       LOGICAL FUNCTION FINITED(X)
       IMPLICIT NONE

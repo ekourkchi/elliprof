@@ -1461,7 +1461,7 @@ C     has 3.14159265 (and 0.33333333)
       double precision eps(0:maxr), ca(0:maxr), sa(0:maxr), rq(0:maxr)
       double precision c3(0:maxr), s3(0:maxr), c4(0:maxr), s4(0:maxr)
       double precision th(0:maxr), dth(0:maxr)
-      logical inside, outside, incr
+      logical inside, outside, incr, physd
       integer counter_666 
       common /elltstd/ ktest, itest, iverbose
       common /ellzd/ x0z,x1z,y0z,y1z,thz,dtz,ez0,ez1,r0z,r1z,
@@ -1551,6 +1551,8 @@ C      sky = amin1(skye,0.98*fn)
  666  continue
 C     PRECISION PORT: a new synthesis pass counts afresh
       nunder = 0
+      nsubn = 0
+      noverm = 0
 
       do 5 i = 1,n
          r(i) = par(1,i)
@@ -1695,6 +1697,8 @@ C         IF(MOD(IY,50).EQ.0) WRITE(6,'(''+'',i5)') IY
                   goto 666
                else
                   write(6,*) 'ERROR No convergence after 30 iter'
+C     PRECISION PORT (R6): the rest of the array to physical units too
+                  call physrestd(data,nx,ny,ix,iy)
                   return
                endif
             end if
@@ -1724,6 +1728,8 @@ C         IF(MOD(IY,50).EQ.0) WRITE(6,'(''+'',i5)') IY
                      goto 666
                   else 
                      write(6,*) 'ERROR No convergence after 30 iter'
+C     PRECISION PORT (R6): the rest of the array to physical units too
+                     call physrestd(data,nx,ny,ix,iy)
                      return
                   endif
                end if
@@ -1812,29 +1818,31 @@ C            END IF
 
 * Fill in the data point as a linear combination of ellipse k0 and k1
             arg = f0(k0) + frac*(f0(k1)-f0(k0))
-C     PRECISION PORT: exp(arg) for every arg up to LOG(HUGE(1D0))
-C     (the original: |arg| < 85, else the pixel is set to 0);
-C     beyond, the model is not representable: an error.  An
+C     PRECISION PORT (R6): the model is returned in physical units: the
+C     normalized value times 2**knorm, exactly, as the driver did
+C     before -- unless that path would let normalization alone turn a
+C     representable physical model into 0, a subnormal or Inf (knorm
+C     > 0: exp(arg) or the value below the normal range; knorm < 0:
+C     the value beyond DBL_MAX; any knorm: exp(arg) beyond DBL_MAX).
+C     Then the same expression is evaluated at a working scale 2**it
+C     that depends only on arg and sky (exp(arg)*2**it near 1, by
+C     EXPSC2D; sky*2**it at most 2**1000) and goes to physical units
+C     by one exact SCALE: the ordinary path's arithmetic, rounded once
+C     at the end, so exactly scale-invariant.  Counted on the physical
+C     value: underflow to 0, subnormal, beyond DBL_MAX (an error,
+C     unless the harmonic factor 1+corr is itself not finite -- its
+C     singularity at the centre, as in single -- kept as before).  An
 C     undefined arg (NaN: the log of a non-positive isophote
 C     intensity) is handled as in the original.
-            if(arg.le.log(huge(1D0))) then
-               data(ix,iy) = exp(arg) + sky
-C     PRECISION PORT: count exp(arg) underflowing to zero
-               if(data(ix,iy).eq.0) then
-                  if(exp(arg).eq.0) nunder = nunder + 1
-               end if
-            else if(arg.ne.arg) then
+            emod = 0
+            wcorr = 1
+            if(arg.ne.arg) then
                write(6,4738) ix, iy, arg
  4738          format('Pixel at',2i5,' at exp ',1pg12.2,' set to 0')
                data(ix,iy) = 0
             else
-               write(0,4739) ix, iy, arg
- 4739          format('elliprof: error (double precision, ',
-     $              'model): the model at pixel',2(1x,i0),
-     $              ' is exp(',1pe12.4e3,'), beyond the ',
-     $              'double range')
-               xerr = .true.
-               return
+               if(arg.le.log(huge(1D0))) emod = exp(arg)
+               data(ix,iy) = emod + sky
             end if
 
 * If requested, correct the data by the cos3x and cos4x terms
@@ -1867,7 +1875,33 @@ C     PRECISION PORT: count exp(arg) underflowing to zero
                   s4mid = s4(k0) + frac*(s4(k1)-s4(k0))
                   corr = corr + c4mid*c4x + s4mid*s4x
                end if
-               data(ix,iy) = data(ix,iy)*(1+corr)
+               wcorr = 1+corr
+               data(ix,iy) = data(ix,iy)*wcorr
+            end if
+
+C     PRECISION PORT (R6): to physical units and the model counters
+            vint = data(ix,iy)
+            physd = arg.eq.arg .and. (arg.gt.log(huge(1D0)) .or.
+     $           (knorm.gt.0 .and. (emod.lt.tiny(1D0) .or.
+     $           (vint.ne.0 .and. abs(vint).lt.tiny(1D0)))) .or.
+     $           (knorm.lt.0 .and. abs(vint).gt.huge(1D0)))
+            if(physd) then
+               it = -nint(max(min(arg,1D4),-1D4)/log(2D0))
+               if(sky.ne.0) it = min(it, 1000 - exponent(sky))
+               vint = (expsc2d(arg, it) + pow2d(sky, it))*wcorr
+               data(ix,iy) = pow2d(vint, knorm - it)
+            else
+               data(ix,iy) = pow2d(vint, knorm)
+            end if
+            vphy = data(ix,iy)
+            if(abs(vphy).gt.huge(1D0)) then
+               if(arg.eq.arg .and. abs(wcorr).le.huge(1D0))
+     $              noverm = noverm + 1
+            else if(vphy.eq.0) then
+               if(arg.eq.arg .and. (vint.ne.0 .or. emod.eq.0))
+     $              nunder = nunder + 1
+            else if(abs(vphy).lt.tiny(1D0)) then
+               nsubn = nsubn + 1
             end if
 
 * Set up suggested k0 for the next point
@@ -1878,6 +1912,8 @@ C     PRECISION PORT: count exp(arg) underflowing to zero
 
       write(6,*) neval, ' function evaluations,', 
      $     dble(neval)/(dble(nx)*dble(ny)), ' per point'
+C     PRECISION PORT (R6): the whole model is now in physical units
+      modphy = .true.
 
       return
       end

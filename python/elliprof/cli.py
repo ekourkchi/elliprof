@@ -416,6 +416,7 @@ _NONF = re.compile(r"^\s*Mask: (\d+) of them NaN")
 _NONFIN = re.compile(r"^\s*Non-finite: policy (.*?); NaN (\d+), \+Inf "
                      r"(\d+), -Inf (\d+); masked (\d+)")
 _UNDER = re.compile(r"^\s*Model: (\d+) pixels underflowed to zero")
+_SUBN = re.compile(r"^\s*Model: (\d+) pixels are subnormal")
 _BITPIX64 = re.compile(r"^\s*Image: BITPIX (-?64) converted")
 _PREC = re.compile(r"^\s*Precision: (single|double) .*?; requested (\w+)"
                    r"(?: \(auto: (.*)\))?\s*$")
@@ -489,6 +490,10 @@ def _summary(result, opts: dict, nr: str = "") -> None:
     if under:
         print(f"Model: {under.group(1)} pixels underflowed to zero at "
               "double precision.")
+    subn = next((m for m in map(_SUBN.match, out) if m), None)
+    if subn:
+        print(f"Model: {subn.group(1)} pixels are subnormal (nonzero, below "
+              "the normal double range: reduced precision).")
     sys.stdout.flush()
     for text, note in _NOTES:
         n = sum(text in l for l in out)

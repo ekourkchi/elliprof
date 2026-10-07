@@ -1,12 +1,14 @@
 C     Range-protection probe (tests/unit/test_range_guards.py): calls
 C     the double backend's own GETCONTOURD (bilinear sample, R4),
-C     ALTERD (log-fit I0 update, R5), linked from the
+C     ALTERD (log-fit I0 update, R5) and EXPSC2D (R6), linked from the
 C     same objects as elliprof_native.  One case per input line, every
 C     value a binary64 bit pattern (Z16); one result per output line:
 C       B x y p00 p10 p01 p11 f0  -> contour at (x,y) (radius 0)
 C       A f0 gain c1 c4           -> I0 after one log-fit update
+C       E arg k                   -> exp(arg)*2**k  (k as a double)
       PROGRAM RANGEPROBE
       IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION EXPSC2D
       CHARACTER*1 T
       INTEGER*8 IV(7)
       DOUBLE PRECISION V(7), R, PAR(11), FC(9), DATA(12,12), C(1)
@@ -32,7 +34,7 @@ C       A f0 gain c1 c4           -> I0 after one log-fit update
          PAR(6) = 1
          CALL GETCONTOURD(PAR, 0, 1, C, 12, 12, DATA, 0)
          R = C(1)
-      ELSE
+      ELSE IF (T .EQ. 'A') THEN
          DO 4 I = 1, 9
             FC(I) = 0
  4       CONTINUE
@@ -47,6 +49,8 @@ C       A f0 gain c1 c4           -> I0 after one log-fit update
          FC(4) = V(4)
          CALL ALTERD(PAR, 1, 1, 0.3D0, FC, V(2))
          R = PAR(4)
+      ELSE
+         R = EXPSC2D(V(1), NINT(V(2)))
       END IF
       WRITE (6,'(Z16.16)') TRANSFER(R, IV(1))
       GOTO 1

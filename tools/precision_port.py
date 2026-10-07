@@ -235,6 +235,60 @@ C     exp); the fallback would keep any sign.
             f0 = f0 * t
          end if
 """
+SYNTHRANGE = """\
+C     PRECISION PORT (R6): the model is returned in physical units: the
+C     normalized value times 2**knorm, exactly, as the driver did
+C     before -- unless that path would let normalization alone turn a
+C     representable physical model into 0, a subnormal or Inf (knorm
+C     > 0: exp(arg) or the value below the normal range; knorm < 0:
+C     the value beyond DBL_MAX; any knorm: exp(arg) beyond DBL_MAX).
+C     Then the same expression is evaluated at a working scale 2**it
+C     that depends only on arg and sky (exp(arg)*2**it near 1, by
+C     EXPSC2D; sky*2**it at most 2**1000) and goes to physical units
+C     by one exact SCALE: the ordinary path's arithmetic, rounded once
+C     at the end, so exactly scale-invariant.  Counted on the physical
+C     value: underflow to 0, subnormal, beyond DBL_MAX (an error,
+C     unless the harmonic factor 1+corr is itself not finite -- its
+C     singularity at the centre, as in single -- kept as before).  An
+C     undefined arg (NaN: the log of a non-positive isophote
+C     intensity) is handled as in the original.
+            emod = 0
+            wcorr = 1
+            if(arg.ne.arg) then
+               write(6,4738) ix, iy, arg
+ 4738          format('Pixel at',2i5,' at exp ',1pg12.2,' set to 0')
+               data(ix,iy) = 0
+            else
+               if(arg.le.log(huge(1D0))) emod = exp(arg)
+               data(ix,iy) = emod + sky
+            end if
+"""
+SYNTHPHYS = """\
+C     PRECISION PORT (R6): to physical units and the model counters
+            vint = data(ix,iy)
+            physd = arg.eq.arg .and. (arg.gt.log(huge(1D0)) .or.
+     $           (knorm.gt.0 .and. (emod.lt.tiny(1D0) .or.
+     $           (vint.ne.0 .and. abs(vint).lt.tiny(1D0)))) .or.
+     $           (knorm.lt.0 .and. abs(vint).gt.huge(1D0)))
+            if(physd) then
+               it = -nint(max(min(arg,1D4),-1D4)/log(2D0))
+               if(sky.ne.0) it = min(it, 1000 - exponent(sky))
+               vint = (expsc2d(arg, it) + pow2d(sky, it))*wcorr
+               data(ix,iy) = pow2d(vint, knorm - it)
+            else
+               data(ix,iy) = pow2d(vint, knorm)
+            end if
+            vphy = data(ix,iy)
+            if(abs(vphy).gt.huge(1D0)) then
+               if(arg.eq.arg .and. abs(wcorr).le.huge(1D0))
+     $              noverm = noverm + 1
+            else if(vphy.eq.0) then
+               if(arg.eq.arg .and. (vint.ne.0 .or. emod.eq.0))
+     $              nunder = nunder + 1
+            else if(abs(vphy).lt.tiny(1D0)) then
+               nsubn = nsubn + 1
+            end if
+"""
 REVIEWED = {
     "elliprof.f": [
         (r"      if\(igc\.eq\.1\) goto 100\n", GC_REFUSE, "gc-refuse"),
@@ -312,34 +366,11 @@ REVIEWED = {
          r"' set to 0'\)\n"
          r"               data\(ix,iy\) = 0\n"
          r"            end if\n",
-         "C     PRECISION PORT: exp(arg) for every arg up to LOG(HUGE(1D0))"
-         "\nC     (the original: |arg| < 85, else the pixel is set to 0);"
-         "\nC     beyond, the model is not representable: an error.  An"
-         "\nC     undefined arg (NaN: the log of a non-positive isophote"
-         "\nC     intensity) is handled as in the original.\n"
-         "            if(arg.le.log(huge(1D0))) then\n"
-         "               data(ix,iy) = exp(arg) + sky\n"
-         "C     PRECISION PORT: count exp(arg) underflowing to zero\n"
-         "               if(data(ix,iy).eq.0) then\n"
-         "                  if(exp(arg).eq.0) nunder = nunder + 1\n"
-         "               end if\n"
-         "            else if(arg.ne.arg) then\n"
-         "               write(6,4738) ix, iy, arg\n"
-         " 4738          format('Pixel at',2i5,' at exp ',1pg12.2,"
-         "' set to 0')\n"
-         "               data(ix,iy) = 0\n"
-         "            else\n"
-         "               write(0,4739) ix, iy, arg\n"
-         " 4739          format('elliprof: error (double precision, ',\n"
-         "     $              'model): the model at pixel',2(1x,i0),\n"
-         "     $              ' is exp(',1pe12.4e3,'), beyond the ',\n"
-         "     $              'double range')\n"
-         "               xerr = .true.\n"
-         "               return\n"
-         "            end if\n", "synth-range"),
+         SYNTHRANGE, "synth-range"),
         (r"( 666  continue\n)",
          r"\1C     PRECISION PORT: a new synthesis pass counts afresh\n"
-         r"      nunder = 0\n", "underflow-reset"),
+         r"      nunder = 0\n      nsubn = 0\n      noverm = 0\n",
+         "underflow-reset"),
         # contour/f0 can overflow for finite positive values whose ratio
         # exceeds DBL_MAX.  Only then (detected without dividing:
         # f0 < 1, so HUGE/4*f0 is finite) the logarithm is taken in the
@@ -374,6 +405,25 @@ REVIEWED = {
         # normal number although the product can be
         (r"         f0 = f0 \* exp\(gain\*\(fcoeff\(1\)\+fcoeff\(4\)\)\)\n",
          lambda m: ALTEREXP, "alter-exp"),
+        # R6: the model in physical units (normalization alone never
+        # turns a representable physical model into 0 or Inf)
+        (r"               data\(ix,iy\) = data\(ix,iy\)\*\(1\+corr\)\n"
+         r"            end if\n\n",
+         lambda m: "               wcorr = 1+corr\n"
+         "               data(ix,iy) = data(ix,iy)*wcorr\n"
+         "            end if\n\n" + SYNTHPHYS + "\n", "synth-physical"),
+        (r"(      logical inside, outside, incr)\n",
+         r"\1, physd\n", "synth-physd"),
+        (r"(\n( +)write\(6,\*\) 'ERROR No convergence after 30 iter'\n)"
+         r"( +)return\n",
+         lambda m: m.group(1) + "C     PRECISION PORT (R6): the rest of "
+         "the array to physical units too\n" + m.group(3)
+         + "call physrestd(data,nx,ny,ix,iy)\n" + m.group(3) + "return\n",
+         "synth-early-return", 2),
+        (r"(     \$     dble\(neval\)/\(dble\(nx\)\*dble\(ny\)\), "
+         r"' per point'\n)",
+         r"\1C     PRECISION PORT (R6): the whole model is now in physical "
+         r"units\n      modphy = .true.\n", "synth-modphy"),
     ],
 }
 
