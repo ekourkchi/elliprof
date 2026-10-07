@@ -14,8 +14,18 @@
   hold (`BITPIX` ±64, values beyond or below the 32-bit range); every
   other image gives the same results as 0.1.4. The summary, the CSV and
   `result.precision` say which backend ran and why.
-- `--nonfinite keep|mask|error` (`nonfinite=`): what happens to NaN and
-  ±Inf science pixels (e.g. no-data regions). Default `keep`, as before.
+- `--nonfinite auto|mask|keep|error` (`nonfinite=`): what happens to NaN
+  and ±Inf science pixels (e.g. no-data regions). The default `auto`
+  masks them, except with an explicit `--precision single`, which keeps
+  them as 0.1.4 did; `--precision single` therefore still reproduces
+  0.1.4 exactly. The summary records the policy and the counts.
+- In double precision, intensity ratios along an isophote and `AVG` box
+  sums that would exceed the double range are computed safely (only
+  then; ordinary images keep the original arithmetic bit for bit), and
+  a fit that still leaves the double range stops with a clear error.
+  Model pixels that underflow to 0 are counted and reported.
+- `auto` also chooses double when the single backend's parser cannot
+  read a `--sky` or `SKY=` value (0.1.4 failed on, e.g., `--sky 1e-40`).
 - `read_prf`/`read_profile` read double profiles exactly;
   `subtract_sky`/`apply_mask` take `precision="double"`.
 

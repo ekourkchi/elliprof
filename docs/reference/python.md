@@ -41,7 +41,7 @@ The keyword names follow the command line, in lower case.
 | `load_profile` | | `False` skips reading the profile (and never imports pandas) |
 | `backend_verbose=True` | `--verbose` | the backend's full output in `result.stdout` |
 | `precision` | `--precision` | `"auto"` (default), `"single"` or `"double"`; see [Precision](../concepts/precision.md) |
-| `nonfinite` | `--nonfinite` | `"keep"` (default), `"mask"` or `"error"`: NaN/Inf science pixels |
+| `nonfinite` | `--nonfinite` | `"auto"` (default: `"keep"` with `precision="single"`, else `"mask"`), `"mask"`, `"keep"` or `"error"`: NaN/Inf science pixels |
 | `timeout` | `--timeout` | seconds (default 1800; `None` = no limit) |
 | `check` | | raise on failure (default `True`) |
 
@@ -58,6 +58,8 @@ It returns an `ElliprofResult` with:
 | `version`, `backend_path` | versions and paths, for records |
 | `precision`, `precision_requested`, `precision_reason` | the backend that ran (`"single"`/`"double"`), what was asked for, and why `auto` chose it |
 | `normalization_exponent` | double backend: the fit ran on image × 2<sup>−k</sup>; k |
+| `nonfinite_policy`, `nonfinite_counts` | the non-finite policy applied, and the NaN / +Inf / −Inf / masked counts |
+| `model_underflow_zero_count` | double backend with a model: model pixels whose value underflowed to 0 |
 
 Errors raise `ElliprofError` (the fit failed; `.result` holds the
 backend output), `ElliprofTimeoutError` (on timeout) or `GeometryError`

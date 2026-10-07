@@ -63,7 +63,7 @@ Details: [How ELLIPROF fits a galaxy](../concepts/how-it-works.md).
 | `--sky VALUE` | subtract one constant sky level (image units) |
 | `--sky-image FILE` | subtract a sky image pixel by pixel; same dimensions as the science image. Not together with `--sky` |
 | `--mask FILE` | logical mask, by default: 0 = bad; other finite values = good; NaN, Inf, BLANK = bad. FITS of any BITPIX, or legacy BITPIX=1 `.dmask`. Same dimensions |
-| `--nonfinite keep\|mask\|error` | science pixels that are NaN or ±Inf after the sky and the mask (no-data regions): `keep` (default) passes them to ELLIPROF, with a warning; `mask` excludes them like masked pixels; `error` refuses the image |
+| `--nonfinite auto\|mask\|keep\|error` | science pixels that are NaN or ±Inf after the sky and the mask (no-data regions): `mask` excludes them like masked pixels; `keep` passes them to ELLIPROF, as 0.1.4 did, with a warning; `error` refuses the image. `auto` (default): `keep` with an explicit `--precision single`, `mask` otherwise |
 | `--mask-convention nonzero-good\|zero-good` | how the mask values are read. `nonzero-good` (default): the rule above. `zero-good`: 0 = good; any nonzero value, NaN, Inf, BLANK = bad. Refused for a legacy `.dmask` (1 always means good) |
 | `--sc VALUE` | deprecated alias of `--sky` |
 | `SKY=s` | ELLIPROF's own sky, used **only** in the de Vaucouleurs fit it prints; does not change the image or profile |

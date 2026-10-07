@@ -30,7 +30,11 @@ give exactly the results of earlier versions. Double is chosen when
   would be infinite in 32-bit floating point (beyond about 3.4 × 10³⁸)
   or is nonzero but would be 0 (below about 7 × 10⁻⁴⁶); elliprof checks
   the actual values, never `DATAMIN`/`DATAMAX`;
-- the `--sky` value or the `SKY=` keyword is such a value.
+- the `--sky` value or the `SKY=` keyword is such a value, or is a valid
+  number that the original single-precision parser cannot read. That
+  parser refuses decimal exponents beyond about ±38 even for numbers a
+  32-bit float holds (`1e-40`, `3.4e38`), so 0.1.4 failed on them;
+  elliprof runs the old parser on the text itself to decide.
 
 Values that remain nonzero as tiny 32-bit numbers, values that are
 merely not exact in 32 bits, and 32-bit integers above 2²⁴ do not
@@ -89,21 +93,52 @@ outermost isophotes by about as much as single and double differ.
 
 - **GC mode** runs in single only.
 - **Extreme ratios inside one image.** When the brightest and the
-  typical values of one image are more than about 10³⁰⁸ apart, the
-  normalization cannot centre the data, and some intermediate
-  quantities of the fit (an intensity ratio along an isophote, an `AVG`
-  box sum) can overflow; such isophotes come out as NaN. This needs
-  data spanning most of the double range in a single image. A `LINEAR`
-  fit, which squares intensities, refuses such an image with a clear
-  error; the default log fit handles it unless the ratios themselves
-  overflow.
-- The **single** backend's command-line parser refuses numbers with a
-  decimal exponent beyond ±38 even when a 32-bit float holds them (for
-  example `--sky 1e-40`), as before; `--precision double` reads them.
-- Memory: the double backend needs 8 bytes per pixel for the image, 8
-  more for `--residual`, 4 for the mask, and a transient buffer while a
-  sky image or mask is read. `--verbose` prints the estimate; if the
-  memory is not there, elliprof says so and stops.
+  typical values of one image are more than about 10³⁰⁸ apart (for
+  example a galaxy at 10⁻³⁰⁰ with a 10³⁰⁰ source), the normalization
+  cannot centre the data. Two quantities of the fit whose intermediate
+  could then overflow are computed safely, only in that case: the log
+  of an intensity ratio along an isophote (taken in the log domain when
+  the ratio itself would exceed the double range) and the `AVG` box sum
+  (accumulated in units of the box's largest value). Every ordinary
+  image keeps the original arithmetic, bit for bit.
+- If the fit itself still leaves the double range -- an isophote
+  intensity overflowing or underflowing to 0 during the iteration, or a
+  slope between neighbouring isophotes whose intensities differ by more
+  than 10³⁰⁸ -- elliprof stops with a clear error naming the isophote,
+  never a silent NaN.
+- A `LINEAR` fit, which squares intensities, refuses an image spanning
+  more than about 2¹⁵⁷³ with a clear error.
+- The **single** backend's parser limit (above) still applies with
+  `--precision single`.
+- Pixels exactly at the largest double (1.8 × 10³⁰⁸) can make the
+  four-pixel interpolation round past the double range; such values do
+  not occur in ordinary data.
+- **Model underflow.** Far in the wings, the model's exponential can be
+  below the smallest double and becomes 0. This is counted, not an
+  error: `Model: N pixels underflowed to zero at double precision.`
+  in the summary, `# Model underflow to zero:` in the CSV, a `HISTORY`
+  card in the model and residual, `result.model_underflow_zero_count`
+  in Python.
+
+## Memory
+
+The double backend keeps these arrays per pixel: the image (8 bytes),
+its prepared copy for `--residual` (8), the logical mask (4, also with
+the default `--nonfinite mask`), and a transient buffer while a mask (12)
+or a sky image (8) is read. With a mask and `--residual` that is
+**32 bytes per pixel**:
+
+| Image | Pixels | Per-pixel arrays (32 B/pixel) |
+|---|---|---|
+| 4096 × 4096 | 16.8 million | 512 MiB |
+| 8192 × 8192 | 67.1 million | 2 GiB |
+| 10000 × 10000 | 100 million | 3.0 GiB (3052 MiB) |
+
+This is a baseline for the per-pixel arrays, not the peak memory of the
+process: the fit's own arrays, CFITSIO buffers, the header, the Fortran
+run time and, with the Python API, Python itself come on top.
+`--verbose` prints the estimate for the run. If the memory is not
+there, elliprof says so and stops. There is no size limit.
 
 ## Modern multi-extension images (JWST, HST, Euclid, ...)
 
@@ -115,12 +150,17 @@ elliprof stays a generic FITS tool. It needs no mission software.
   refused.
 - **2-D only.** A cube is refused; fit one plane with a CFITSIO
   section, `'cube.fits[SCI][*,*,2:2]'`.
-- **NaN no-data regions:** `--nonfinite mask` excludes NaN and ±Inf
-  science pixels like masked ones (the effective mask is your mask and
-  the finite pixels). The default, `keep`, passes them to ELLIPROF as
-  before and warns; ELLIPROF's log-intensity fit skips such samples,
-  but `LINEAR` fits and the products do not. `--nonfinite error`
-  refuses the image.
+- **NaN no-data regions:** `--nonfinite` decides what happens to
+  science pixels that are NaN or ±Inf after the sky and the mask.
+  `mask` excludes them like masked pixels: the effective mask is your
+  mask AND the finite pixels (and, later, a data-quality selection).
+  `keep` passes them to ELLIPROF, as 0.1.4 did, with a warning; the
+  log-intensity fit skips such samples, but `LINEAR` fits, the model
+  and the products do not. `error` refuses the image. The default,
+  `auto`, is `mask`, except with an explicit `--precision single`,
+  where it is `keep`, so `--precision single` alone reproduces 0.1.4
+  exactly. The summary records the policy and the NaN, +Inf and −Inf
+  counts (`result.nonfinite_counts` in Python).
 - **Data-quality flags:** a `DQ` extension can be used as an ordinary
   mask in which any nonzero flag is bad:
   `--mask 'cal.fits[DQ]' --mask-convention zero-good`. Selecting
