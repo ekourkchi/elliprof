@@ -34,6 +34,10 @@ STATES = {
     "6th":         ({"sixth_order": True}, ["--sixth-order"], -2, 2),
     "6th median":  ({"sixth_order": True, "harmonic_mode": "median"},
                     ["--sixth-order", "--harmonic-mode", "median"], -1, 1),
+    "6th measured": ({"sixth_order": True, "model_harmonics": "none"},
+                     ["--sixth-order", "--model-harmonics", "none"], -3, 0),
+    "6th measured, 4": ({"sixth_order": True, "model_harmonics": (4,)},
+                        ["--sixth-order", "--model-harmonics", "4"], -3, 2),
 }
 
 
@@ -151,9 +155,11 @@ def test_sixth_order_changes_the_fit(runs):
 
 
 @pytest.mark.parametrize("word,message", [
-    ("COS3X=3", "COS3X must be an integer from -2 to 2"),
+    ("COS3X=3", "COS3X must be an integer from -3 to 2"),
+    ("COS3X=-4", "COS3X must be an integer from -3 to 2"),
     ("COS4X=-1", "COS4X must be an integer from 0 to 2"),
-    ("COS3X=1.5", "COS3X must be an integer from -2 to 2"),
+    ("COS4X=3", "COS4X must be an integer from 0 to 2"),
+    ("COS3X=1.5", "COS3X must be an integer from -3 to 2"),
 ])
 def test_backend_rejects_other_values(native, tmp_path, word, message):
     proc = subprocess.run([str(native), str(IMAGE), *FIT[:5], word,
@@ -167,9 +173,9 @@ def test_cli_rejects_mixed_and_invalid(tmp_path, capsys):
     base = [str(IMAGE), *FIT, "-o", str(tmp_path / "x.prf")]
     assert cli.main(base + ["--model-harmonics", "5"]) == 1
     assert cli.main(base + ["COS3X=1", "--model-harmonics", "3"]) == 1
-    assert cli.main(base + ["--sixth-order", "--model-harmonics", "4"]) == 1
+    assert cli.main(base + ["--model-harmonics", "6"]) == 1
     err = capsys.readouterr().err
     assert "model harmonics must be" in err
     assert "given twice" in err
-    assert "6th-order term takes the place" in err
+    assert "model harmonic 6 needs --sixth-order" in err
     assert not (tmp_path / "x.prf").exists()

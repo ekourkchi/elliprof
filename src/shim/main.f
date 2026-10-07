@@ -321,9 +321,14 @@ C     its fitting arrays hold at most 100
             END IF
          END IF
       END IF
-C     COS3X/COS4X: ELLIPROF's harmonic modes (see its help text).
-C     COS3X -2..2 (negative: 6th- instead of 3rd-order term), COS4X 0..2
-      CALL CHKMODE('COS3X', -2, 2, IERR)
+C     COS3X/COS4X: ELLIPROF's harmonic modes (see its help text and
+C     docs/concepts/harmonics.md).  The sign of COS3X selects the order
+C     fitted (>= 0: 3rd, < 0: 6th); |COS3X| how that term enters the
+C     model (0 none, 1 median, 2 each isophote).  The supported values
+C     are COS3X -3..2 (-3: measure the 6th order, none in the model) and
+C     COS4X 0..2; other values are refused, although the original code
+C     would treat them like one of these.
+      CALL CHKMODE('COS3X', -3, 2, IERR)
       IF (IERR .EQ. 0) CALL CHKMODE('COS4X', 0, 2, IERR)
       IF (IERR .NE. 0) CALL EXIT(1)
       IF (SKYSTR .NE. ' ') THEN
@@ -464,6 +469,26 @@ C     ---- Run the unchanged ELLIPROF
          CALL EXIT(1)
       END IF
 
+C     A 6th-order term in the model (COS3X = -1 or -2) and a fitted
+C     position angle that wraps across 0/180 deg: the original model
+C     synthesis then gives the 6th-order term the wrong sign beyond the
+C     wrap.  The measured profile is not affected.  Warn; never alter.
+      IF (DOMODEL .AND. N_PRF .GT. 1) THEN
+         ICOS3X = NINT(PARAM_PRF(12,15))
+         IF (ICOS3X .EQ. -1 .OR. ICOS3X .EQ. -2) THEN
+            CALL PAWRAP(N_PRF, PARAM_PRF, K)
+            IF (K .GT. 0) WRITE (0,'(A,I0,A,F0.1,6A)')
+     $           'elliprof: warning: the fitted PA wraps across 0/180'//
+     $           ' deg at isophote ', K, ' (Rmaj = ', PARAM_PRF(1,K),
+     $           '). The 6th-order measurements are valid, but the ',
+     $           'original model synthesis gives the 6th-order term ',
+     $           'the wrong sign beyond the wrap: the model and ',
+     $           'residual may be wrong there. COS3X=-3 ',
+     $           '(--sixth-order --model-harmonics none) measures ',
+     $           'without modelling.'
+         END IF
+      END IF
+
 C     ---- Print the profile the way PRINT EPROF does (printout.f), when
 C     it is not being written to -o or --csv (or with --verbose)
 
@@ -558,6 +583,29 @@ C     good pixels and exactly 0 on bad ones
          IF (IERR .NE. 0) CALL EXIT(1)
       END IF
 
+      END
+
+C     First isophote K (> 1) at which the original model synthesis
+C     (SYNTHESIZE in elliprof.f) shifts the position angle by a multiple
+C     of 180 deg to keep it continuous, i.e. where the fitted angle
+C     wraps across 0/180 deg; 0 if it never does.  The same arithmetic
+C     as SYNTHESIZE: th = (alpha + 90 deg) in radians, and a shift of
+C     pi * anint((th(i) - th(i-1)) / pi) against the shifted th(i-1).
+      SUBROUTINE PAWRAP(N, PRM, K)
+      INTEGER N, K, I
+      REAL PRM(12,*), TH, THPREV, D
+      REAL PI, Q
+      PARAMETER (PI=3.14159265)
+      Q = 180/PI
+      K = 0
+      THPREV = (PRM(5,1) + 90) / Q
+      DO 10 I = 2, N
+         TH = (PRM(5,I) + 90) / Q
+         D = PI * ANINT((TH - THPREV) / PI)
+         IF (D .NE. 0 .AND. K .EQ. 0) K = I
+         THPREV = TH - D
+ 10   CONTINUE
+      RETURN
       END
 
 C     The numeric value of keyword KEY= (a plain, finite number).

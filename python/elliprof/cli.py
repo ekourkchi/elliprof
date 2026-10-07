@@ -187,22 +187,28 @@ MODEL AND HARMONIC CONTROLS
   MODEL              no longer needed and ignored (kept so that old
                      commands still run); -m FILE writes the model.
                      MODEL=value is an error.
-  Every isophote is fitted with a constant plus cos/sin of 1, 2, 3 and 4
-  times the angle around the ellipse.  Orders 1-2 move the ellipse; orders 3
-  and 4 are always measured (I3 A3 I4 A4) but never change the ellipse.
-  These options choose what goes into the model image (and so into the
-  residual) and do NOT change the fitted profile -- except --sixth-order:
+  Every isophote is fitted with a constant plus cos/sin of 1, 2, 4 and 3
+  (or, with --sixth-order, 6) times the eccentric angle around the
+  ellipse, all at once.  Orders 1-2 move the ellipse; the 3rd/6th and 4th
+  orders are measured (I3 A3 I4 A4) and do not move it.
   --model-harmonics none|3|4|3,4
-                     harmonic terms included in the model (default 3,4).
+                     which measured terms go into the model image (and so
+                     the residual); default 3,4.  This never changes the
+                     fitted profile.  With --sixth-order: none|6|4|4,6.
   --harmonic-mode each|median
                      each: every isophote's own terms (default); median: the
                      median of each term over all isophotes.
-  --sixth-order      fit and model the 6th-order term in place of the 3rd.
-                     This DOES change the fit; I3/A3 then hold the 6th-order
-                     amplitude and twice its phase.  Known original
-                     behaviour: in 'each' mode the model can have a few NaN
-                     pixels at the very centre.
-  Default: the same as COS3X=2 COS4X=2 (see LEGACY ELLIPROF CONTROLS).
+  --sixth-order      measure the 6th-order term INSTEAD of the 3rd.  I3/A3
+                     then hold the 6th-order amplitude and TWICE its phase
+                     (there are no I6/A6 columns).  The fit can change a
+                     little where ellipses are poorly sampled.  Known
+                     original limitations of a 6th-order MODEL: its sign is
+                     wrong beyond a fitted PA wrap across 0/180 deg (a
+                     warning says so), and a few central pixels can be NaN.
+                     --sixth-order --model-harmonics none (COS3X=-3)
+                     measures the 6th order without modelling it.
+  Default: the same as COS3X=2 COS4X=2.  Full explanation:
+  https://ekourkchi.github.io/elliprof/concepts/harmonics/
 
 OUTPUT FILES
   -o FILE        the profile in ELLIPROF's native text format, full
@@ -230,21 +236,33 @@ PROFILE COLUMNS (-o, --csv)
   ellip   ellipticity 1 - b/a
   I3 I4   amplitude of the 3rd/4th-order intensity variation around the
           isophote, as a fraction of I0 (dimensionless)
-  A3 A4   their phases [deg] in the angle around the ellipse measured from
-          the major axis: intensity ~ cos(n (theta - An)); A3 0-120, A4 0-90.
-          They are NOT position angles.
+  A3 A4   their phases [deg] in the eccentric angle around the ellipse,
+          from the end of the major axis at angle alpha: intensity ~
+          1 + In cos(n (theta - An)); A3 0-120, A4 0-90.  They are NOT
+          position angles.  With --sixth-order (COS3X < 0) I3 is the
+          6th-order amplitude and A3 twice the 6th-order phase.
   slope   logarithmic slope d ln I / d ln r from the neighbouring isophotes
           (set to -2 where it would be positive)
   Boxy/disky: A4 near 0 or 90 deg = disky, A4 near 45 deg = boxy.  I4 is an
   intensity amplitude, not a4/a or B4 (see the README for the conversion).
 
-LEGACY ELLIPROF CONTROLS
-  COS3X=k       original 3rd-order switch: 0 none, 1 median, 2 each isophote
-                (default) in the model image; -1/-2: the 6th-order term in
-                place of the 3rd (changes the fit).
-  COS4X=k       original 4th-order switch: 0 none, 1 median, 2 each
-                (default) in the model image; never changes the fit.
-  Use either COS3X/COS4X or the options above, not both.  The interactive
+LEGACY ELLIPROF CONTROLS (the original concise interface, fully supported)
+  COS3X=k       sign = the order measured, |k| = its use in the model:
+                   2  measure 3rd, model each isophote's term (default)
+                   1  measure 3rd, model the median term
+                   0  measure 3rd, not in the model
+                  -2  measure 6th, model each isophote's term
+                  -1  measure 6th, model the median term
+                  -3  measure 6th, not in the model
+  COS4X=k       the 4th order is always measured:
+                   2  model each isophote's term (default)
+                   1  model the median term
+                   0  not in the model
+  Use either COS3X/COS4X or the options above, not both.  The options
+  set both values at once, e.g. --model-harmonics none = COS3X=0
+  COS4X=0, --model-harmonics 4 = COS3X=0 COS4X=2, --harmonic-mode median
+  = COS3X=1 COS4X=1, --sixth-order --model-harmonics none = COS3X=-3
+  COS4X=0.  The interactive
   options OLD, EDIT and TV are not supported.
 
 DIAGNOSTICS AND RUNTIME OPTIONS
