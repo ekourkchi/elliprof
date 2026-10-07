@@ -163,6 +163,43 @@ REVIEWED = {
         (r"      q = 180/3\.14159265D0\n",
          PI_NOTE + "      q = 180/(4D0*atan(1D0))\n", "pi-q"),
         (r"third=0\.33333333D0", "third=1D0/3D0", "third"),
+        # the model's range: the original keeps |ln I| < 85 (where the
+        # REAL*4 EXP is finite and normal) and sets other pixels to 0;
+        # in double EXP is finite up to LOG(HUGE(1D0)) and underflows
+        # gradually below, so only overflow remains, and it is an error
+        (r"(      external elliterpd\n)",
+         r"\1C     PRECISION PORT: XERR (vistalink.inc) for the range error\n"
+         r"      REAL CONST\n      include 'vistalink.inc'\n",
+         "synth-xerr"),
+        (r"            if\(abs\(arg\)\.lt\.85\) then\n"
+         r"               data\(ix,iy\) = exp\(arg\) \+ sky\n"
+         r"            else\n"
+         r"               write\(6,4738\) ix, iy, arg\n"
+         r" 4738          format\('Pixel at',2i5,' at exp ',1pg12\.2,"
+         r"' set to 0'\)\n"
+         r"               data\(ix,iy\) = 0\n"
+         r"            end if\n",
+         "C     PRECISION PORT: exp(arg) for every arg up to LOG(HUGE(1D0))"
+         "\nC     (the original: |arg| < 85, else the pixel is set to 0);"
+         "\nC     beyond, the model is not representable: an error.  An"
+         "\nC     undefined arg (NaN: the log of a non-positive isophote"
+         "\nC     intensity) is handled as in the original.\n"
+         "            if(arg.le.log(huge(1D0))) then\n"
+         "               data(ix,iy) = exp(arg) + sky\n"
+         "            else if(arg.ne.arg) then\n"
+         "               write(6,4738) ix, iy, arg\n"
+         " 4738          format('Pixel at',2i5,' at exp ',1pg12.2,"
+         "' set to 0')\n"
+         "               data(ix,iy) = 0\n"
+         "            else\n"
+         "               write(0,4739) ix, iy, arg\n"
+         " 4739          format('elliprof: error (double precision, ',\n"
+         "     $              'model): the model at pixel',2(1x,i0),\n"
+         "     $              ' is exp(',1pe12.4e3,'), beyond the ',\n"
+         "     $              'double range')\n"
+         "               xerr = .true.\n"
+         "               return\n"
+         "            end if\n", "synth-range"),
     ],
 }
 

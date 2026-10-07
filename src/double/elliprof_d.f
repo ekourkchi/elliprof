@@ -1363,6 +1363,9 @@ C     has 3.14159265 (and 0.33333333)
       common /ellzd/ x0z,x1z,y0z,y1z,thz,dtz,ez0,ez1,r0z,r1z,
      $     xpt,ypt,x0mid,y0mid,camid,samid,epsmid,xp,yp,rmid, neval
       external elliterpd
+C     PRECISION PORT: XERR (vistalink.inc) for the range error
+      REAL CONST
+      include 'vistalink.inc'
 C     PRECISION PORT: the normalization exponent (norm_d.inc); POW2D(X,K)
 C     is X * 2**K (src/shim/double/prep_d.f)
       include 'norm_d.inc'
@@ -1703,12 +1706,25 @@ C            END IF
 
 * Fill in the data point as a linear combination of ellipse k0 and k1
             arg = f0(k0) + frac*(f0(k1)-f0(k0))
-            if(abs(arg).lt.85) then
+C     PRECISION PORT: exp(arg) for every arg up to LOG(HUGE(1D0))
+C     (the original: |arg| < 85, else the pixel is set to 0);
+C     beyond, the model is not representable: an error.  An
+C     undefined arg (NaN: the log of a non-positive isophote
+C     intensity) is handled as in the original.
+            if(arg.le.log(huge(1D0))) then
                data(ix,iy) = exp(arg) + sky
-            else
+            else if(arg.ne.arg) then
                write(6,4738) ix, iy, arg
  4738          format('Pixel at',2i5,' at exp ',1pg12.2,' set to 0')
                data(ix,iy) = 0
+            else
+               write(0,4739) ix, iy, arg
+ 4739          format('elliprof: error (double precision, ',
+     $              'model): the model at pixel',2(1x,i0),
+     $              ' is exp(',1pe12.4e3,'), beyond the ',
+     $              'double range')
+               xerr = .true.
+               return
             end if
 
 * If requested, correct the data by the cos3x and cos4x terms
