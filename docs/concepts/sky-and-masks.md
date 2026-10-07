@@ -127,8 +127,9 @@ elliprof galaxy.fits --mask segmap.fits --mask-convention zero-good ...
 ## The prepared image
 
 `--prepared FILE` writes the image exactly as ELLIPROF fits it:
-`mask × (science − sky)`, as 32-bit floating-point FITS with the science image's
-header and WCS. Look at it whenever a fit behaves oddly. Most problems
+`mask × (science − sky)`, as floating-point FITS (32-bit from the single
+backend, 64-bit from the double one; see [Precision](precision.md)) with the
+science image's header and WCS. Look at it whenever a fit behaves oddly. Most problems
 (a wrong sky, a mask that is too small, an inverted mask) are obvious in
 the prepared image.
 

@@ -31,7 +31,7 @@ is given.
 
 | Argument | Meaning |
 |---|---|
-| `IMAGE.fits` | 2-D FITS image (first argument), any BITPIX: 8, 16, 32, 64, −32, −64 (converted to 32-bit floating point, the precision ELLIPROF works in). Select an extension with CFITSIO syntax, quoted: `'galaxy.fits[SCI]'`, `'galaxy.fits[1]'`. The selected HDU is fitted; there is no fallback to another |
+| `IMAGE.fits` | 2-D FITS image (first argument), any BITPIX: 8, 16, 32, 64, −32, −64, read as 32-bit floats by the single backend and as 64-bit floats by the double one (`--precision`). Cubes are refused; one plane can be chosen with a CFITSIO section, `'cube.fits[SCI][*,*,2:2]'`. Select an extension with CFITSIO syntax, quoted: `'galaxy.fits[SCI]'`, `'galaxy.fits[1]'`. The selected HDU is fitted; there is no fallback to another |
 | `X0=x Y0=y` | **required** initial centre, in pixels. ELLIPROF refines the centre of each isophote unless `FIXCTR=1`. The centre of the pixel in FITS column *i* is at x = *i* − 0.5 |
 
 ## Radial fitting parameters
@@ -63,6 +63,7 @@ Details: [How ELLIPROF fits a galaxy](../concepts/how-it-works.md).
 | `--sky VALUE` | subtract one constant sky level (image units) |
 | `--sky-image FILE` | subtract a sky image pixel by pixel; same dimensions as the science image. Not together with `--sky` |
 | `--mask FILE` | logical mask, by default: 0 = bad; other finite values = good; NaN, Inf, BLANK = bad. FITS of any BITPIX, or legacy BITPIX=1 `.dmask`. Same dimensions |
+| `--nonfinite keep\|mask\|error` | science pixels that are NaN or ±Inf after the sky and the mask (no-data regions): `keep` (default) passes them to ELLIPROF, with a warning; `mask` excludes them like masked pixels; `error` refuses the image |
 | `--mask-convention nonzero-good\|zero-good` | how the mask values are read. `nonzero-good` (default): the rule above. `zero-good`: 0 = good; any nonzero value, NaN, Inf, BLANK = bad. Refused for a legacy `.dmask` (1 always means good) |
 | `--sc VALUE` | deprecated alias of `--sky` |
 | `SKY=s` | ELLIPROF's own sky, used **only** in the de Vaucouleurs fit it prints; does not change the image or profile |
@@ -123,14 +124,16 @@ slightly where ellipses are poorly sampled. Details:
 | `--residual FILE` | the residual image |
 | `--prepared FILE` | mask × (science − sky), the image as fitted |
 
-The images are 32-bit floating-point FITS (whatever the BITPIX of the
-input) with the header (and WCS) of the selected science HDU. Details: [The profile](../outputs/profile.md),
+The images are floating-point FITS, 32-bit from the single backend and
+64-bit from the double one, with the header (and WCS) of the selected
+science HDU. Details: [The profile](../outputs/profile.md),
 [Model, residual and prepared images](../outputs/images.md).
 
 ## Runtime options
 
 | Option | Meaning |
 |---|---|
+| `--precision auto\|single\|double` | the backend: `single`, the original ELLIPROF in 32-bit floating point; `double`, its IEEE-754 double-precision port; `auto` (default) uses double only for data single cannot hold. See [Precision](../concepts/precision.md) |
 | `--timeout SECONDS` | maximum run time (default 1800). On timeout the backend is stopped, temporary files removed, and elliprof exits with status 124 |
 | `--verbose` | show ELLIPROF's full output: iteration tables, model progress, every message |
 | `--diagnostics` | versions, Python, OS, architecture and backend details, for bug reports |

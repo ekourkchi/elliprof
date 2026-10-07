@@ -1,5 +1,33 @@
 # Changes
 
+## Unreleased (candidate 0.2.0, branch precision64)
+
+### Added
+
+- **A double-precision backend.** `--precision single|double|auto`
+  (Python `precision=`). single is the original ELLIPROF (32-bit
+  floating point, unchanged); double is its port to IEEE-754 double
+  precision: images read as 64-bit floats, sky and mask in double, an
+  exact power-of-two normalization, the fit and the model in double,
+  64-bit model/residual/prepared images, profiles with 18 significant
+  digits. `auto` (the default) runs double only for data single cannot
+  hold (`BITPIX` ±64, values beyond or below the 32-bit range); every
+  other image gives the same results as 0.1.4. The summary, the CSV and
+  `result.precision` say which backend ran and why.
+- `--nonfinite keep|mask|error` (`nonfinite=`): what happens to NaN and
+  ±Inf science pixels (e.g. no-data regions). Default `keep`, as before.
+- `read_prf`/`read_profile` read double profiles exactly;
+  `subtract_sky`/`apply_mask` take `precision="double"`.
+
+### Changed
+
+- An image with a third axis longer than 1 (a cube) is refused instead
+  of being fitted on its first plane; select a plane with a CFITSIO
+  section, `'cube.fits[SCI][*,*,2:2]'`.
+- The CSV header has a `# Precision:` line, and the backend summary a
+  `Precision:` line.
+- `parse_elliprof_csv` parses numbers round-trip exactly.
+
 ## 0.1.4 (2026-10-06)
 
 The numerical results are unchanged: for the same input, mask

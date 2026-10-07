@@ -90,9 +90,9 @@ the sky and the mask. See [Sky and masks](../concepts/sky-and-masks.md).
 
 ## Headers and WCS
 
-All three images are **32-bit floating-point FITS** (also when the
-science image is stored as 64-bit) and carry the **header of the
-science image**, including its WCS (`CTYPE`, `CRPIX`, `CRVAL`,
+All three images are **floating-point FITS**: 32-bit from the single
+backend, 64-bit from the double one (see [Precision](../concepts/precision.md)).
+They carry the **header of the science image**, including its WCS (`CTYPE`, `CRPIX`, `CRVAL`,
 `CD`/`PC`/`CDELT`, distortion terms), `BUNIT` and the other keywords. Only
 the cards that describe how the science data were stored are left out,
 such as `BITPIX`, `BSCALE`, `BZERO` and `BLANK`.

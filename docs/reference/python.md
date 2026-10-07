@@ -40,6 +40,8 @@ The keyword names follow the command line, in lower case.
 | `residual_path` | `--residual` | path of the residual (implies the model) |
 | `load_profile` | | `False` skips reading the profile (and never imports pandas) |
 | `backend_verbose=True` | `--verbose` | the backend's full output in `result.stdout` |
+| `precision` | `--precision` | `"auto"` (default), `"single"` or `"double"`; see [Precision](../concepts/precision.md) |
+| `nonfinite` | `--nonfinite` | `"keep"` (default), `"mask"` or `"error"`: NaN/Inf science pixels |
 | `timeout` | `--timeout` | seconds (default 1800; `None` = no limit) |
 | `check` | | raise on failure (default `True`) |
 
@@ -54,6 +56,8 @@ It returns an `ElliprofResult` with:
 | `center` | the initial centre |
 | `stdout`, `stderr`, `returncode`, `command` | the backend run |
 | `version`, `backend_path` | versions and paths, for records |
+| `precision`, `precision_requested`, `precision_reason` | the backend that ran (`"single"`/`"double"`), what was asked for, and why `auto` chose it |
+| `normalization_exponent` | double backend: the fit ran on image × 2<sup>−k</sup>; k |
 
 Errors raise `ElliprofError` (the fit failed; `.result` holds the
 backend output), `ElliprofTimeoutError` (on timeout) or `GeometryError`
@@ -63,16 +67,16 @@ backend output), `ElliprofTimeoutError` (on timeout) or `GeometryError`
 
 | Function | Purpose |
 |---|---|
-| `read_profile(path)` | the text profile (`-o`) as a DataFrame (exact float32 values); `df.attrs` holds `scale` and the run `flags` |
-| `read_prf(path)` | the raw content of the text profile (`-o`): `n`, `scale`, `params` (250 × 12), `header` |
+| `read_profile(path)` | the text profile (`-o`) as a DataFrame with the backend's exact values (float32 from single, float64 from double); `df.attrs` holds `scale`, the run `flags`, `precision` and `normalization_exponent` |
+| `read_prf(path)` | the raw content of the text profile (`-o`): `n`, `scale`, `params` (250 × 12), `header`, `precision`, `normalization_exponent` |
 | `parse_elliprof_csv(path)` | a `--csv` file: `(DataFrame, header dict)` |
 | `COLUMNS` | the profile column names |
 | `write_ds9_regions(profile, path)` | DS9 ellipses from a profile |
 | `read_ds9_regions(path)` | read them back |
 | `load_mask(path)` | a mask as float32, as the backend sees it (FITS masks need astropy) |
 | `write_bitmap_mask(path, mask)` | write a legacy BITPIX=1 mask |
-| `subtract_sky(data, sky=None, sky_image=None)` | `data − sky` in float32, as the backend does |
-| `apply_mask(data, mask, convention="nonzero-good")` | bad pixels → exactly 0, as the backend does |
+| `subtract_sky(data, sky=None, sky_image=None, precision="single")` | `data − sky` as the backend does: float32, or float64 with `precision="double"` |
+| `apply_mask(data, mask, convention="nonzero-good", precision="single")` | bad pixels → exactly 0, as the backend does (float32 or float64) |
 | `harmonic_settings(...)` | the `COS3X`/`COS4X` values for given model-harmonic options |
 | `find_backend()` | the path of the compiled backend |
 
