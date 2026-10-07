@@ -25,13 +25,16 @@ C     physical units -> products.  ISTAT returns the exit status.
       LOGICAL, ALLOCATABLE :: GOOD(:,:)
       DOUBLE PRECISION SKYVAL, BYTES
       INTEGER NCOL, NROW, IUNIT, IERR, IBITPIX, MBITPIX, NBAD, NNONF
-      INTEGER NOVER, IST, KPREF, KMIN, KMAX, I, J, K, NHIST, ICOS3X
+      INTEGER NOVER, IST, KPREF, KMIN, KMAX, I, J, K, NHIST, ICOS3X, L
       INTEGER*8 NPIX, NUSED, NINEX
       LOGICAL LINEAR, SHVERB
       CHARACTER*1024 SKYDESC, MSKDESC
       CHARACTER*72 HIST(4)
       CHARACTER*3 YESNO
       CHARACTER*16 MIBD
+      CHARACTER*512 PRECLN, NORMLN
+      DOUBLE PRECISION V
+      LOGICAL FINITED
       COMMON /SHIMOPT/ SHVERB
 
       ISTAT = 1
@@ -285,6 +288,83 @@ C     every value with 18 significant digits and a 3-digit exponent
 
       IF (PRFFILE .NE. ' ') THEN
          CALL WRITEDATD(PRFFILE, IERR)
+         IF (IERR .NE. 0) RETURN
+      END IF
+
+C     ---- CSV table and DS9 regions
+
+      WRITE (PRECLN,'(4A)') 'double (IEEE-754 binary64); requested ',
+     $     PRECREQ(1:LEN_TRIM(PRECREQ)), PRECWHY(1:LEN_TRIM(PRECWHY))
+      WRITE (NORMLN,'(A,I0,A,I0,3A)') 'k=', KNORM, ' preferred=',
+     $     KPREF, ' clamped=', YESNO(1:LEN_TRIM(YESNO)),
+     $     ' (fit on image x 2**(-k); values in physical units)'
+      IF (CSVFILE .NE. ' ') THEN
+         L = LEN_TRIM(ORIGCOMMAND)
+         CALL WRITECSVD(CSVFILE, FITSFILE, MSKDESC, SKYDESC,
+     $        ORIGCOMMAND(10:MAX(10,L)), ISC, ISR, PRECLN, NORMLN,
+     $        IERR)
+         IF (IERR .NE. 0) RETURN
+      END IF
+      IF (REGFILE .NE. ' ') THEN
+         CALL WRITEREGD(REGFILE, ISC, ISR, IERR)
+         IF (IERR .NE. 0) RETURN
+      END IF
+
+C     ---- The model, which ELLIPROFD left in PIX (internal units):
+C     back to physical units, exactly.  A finite value that is beyond
+C     the double range there is an error, never a silent Inf.  (A NaN
+C     that the original model algorithm gives stays NaN, as in single.)
+
+      IF (DOMODEL) THEN
+         NOVER = 0
+         DO 60 J = 1, NROW
+            DO 61 I = 1, NCOL
+               V = PIX(I,J)
+               PIX(I,J) = SCALE(V, KNORM)
+               IF (FINITED(V) .AND. .NOT. FINITED(PIX(I,J)))
+     $              NOVER = NOVER + 1
+ 61         CONTINUE
+ 60      CONTINUE
+         IF (NOVER .GT. 0) THEN
+            WRITE (0,'(A,I0,A)') 'elliprof: error (double precision, '
+     $           //'model): the model is beyond the double range at ',
+     $           NOVER, ' pixel(s) in physical units'
+            RETURN
+         END IF
+      END IF
+      IF (MODFILE .NE. ' ') THEN
+         CALL FITSWRITEPRODD(MODFILE, FITSFILE, NCOL, NROW, PIX,
+     $        'MODEL (galaxy model from the fitted isophotes)', NHIST,
+     $        HIST, IERR)
+         IF (IERR .NE. 0) RETURN
+      END IF
+
+C     ---- The residual from that model, in physical units:
+C     good(mask) x (science - sky - model)
+
+      IF (RESFILE .NE. ' ') THEN
+         NOVER = 0
+         DO 70 J = 1, NROW
+            DO 71 I = 1, NCOL
+               IF (GOOD(I,J)) THEN
+                  V = PREP(I,J)
+                  PREP(I,J) = V - PIX(I,J)
+                  IF (FINITED(V) .AND. FINITED(PIX(I,J)) .AND.
+     $                 .NOT. FINITED(PREP(I,J))) NOVER = NOVER + 1
+               ELSE
+                  PREP(I,J) = 0
+               END IF
+ 71         CONTINUE
+ 70      CONTINUE
+         IF (NOVER .GT. 0) THEN
+            WRITE (0,'(A,I0,A)') 'elliprof: error (double precision, '
+     $           //'residual): prepared - model is beyond the double '
+     $           //'range at ', NOVER, ' pixel(s)'
+            RETURN
+         END IF
+         CALL FITSWRITEPRODD(RESFILE, FITSFILE, NCOL, NROW, PREP,
+     $        'RESIDUAL = mask x (science - sky - model)', NHIST, HIST,
+     $        IERR)
          IF (IERR .NE. 0) RETURN
       END IF
 

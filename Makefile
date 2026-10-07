@@ -43,7 +43,7 @@ SHIM = main stubs fitsio profout maskio prep
 # routines (src/double), with their own COMMON blocks (src/double/include)
 DOUBLE = elliprof_d jtutil_d
 # and its driver, image preparation and output (src/shim/double)
-SHIMD = main_d fitsio_d prep_d
+SHIMD = main_d fitsio_d prep_d profout_d
 OBJS = $(ORIG:%=build/%.o) $(SHIM:%=build/%.o) $(DOUBLE:%=build/%.o) \
        $(SHIMD:%=build/%.o)
 INCS = $(wildcard include/*.inc include/*.par) build/version.inc
