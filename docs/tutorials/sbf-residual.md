@@ -22,7 +22,8 @@ elliprof u12517j.fits \
     -m u12517.prf --residual u12517_residual.fits
 ```
 
-- The model keeps the default 3rd- and 4th-order harmonic terms.
+- The model keeps the default 3rd- and 4th-order harmonic terms (see
+  [Harmonic analysis](../concepts/harmonics.md#harmonics-and-sbf-distances)).
 - The residual is `mask × (science − sky − model)`: 0 on masked pixels,
   float32, with the science image's WCS.
 
@@ -40,7 +41,7 @@ Look for:
 
 - **rings or 4-fold patterns**: the model does not follow the galaxy.
   Try more isophotes (`NR`), more iterations (`NITER`), or check the
-  model harmonics.
+  [model harmonics](../concepts/harmonics.md#the-harmonic-modes).
 - **a large-scale gradient or offset**: the sky is wrong, or the galaxy
   has structure (dust, disk) that the model cannot describe.
 - **point sources**: globular clusters and background galaxies that the

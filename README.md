@@ -306,62 +306,35 @@ elliprof galaxy.fits \
 - The mask and the sky image must have exactly the same dimensions as the science image. Nothing is ever resized, interpolated, cropped, padded, shifted or reprojected.
 - The image is prepared as `mask × (science − sky)`, and ELLIPROF ignores pixels that are exactly 0.
 
-## Harmonic terms: boxy and disky isophotes
+## Harmonic analysis
 
-Along each fitted ellipse, ELLIPROF fits the intensity with a constant plus cos/sin terms of 1, 2, 3 and 4 times the angle around the ellipse. The 1st- and 2nd-order terms move the centre and change the ellipticity and position angle until the ellipse follows the isophote. The **3rd- and 4th-order terms are always fitted and reported** (`I3`, `A3`, `I4`, `A4`). They measure how the isophote departs from a pure ellipse, but they never change the ellipse itself.
+Along each fitted ellipse, ELLIPROF also measures how the isophote departs from a pure ellipse, as harmonic terms of the eccentric angle θ: `I/I0 ≈ 1 + In cos n(θ − An)`.
 
-The 4th-order term is the familiar measure of **boxy** or **disky** isophotes:
+- **4th order** (`I4`, `A4`): always measured. The classic **boxy/disky** term: `A4` near 0° (≡ 90°) is disky, near 45° boxy. To first order, `a4/a ≈ I4 × cos(4 × A4) / (−slope)`.
+- **3rd order** (`I3`, `A3`): measured by default, for lopsided (egg-shaped) isophotes.
+- **6th order**, optional, measured *instead of* the 3rd. There are no I6/A6 columns: `I3` then holds the 6th-order amplitude and `A3` twice its phase.
 
-- `A4` near **0°** (or 90°, which is the same phase): extra light along the major and minor axes, so the isophote is pointed along its axes: **disky**.
-- `A4` near **45°**: extra light along the diagonals: **boxy**.
-- `I4` is the size of the deviation.
+Separately, you choose which measured terms go into the **model image**: none, the median over all isophotes, or each isophote's own. This changes only the model and the residual, never the profile. Both the original concise settings and descriptive options are supported and run the same code:
 
-`I4` is an intensity amplitude, **not** the conventional radial a4/a (and not B4). To first order, the conventional radial coefficient is
+| Original | Measured | In the model | Modern equivalent of this value |
+|---|---|---|---|
+| `COS3X=2` | 3rd order | each isophote | 3 in `--model-harmonics` (default) |
+| `COS3X=1` | 3rd order | median | 3 in `--model-harmonics`, with `--harmonic-mode median` |
+| `COS3X=0` | 3rd order | none | 3 not in `--model-harmonics` |
+| `COS3X=-2` | 6th order | each isophote | `--sixth-order`, 6 in `--model-harmonics` (default) |
+| `COS3X=-1` | 6th order | median | `--sixth-order`, 6 in `--model-harmonics`, with `--harmonic-mode median` |
+| `COS3X=-3` | 6th order | none | `--sixth-order`, 6 not in `--model-harmonics` |
+| `COS4X=2` / `1` / `0` | 4th order | each / median / none | 4 in `--model-harmonics` / with `--harmonic-mode median` / 4 not in it |
 
-```text
-a4/a  ≈  I4 × cos(4 × A4) / (−slope)
-```
+The modern options set both values at once (for example `--model-harmonics 4` is `COS3X=0 COS4X=2`, and `--sixth-order --model-harmonics none` is `COS3X=-3 COS4X=0`); the documentation lists every pair.
 
-This is positive for disky and negative for boxy isophotes. On synthetic galaxies with a4/a = ±0.030 it gives ±0.030.
-
-### Choosing which harmonic terms go into the model image
-
-The original ELLIPROF controls the harmonics through `COS3X` and `COS4X`. These choose which measured terms are included when ELLIPROF builds a **model image** (`-m n1234.prf`). They do not change the fitted profile. elliprof exposes them as options:
-
-| Option | Model image contains | ELLIPROF setting |
-|---|---|---|
-| (default) | 3rd- and 4th-order terms, each isophote's own values | `COS3X=2 COS4X=2` |
-| `--model-harmonics none` | pure ellipses, no harmonic terms | `COS3X=0 COS4X=0` |
-| `--model-harmonics 3` | 3rd-order term only | `COS3X=2 COS4X=0` |
-| `--model-harmonics 4` | 4th-order term only (boxy/disky shape) | `COS3X=0 COS4X=2` |
-| `--model-harmonics 3,4` | both (same as the default) | `COS3X=2 COS4X=2` |
-| add `--harmonic-mode median` | the median of each term over all isophotes, instead of each isophote's own | 1 instead of 2 |
-
-Examples:
-
-```sh
-# model of pure ellipses
-elliprof galaxy.fits X0=500 Y0=500 R0=5 R1=200 NR=30 \
-    -m galaxy.prf --model-harmonics none
-
-# model with the boxy/disky (4th-order) structure only
-elliprof galaxy.fits X0=500 Y0=500 R0=5 R1=200 NR=30 \
-    -m galaxy.prf --model-harmonics 4
-```
+A 6th-order term *in the model* has a known limitation of the original code when the fitted position angle wraps across 0°/180° (elliprof warns). `COS3X=-3` measures the 6th order without modelling it.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/ekourkchi/elliprof/main/docs/assets/model_harmonics.png" width="85%" alt="Three panels for UGC 12517: the model with no harmonic terms; the difference between the model with the 4th-order term and the pure-ellipse model, a four-fold pattern near the centre; and the same for the 3rd- and 4th-order terms together.">
 </p>
 
-Subtracting such a model from the image shows the structure that the chosen terms do not describe. For example, a residual made with the pure-ellipse model reveals boxy or disky light directly.
-
-**6th order instead of 3rd.** `--sixth-order` (ELLIPROF's `COS3X < 0`) fits and models the 6th-order term in place of the 3rd. This is the only harmonic setting that changes the fit. The `I3` and `A3` columns then hold the 6th-order amplitude, and a phase equal to twice the 6th-order phase (0–120°).
-
-```sh
-elliprof galaxy.fits X0=500 Y0=500 R0=5 R1=200 NR=30 --sixth-order
-```
-
-The original keywords work too, for those who know them from the original program: `COS3X=` (−2 to 2) and `COS4X=` (0 to 2). Use either the keywords or the options, not both.
+The full treatment is on the documentation site: conventions, phases, the a4/a conversion, sixth order, synthetic tests, the UGC 12517 harmonic profile and the SBF context. See [Harmonic analysis with ELLIPROF](https://ekourkchi.github.io/elliprof/concepts/harmonics/).
 
 ## Python
 
@@ -435,8 +408,8 @@ One row per isophote (`result.profile`, the CSV file, and the text profile writt
 | `-m F` | `model_path` (or `model=True`) | compute the model image and write it as FITS |
 | `--model-harmonics` | `model_harmonics` | harmonic terms in the model (above) |
 | `--harmonic-mode` | `harmonic_mode` | `each` (default) or `median` |
-| `--sixth-order` | `sixth_order` | 6th- instead of 3rd-order term |
-| `COS3X=` `COS4X=` | `cos3x` `cos4x` | the original harmonic settings |
+| `--sixth-order` | `sixth_order` | measure the 6th- instead of the 3rd-order term |
+| `COS3X=` `COS4X=` | `cos3x` `cos4x` | the original harmonic settings: COS3X −3 to 2, COS4X 0 to 2 |
 | `TIE=` | `tie` | smooth the parameters with radius |
 | `AVG=` | `avg` | average a (2n+1)² box when sampling |
 | `GAIN=` | `gain` | iteration gain (default 1) |

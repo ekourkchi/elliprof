@@ -51,7 +51,7 @@ are a shell pattern. Write `'galaxy.fits[SCI]'`.
 **Reading `A4` as a position angle.**
 `A3`/`A4` are phases around the ellipse, measured from the major axis.
 The position angle is `alpha`. See
-[Boxy and disky isophotes](../concepts/harmonics.md).
+[Harmonic analysis](../concepts/harmonics.md).
 
 **Comparing `I4` with a4/a from another program.**
 `I4` is an intensity amplitude. Convert:

@@ -43,6 +43,22 @@ as typed. The original ELLIPROF Fortran is untouched (SHA-256 verified).
   always mean 1 = good.
 - `--niter N`, the same as ELLIPROF's `NITER=N` (default 5, from the
   original code). NITER is the only iteration count of the isophote fit.
+- `COS3X=-3`: measure the 6th-order harmonic without putting it into the
+  model (completing the original family: 2/1/0 = 3rd order, each /
+  median / none; -2/-1/-3 = 6th order, each / median / none). Modern
+  spelling: `--sixth-order --model-harmonics none` (or `4`). With
+  `--sixth-order`, `--model-harmonics` also accepts `6` and `4,6`.
+  `COS3X` outside -3..2 and `COS4X` outside 0..2 are still refused.
+- A warning when a 6th-order term is put into the model (`COS3X=-2` or
+  `-1`) and the fitted position angle wraps across 0/180 deg. This is a
+  pre-existing limitation of the original ELLIPROF model synthesis, not a
+  0.1.4 change: beyond the wrap it gives the 6th-order term the wrong
+  sign, so the model and residual are wrong there. The measured profile
+  is correct. The original code and its output are left unchanged;
+  `COS3X=-3` measures the 6th order without the problem.
+- In 6th-order mode the CSV header says so (`# Harmonic order: 6 ...`):
+  the `I3`/`A3` columns then hold the 6th-order amplitude and twice its
+  phase. Column names and the `.dat` format are unchanged.
 - `elliprof --update` (also `-u`) installs the newest elliprof from PyPI
   with the pip of the Python that runs elliprof. `elliprof --check-update`
   only reports whether a newer version exists.
@@ -60,6 +76,14 @@ as typed. The original ELLIPROF Fortran is untouched (SHA-256 verified).
   it also displays on PyPI.
 - The example notebook shows the original image, the model and the
   residual side by side, on the same stretch.
+- Documentation: a new "Harmonic analysis" page, verified against the
+  original source (the fitted convention, the phase ranges and the A3
+  reference end, measuring versus modelling, every `COS3X`/`COS4X` value
+  and its exact modern equivalent, sixth order and its output semantics,
+  the a4/a conversion, synthetic and real examples, the SBF context);
+  workflow and harmonic-mode diagrams; corrected wording: the 3rd/6th and
+  4th orders do not move the ellipse, but the 3rd-or-6th choice can
+  shift the fitted geometry slightly where an ellipse is poorly sampled.
 
 Earlier versions (0.1.0–0.1.3): see the
 [tags](https://github.com/ekourkchi/elliprof/tags) and the

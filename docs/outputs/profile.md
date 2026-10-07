@@ -45,7 +45,7 @@ terminal instead.
 
 The details are on [What is an isophote?](../concepts/isophotes.md),
 [How ELLIPROF fits a galaxy](../concepts/how-it-works.md) and
-[Boxy and disky isophotes](../concepts/harmonics.md).
+[Harmonic analysis](../concepts/harmonics.md).
 
 !!! researcher "What the profile does not contain"
     - **No uncertainties.** Estimate them yourself, for example from

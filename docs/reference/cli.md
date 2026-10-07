@@ -79,15 +79,38 @@ reprojected. Details: [Sky and masks](../concepts/sky-and-masks.md).
 | `-m FILE` | compute the model image and write it as FITS (nothing else is needed) |
 | `--residual FILE` | write mask × (science − sky − model); computes the same model, with or without `-m` |
 | `MODEL` | no longer needed; accepted and ignored, with a note. `MODEL=value` is an error |
-| `--model-harmonics none\|3\|4\|3,4` | harmonic terms in the model (default 3,4) |
+| `--model-harmonics none\|3\|4\|3,4` | measured terms put into the model (default 3,4); with `--sixth-order`: `none\|6\|4\|4,6`. Never changes the profile |
 | `--harmonic-mode each\|median` | each isophote's own terms (default) or the median over isophotes |
-| `--sixth-order` | fit and model the 6th-order term in place of the 3rd (**changes the fit**) |
-| `COS3X=k` | original switch: 0 none, 1 median, 2 each (default); −1/−2 = 6th order |
-| `COS4X=k` | original switch: 0 none, 1 median, 2 each (default) |
+| `--sixth-order` | measure the 6th-order term **instead of** the 3rd; `I3`/`A3` then hold the 6th-order amplitude and **twice** its phase |
+| `COS3X=k` | original switch (see below) |
+| `COS4X=k` | original switch (see below) |
 
-Use either `COS3X`/`COS4X` or the options above, not both. Only the
-6th-order setting changes the fitted profile. Details:
-[Boxy and disky isophotes](../concepts/harmonics.md).
+Both interfaces are fully supported and run the same code; use one or
+the other in a command, not both.
+
+| Legacy | Measured | In the model | Modern equivalent of this value |
+|---|---|---|---|
+| `COS3X=2` | 3rd order | each isophote's term | 3 in `--model-harmonics` (default) |
+| `COS3X=1` | 3rd order | median term | 3 in `--model-harmonics`, `--harmonic-mode median` |
+| `COS3X=0` | 3rd order | none | 3 not in `--model-harmonics` |
+| `COS3X=-2` | 6th order | each isophote's term ⚠ | `--sixth-order`, 6 in `--model-harmonics` (default) |
+| `COS3X=-1` | 6th order | median term ⚠ | `--sixth-order`, 6 in `--model-harmonics`, `--harmonic-mode median` |
+| `COS3X=-3` | 6th order | none | `--sixth-order`, 6 not in `--model-harmonics` |
+| `COS4X=2` | 4th order | each isophote's term | 4 in `--model-harmonics` (default) |
+| `COS4X=1` | 4th order | median term | 4 in `--model-harmonics`, `--harmonic-mode median` |
+| `COS4X=0` | 4th order | none | 4 not in `--model-harmonics` |
+
+The modern options set `COS3X` and `COS4X` together; a few legacy pairs
+that mix "each" and "median" (such as `COS3X=2 COS4X=1`) have no modern
+spelling. The full list of pairs:
+[Exact equivalences](../concepts/harmonics.md#exact-equivalences).
+
+⚠ A 6th-order term in the model is subject to a known limitation of
+the original model synthesis when the fitted position angle wraps across
+0°/180° (elliprof warns). The model settings never change the measured
+profile; choosing the 6th order instead of the 3rd can change the fit
+slightly where ellipses are poorly sampled. Details:
+[Harmonic analysis](../concepts/harmonics.md#the-harmonic-modes).
 
 ## Output files
 

@@ -67,7 +67,7 @@ is the angle on the circle of radius $a$ drawn around the ellipse.
 </figure>
 
 The harmonic phases `A3` and `A4` (see
-[Boxy and disky isophotes](harmonics.md)) are angles of this kind. **They
+[Harmonic analysis](harmonics.md)) are angles of this kind. **They
 are not position angles.**
 
 ## Surface brightness and the profile
@@ -96,7 +96,7 @@ from that are informative:
 - **Centre shifts** can mean asymmetry, dust or a disturbed galaxy. Fits
   near masked regions, or at very low surface brightness, also shift.
 - **Boxy or disky isophotes** (the 4th-order term) are linked to how the
-  galaxy formed. See [Boxy and disky isophotes](harmonics.md).
+  galaxy formed. See [Harmonic analysis](harmonics.md).
 
 !!! researcher "Isophote fitting in the literature"
     ELLIPROF's approach is to sample the image along each ellipse, expand
