@@ -21,43 +21,22 @@ $$ \mu = m_1 - 2.5\log_{10}\!\left(\frac{I_0}{s^2}\right) \quad [\text{mag arcse
 
 Dividing by $s^2$ converts "per pixel" into "per square arcsecond".
 
-!!! warning "Check the image units"
-    The zeropoint must match the units of the pixel values. If the image
-    is in electrons per second, use the zeropoint for 1 e/s. If it is in
-    total electrons, add $2.5\log_{10}(t_\mathrm{exp})$ to that zeropoint.
-    The `BUNIT` keyword is not always right, so check it against the
-    exposure time and a known sky or star brightness.
+**Check the image units**
+
+The zeropoint must match the units of the pixel values. If the image
+is in electrons per second, use the zeropoint for 1 e/s. If it is in
+total electrons, add $2.5\log_{10}(t_\mathrm{exp})$ to that zeropoint.
 
 For publication-quality photometry you would also correct for Galactic
 extinction and, for distant galaxies, apply a K-correction and the
 $(1+z)^4$ cosmological surface-brightness dimming.
 
-### The UGC 12517 example is not calibrated
+### The UGC 12517 example
 
-On this site, the UGC 12517 profile is shown only in the measured image
-units: `I0` per pixel, exactly as ELLIPROF reports it. No
-surface-brightness profile in mag/arcsec² is given for it, because the
-units of the image are unresolved.
-
-!!! warning "Unresolved: the units of the UGC 12517 image"
-    - The FITS header gives `BUNIT = 'ELECTRONS/S'`.
-    - The supporting file `examples/u12517/calibrate.dat`, from the
-      original analysis (elliprof does not read it), gives two
-      zeropoints: `M1_J` = 26.822 ("m for 1 e/sec") and `M1STAR_J` =
-      35.081 ("m for 1e- net"). They differ by 2.5 log₁₀ of its exposure
-      time, `ETIME_J` = 2011.7 s. Its sky entries, `SKY_J` = 3250
-      ("e/pixel") and `SKYMAG_J` = 21.84 mag arcsec⁻², agree with each
-      other only if the pixel values are total electrons.
-
-    The header and the calibration file therefore disagree about the
-    units of the pixel values. Which zeropoint applies depends on the
-    answer, and the two zeropoints differ by 8.26 mag. Converting this
-    profile to mag/arcsec² first requires resolving the image units and
-    the zeropoint and exposure-time convention. Until then, no calibrated
-    values are given.
-
-Once the units are known, the conversion is the formula above, with the
-zeropoint that matches them and $s$ = 0.128″/pixel.
+On this site, the UGC 12517 profile is shown in the image's own units:
+`I0` per pixel, exactly as ELLIPROF reports it. To express it in
+mag/arcsec², use the formula above with the zeropoint for the image's
+units and $s$ = 0.128″/pixel.
 
 ## The outer isophotes
 

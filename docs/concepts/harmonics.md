@@ -92,28 +92,29 @@ ellipse* the extra light is, relative to the major axis.
   intensity term Iₙ cos n(θ − Aₙ) on the fitted ellipse.</figcaption>
 </figure>
 
-!!! warning "In 3rd-order mode, A3 can jump by 60° where the position angle wraps"
-    `alpha` is reported in 0–180°. Where the fitted position angle of the
-    isophotes crosses 0°/180° (common for a galaxy whose major axis is
-    near the y axis, and for nearly round isophotes with an uncertain
-    angle), the end of the major axis that θ is measured from swaps to
-    the other end, which shifts θ by 180°. The phase of an order-n term
-    then shifts by 180°, counted modulo its period 360°/n:
+**In 3rd-order mode, A3 can jump by 60° where the position angle wraps**
 
-    | Order | Period of the phase | Effect of the 180° swap |
-    |---|---|---|
-    | 3rd (`A3`, `COS3X` ≥ 0) | 120° | **60° jump in A3** (half a period) |
-    | 4th (`A4`) | 90° | none (two whole periods) |
-    | 6th (A6) | 60° | none (three whole periods) |
+`alpha` is reported in 0–180°. Where the fitted position angle of the
+isophotes crosses 0°/180° (common for a galaxy whose major axis is
+near the y axis, and for nearly round isophotes with an uncertain
+angle), the end of the major axis that θ is measured from swaps to
+the other end, which shifts θ by 180°. The phase of an order-n term
+then shifts by 180°, counted modulo its period 360°/n:
 
-    So **only the ordinary 3rd-order A3** jumps. It is a convention
-    effect, not a change in the galaxy. In
-    [sixth-order mode](#sixth-order) the `A3` column holds 2 × A6, and
-    since A6 does not jump, neither does that column. In the synthetic
-    test (a fixed pattern on a galaxy whose angle wraps from 179.9° to
-    2.0°), the 3rd-order `A3` goes from 60.2° to 0.4°, while in
-    sixth-order mode the `A3` column stays near 0.2° (0.1–0.4°) on both
-    sides, and `A4` changes only smoothly with the twist.
+| Order | Period of the phase | Effect of the 180° swap |
+|---|---|---|
+| 3rd (`A3`, `COS3X` ≥ 0) | 120° | **60° jump in A3** (half a period) |
+| 4th (`A4`) | 90° | none (two whole periods) |
+| 6th (A6) | 60° | none (three whole periods) |
+
+So **only the ordinary 3rd-order A3** jumps. It is a convention
+effect, not a change in the galaxy. In
+[sixth-order mode](#sixth-order) the `A3` column holds 2 × A6, and
+since A6 does not jump, neither does that column. In the synthetic
+test (a fixed pattern on a galaxy whose angle wraps from 179.9° to
+2.0°), the 3rd-order `A3` goes from 60.2° to 0.4°, while in
+sixth-order mode the `A3` column stays near 0.2° (0.1–0.4°) on both
+sides, and `A4` changes only smoothly with the twist.
 
 ## Measuring versus modelling { #the-harmonics-in-the-model-image }
 
@@ -361,11 +362,12 @@ The same reasoning gives $a_3/a \approx I_3\cos(3A_3)/(-\text{slope})$
 for the 3rd order, but its sign depends on which end of the major axis
 θ is measured from (see the A3 warning above).
 
-!!! warning "Other programs, other conventions"
-    Other isophote-fitting programs report the 4th-order term with
-    different normalisations and sign conventions (for example, a "B4"
-    intensity coefficient, or a radial coefficient divided by a gradient).
-    Convert every catalogue to a4/a before comparing.
+**Other programs, other conventions**
+
+Other isophote-fitting programs report the 4th-order term with
+different normalisations and sign conventions (for example, a "B4"
+intensity coefficient, or a radial coefficient divided by a gradient).
+Convert every catalogue to a4/a before comparing.
 
 ## Sixth order { #sixth-order }
 
@@ -376,22 +378,23 @@ ELLIPROF measures it **in place of** the 3rd order, using the same two
 fitting slots and the same output columns. That is why it is selected by
 a negative `COS3X` (`--sixth-order`).
 
-!!! warning "In sixth-order mode, I3 and A3 are not 3rd-order quantities"
-    There are **no I6 or A6 columns**. With `COS3X` < 0:
+**In sixth-order mode, I3 and A3 are not 3rd-order quantities**
 
-    - `I3` holds the **6th-order amplitude** (fraction of `I0`);
-    - `A3` holds **twice the 6th-order phase**: A3 = 2 × A6, in 0–120°
-      (A6 itself is in 0–60°);
-    - the 3rd order is not measured at all;
-    - the 3rd-order rule that `A3` jumps by 60° at a position-angle wrap
-      **does not apply**: neither A6 nor this `A3` column jumps
-      ([see above](#the-convention)).
+There are **no I6 or A6 columns**. With `COS3X` < 0:
 
-    ELLIPROF's printed table labels the columns `I(6x)` and `A(6x)` in this
-    mode. The `.dat` profile and the CSV keep the column names `I3`, `A3`;
-    the CSV adds a header line saying `Harmonic order: 6`, and the profile
-    records the negative `COS3X` in its run settings
-    (`read_profile(...).attrs["flags"]`).
+- `I3` holds the **6th-order amplitude** (fraction of `I0`);
+- `A3` holds **twice the 6th-order phase**: A3 = 2 × A6, in 0–120°
+  (A6 itself is in 0–60°);
+- the 3rd order is not measured at all;
+- the 3rd-order rule that `A3` jumps by 60° at a position-angle wrap
+  **does not apply**: neither A6 nor this `A3` column jumps
+  ([see above](#the-convention)).
+
+ELLIPROF's printed table labels the columns `I(6x)` and `A(6x)` in this
+mode. The `.dat` profile and the CSV keep the column names `I3`, `A3`;
+the CSV adds a header line saying `Harmonic order: 6`, and the profile
+records the negative `COS3X` in its run settings
+(`read_profile(...).attrs["flags"]`).
 
 Because A3 = 2 A6, the argument 6 A6 is 3 A3, and the radial 6th-order
 deviation is
@@ -404,32 +407,33 @@ poorly sampled (see [What ELLIPROF fits](#what-elliprof-fits)). Whether
 the 6th-order term also goes into the **model** is chosen by the size of
 `COS3X`, as for the 3rd order.
 
-!!! danger "Known limitation of the original code: sixth-order models across a position-angle wrap"
-    If the fitted position angle of the isophotes crosses the 0°/180°
-    boundary, the original model synthesis (SYNTHESIZE) gives the
-    6th-order term the **wrong sign beyond that radius**. It corrects the
-    phase for the swapped end of the major axis in a way that is right for
-    the 3rd order but not for the 6th.
+**Sixth-order models across a position-angle wrap**
 
-    - The **measured** 6th-order profile (`I3`, `A3`) is correct on both
-      sides of the wrap.
-    - The **model and the residual** are wrong beyond the wrap in the two
-      modes that put the 6th order into the model: `COS3X=-2`
-      (`--sixth-order`) and `COS3X=-1` (`--sixth-order --harmonic-mode
-      median`). There the 6th-order structure is subtracted with the wrong
-      sign, so the residual holds about twice the signal instead of none.
-    - elliprof **warns** when this happens (it names the isophote where
-      the angle wraps), and does not change the model: the original
-      numerical code is kept exactly as it is.
-    - **Measurement only, `COS3X=-3` (`--sixth-order --model-harmonics
-      none`), avoids the problem** and is the recommended mode for
-      6th-order diagnostics.
+If the fitted position angle of the isophotes crosses the 0°/180°
+boundary, the original model synthesis (SYNTHESIZE) gives the
+6th-order term the **wrong sign beyond that radius**. It corrects the
+phase for the swapped end of the major axis in a way that is right for
+the 3rd order but not for the 6th.
 
-    UGC 12517 is affected: in its sixth-order fit the angle wraps already
-    at the 2nd isophote (11.7 pixels), so almost the whole 6th-order model
-    is affected (elliprof's warning names that isophote). This is
-    pre-existing behaviour of the original ELLIPROF, not something
-    introduced by the package.
+- The **measured** 6th-order profile (`I3`, `A3`) is correct on both
+  sides of the wrap.
+- The **model and the residual** are wrong beyond the wrap in the two
+  modes that put the 6th order into the model: `COS3X=-2`
+  (`--sixth-order`) and `COS3X=-1` (`--sixth-order --harmonic-mode
+  median`). There the 6th-order structure is subtracted with the wrong
+  sign, so the residual holds about twice the signal instead of none.
+- elliprof **warns** when this happens (it names the isophote where
+  the angle wraps), and does not change the model: the original
+  numerical code is kept exactly as it is.
+- **Measurement only, `COS3X=-3` (`--sixth-order --model-harmonics
+  none`), avoids the problem** and is the recommended mode for
+  6th-order diagnostics.
+
+UGC 12517 is affected: in its sixth-order fit the angle wraps already
+at the 2nd isophote (11.7 pixels), so almost the whole 6th-order model
+is affected (elliprof's warning names that isophote). This is
+pre-existing behaviour of the original ELLIPROF, not something
+introduced by the package.
 
 <figure markdown="span">
   ![Left: the fitted position angle of a synthetic galaxy against radius,

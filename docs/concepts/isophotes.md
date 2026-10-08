@@ -40,13 +40,14 @@ one.
 | centre | `x0`, `y0` | the fitted centre of this isophote, in pixels |
 | intensity | `I0` | brightness of the isophote, in image units per pixel, after the sky is subtracted |
 
-!!! warning "Position angle convention"
-    ELLIPROF measures `alpha` counter-clockwise from the **+y axis of the
-    image** (the pixel rows), not from north. Measured from +x, the major
-    axis is at `alpha + 90`°. To get a sky position angle (east of north),
-    you must also use the image orientation from its WCS. An angle of 0°
-    and one of 180° are the same axis. For example, 3° and 177° differ by
-    only 6°.
+**Position angle convention**
+
+ELLIPROF measures `alpha` counter-clockwise from the **+y axis of the
+image** (the pixel rows), not from north. Measured from +x, the major
+axis is at `alpha + 90`°. To get a sky position angle (east of north),
+you must also use the image orientation from its WCS. An angle of 0°
+and one of 180° are the same axis. For example, 3° and 177° differ by
+only 6°.
 
 ## The eccentric angle
 

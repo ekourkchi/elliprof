@@ -13,11 +13,12 @@ In Python, `result.profile` (from `run_elliprof`) or
 `elliprof.read_profile("n1234.dat")` gives the same table as a pandas
 DataFrame.
 
-!!! warning "The profile is not an image"
-    The `-o` file is a **table of numbers**, not a picture. You cannot open
-    it in DS9. To *see* the fit, use the DS9 region file (`--reg`) on the
-    image, the model image (`-m`) or the residual (`--residual`).
-    See [Model, residual and prepared images](images.md).
+**The profile is not an image**
+
+The `-o` file is a **table of numbers**, not a picture. You cannot open
+it in DS9. To *see* the fit, use the DS9 region file (`--reg`) on the
+image, the model image (`-m`) or the residual (`--residual`).
+See [Model, residual and prepared images](images.md).
 
 !!! note "File names: .dat and .prf"
     In the traditional ELLIPROF naming, `n1234.dat` is this text profile

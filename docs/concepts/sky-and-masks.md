@@ -36,10 +36,11 @@ elliprof galaxy.fits --sky-image background.fits ...  # a 2-D background
 - Use one or the other, not both. Without either, nothing is subtracted.
   That is right only if your image is already sky-subtracted.
 
-!!! warning "`SKY=` is not `--sky`"
-    The original keyword `SKY=s` does **not** subtract anything. It is
-    used only by the de Vaucouleurs fit that ELLIPROF prints at the end.
-    To subtract a sky, use `--sky` or `--sky-image`.
+**`SKY=` is not `--sky`**
+
+The original keyword `SKY=s` does **not** subtract anything. It is
+used only by the de Vaucouleurs fit that ELLIPROF prints at the end.
+To subtract a sky, use `--sky` or `--sky-image`.
 
 ### Why the sky matters
 
@@ -118,11 +119,12 @@ elliprof galaxy.fits --mask segmap.fits --mask-convention zero-good ...
     into a mask; or both. Mask generously around bright stars, including
     their diffraction spikes.
 
-!!! warning "A pixel that is exactly 0 is always ignored"
-    ELLIPROF cannot tell a masked pixel from a good pixel whose
-    sky-subtracted value happens to be exactly 0. With floating-point
-    images this is rare. With integer images and an integer sky it can
-    happen, so check the number of masked pixels that elliprof reports.
+**A pixel that is exactly 0 is always ignored**
+
+ELLIPROF cannot tell a masked pixel from a good pixel whose
+sky-subtracted value happens to be exactly 0. With floating-point
+images this is rare. With integer images and an integer sky it can
+happen, so check the number of masked pixels that elliprof reports.
 
 ## The prepared image
 

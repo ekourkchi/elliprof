@@ -2,15 +2,10 @@
 
 This tutorial prepares the input an SBF analysis starts from: a smooth
 galaxy model and the residual image. It uses UGC 12517 and stops where
-ELLIPROF's role ends.
-
-!!! warning "No distance is measured here"
-    This tutorial does **not** measure an SBF distance to UGC 12517. That
-    needs the downstream steps on
-    [Workflow and cautions](../sbf/workflow.md): point-source
-    corrections, the PSF, the power-spectrum fit and a calibration. None
-    of these are part of ELLIPROF. The numbers below are checks of the
-    galaxy model.
+ELLIPROF's role ends; the later steps of an SBF distance (point-source
+corrections, the PSF, the power-spectrum fit and a calibration) are
+described in [Workflow](../sbf/workflow.md). The numbers below are
+checks of the galaxy model.
 
 ## 1. Fit and write the products
 

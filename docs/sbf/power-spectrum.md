@@ -87,12 +87,13 @@ tip-of-the-red-giant-branch distances (Blakeslee et al. 2021). Then
 
 $$ \mu = \bar m - \bar M, \qquad d = 10^{(\mu + 5)/5}\ \text{pc} = 10^{(\mu - 25)/5}\ \text{Mpc}. $$
 
-!!! warning "Use the calibration that matches your data"
-    $\bar M$ is not universal. It depends on the filter, the camera, the
-    stellar population (through the colour), and the calibration's
-    zeropoint. A calibration must not be extrapolated beyond the colour
-    range it was derived for (Blakeslee et al. 2010). Quote the
-    calibration you used.
+**Use the calibration that matches your data**
+
+$\bar M$ is not universal. It depends on the filter, the camera, the
+stellar population (through the colour), and the calibration's
+zeropoint. A calibration must not be extrapolated beyond the colour
+range it was derived for (Blakeslee et al. 2010). Quote the
+calibration you used.
 
 !!! researcher "Worked numbers (illustration only)"
     If a galaxy had $\bar m = 30.0$ in some band and the calibration gave

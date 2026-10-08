@@ -39,24 +39,25 @@
 
 ## Cautions
 
-!!! warning "Before you trust an SBF measurement"
-    - **Sky.** An error in the sky changes the model and the normalisation.
-      Its effect grows outwards.
-    - **Galaxy model.** A poor model leaves large-scale structure in the
-      residual. That adds power at low $k$, which can be mistaken for
-      fluctuation power if the fit range is not chosen carefully.
-    - **Dust.** Dust makes its own "fluctuations" and must be masked. SBF
-      is not reliable in dusty regions.
-    - **Young populations.** Recent star formation changes $\bar M$. The
-      colour calibrations assume old, early-type populations.
-    - **Globular clusters and background galaxies.** Undetected sources
-      add power. Their correction depends on the depth of the data and
-      the assumed luminosity functions.
-    - **PSF.** $E(k)$ depends on the PSF. A PSF mismatch biases $P_0$.
-    - **Noise and depth.** The fluctuations must be well above the
-      white-noise floor $P_1$. Distant galaxies need deep data.
-    - **Calibration.** Use the calibration for your filter and camera.
-      Stay inside its colour range, and quote its zeropoint.
+**What affects an SBF measurement**
+
+- **Sky.** An error in the sky changes the model and the normalisation.
+  Its effect grows outwards.
+- **Galaxy model.** A poor model leaves large-scale structure in the
+  residual. That adds power at low $k$, which can be mistaken for
+  fluctuation power if the fit range is not chosen carefully.
+- **Dust.** Dust makes its own "fluctuations" and must be masked. SBF
+  is not reliable in dusty regions.
+- **Young populations.** Recent star formation changes $\bar M$. The
+  colour calibrations assume old, early-type populations.
+- **Globular clusters and background galaxies.** Undetected sources
+  add power. Their correction depends on the depth of the data and
+  the assumed luminosity functions.
+- **PSF.** $E(k)$ depends on the PSF. A PSF mismatch biases $P_0$.
+- **Noise and depth.** The fluctuations must be well above the
+  white-noise floor $P_1$. Distant galaxies need deep data.
+- **Calibration.** Use the calibration for your filter and camera.
+  Stay inside its colour range, and quote its zeropoint.
 
 !!! advanced "Model settings that matter for SBF"
     - Fit out to where the galaxy is still well above the sky noise, and

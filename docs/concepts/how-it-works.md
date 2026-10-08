@@ -101,12 +101,13 @@ reported as `x0`, `y0` in the profile.
 | 1 | all centres fixed at `X0`, `Y0` |
 | 2 | after each iteration, all centres are set to the median of the fitted centres |
 
-!!! warning "ELLIPROF pixel coordinates"
-    ELLIPROF puts the centre of the pixel in FITS column *i* at
-    x = *i* − 0.5, and likewise for rows. That is **half a pixel less than
-    FITS and DS9 pixel numbers**. A galaxy centred on DS9 pixel (567.5,
-    562.5) has ELLIPROF centre (567, 562). The DS9 region files that
-    elliprof writes are already converted.
+**ELLIPROF pixel coordinates**
+
+ELLIPROF puts the centre of the pixel in FITS column *i* at
+x = *i* − 0.5, and likewise for rows. That is **half a pixel less than
+FITS and DS9 pixel numbers**. A galaxy centred on DS9 pixel (567.5,
+562.5) has ELLIPROF centre (567, 562). The DS9 region files that
+elliprof writes are already converted.
 
 A poor starting centre (off by more than a few pixels, or on a star) can
 make the inner isophotes wander. Give the best centre you can, and check
@@ -242,10 +243,11 @@ intensity, centre, ellipticity and position angle with radius, plus the
 3rd- and 4th-order terms you choose ([model harmonics](harmonics.md#the-harmonics-in-the-model-image)).
 It covers the whole image, masked pixels included.
 
-!!! warning "Inside R0 and beyond R1"
-    The model also has values inside the innermost and beyond the
-    outermost fitted isophote, where it is extrapolated from the profile.
-    Only the region between R0 and R1 is constrained by the fit.
+**Inside R0 and beyond R1**
+
+The model also has values inside the innermost and beyond the
+outermost fitted isophote, where it is extrapolated from the profile.
+Only the region between R0 and R1 is constrained by the fit.
 
 ## Other keywords
 
