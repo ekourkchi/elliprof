@@ -1,6 +1,6 @@
 # Command-line reference
 
-This page documents **elliprof 0.2.0rc1**. `elliprof -h` prints the same
+This page documents **elliprof 0.2.0**. `elliprof -h` prints the same
 information.
 
 ```text

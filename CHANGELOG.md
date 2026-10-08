@@ -1,10 +1,6 @@
 # Changes
 
-## 0.2.0rc1 (release candidate)
-
-A release candidate: install it with `pip install --pre elliprof` or
-`pip install elliprof==0.2.0rc1`; a plain `pip install elliprof` keeps
-0.1.4. An installed pre-release is never offered an automatic update.
+## 0.2.0 (2026-10-08)
 
 ### Added
 

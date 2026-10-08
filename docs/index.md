@@ -25,19 +25,6 @@ subtracted.
   elliprof 0.1.3 product.</figcaption>
 </figure>
 
-!!! note "Release status"
-    These pages describe **elliprof 0.2.0rc1, a pre-release** for testing.
-    The current **stable release is 0.1.4**: `python -m pip install elliprof`
-    installs 0.1.4. To try the release candidate, install it explicitly:
-
-    ```sh
-    python -m pip install elliprof==0.2.0rc1     # or: python -m pip install --pre elliprof
-    ```
-
-    Once 0.2.0 final is published, `python -m pip install -U elliprof` will
-    select it. The double-precision backend (`--precision`, 64-bit products)
-    is new in 0.2.0rc1 and not part of 0.1.4.
-
 <figure markdown="span">
   ![Four small line plots against semi-major axis: the isophote intensity
   falls smoothly with radius; the ellipticity is about 0.21 in the inner
