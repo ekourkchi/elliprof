@@ -39,8 +39,15 @@ endif
 
 ORIG = elliprof jtutil gcfit assign dissect value operate variable upper
 SHIM = main stubs fitsio profout maskio prep
-OBJS = $(ORIG:%=build/%.o) $(SHIM:%=build/%.o)
+# Double-precision backend: maintained precision ports of original
+# routines (src/double), with their own COMMON blocks (src/double/include)
+DOUBLE = elliprof_d jtutil_d
+# and its driver, image preparation and output (src/shim/double)
+SHIMD = main_d fitsio_d prep_d profout_d auto_d
+OBJS = $(ORIG:%=build/%.o) $(SHIM:%=build/%.o) $(DOUBLE:%=build/%.o) \
+       $(SHIMD:%=build/%.o)
 INCS = $(wildcard include/*.inc include/*.par) build/version.inc
+DINCS = $(wildcard src/double/include/*.inc)
 
 all: elliprof_native elliprof
 
@@ -57,6 +64,14 @@ build/%.o: src/original/%.f $(INCS) | build
 build/%.o: src/shim/%.f $(INCS) | build
 	$(FC) $(FFLAGS) $(WARN) -Iinclude -Ibuild -c $< -o $@
 
+build/%.o: src/double/%.f $(INCS) $(DINCS) | build
+	$(FC) $(FFLAGS) $(WARN) -Iinclude -Isrc/double/include -Ibuild \
+	    -c $< -o $@
+
+build/%.o: src/shim/double/%.f $(INCS) $(DINCS) | build
+	$(FC) $(FFLAGS) $(WARN) -Iinclude -Isrc/double/include -Ibuild \
+	    -c $< -o $@
+
 build/version.inc: VERSION | build
 	printf "      CHARACTER*(*) VERSTR\n      PARAMETER (VERSTR='%s')\n" \
 	    "$(VERSION)" > $@
@@ -71,10 +86,16 @@ build/maskinfo: tests/tools/maskinfo.f build/maskio.o build/fitsio.o
 build/mktestimage: tests/tools/mktestimage.f | build
 	$(FC) $(FFLAGS) $(WARN) -o $@ $< $(LDLIBS)
 
+# the double backend's own range-protected routines (R4, R5, R6), linked
+# from the objects of elliprof_native without its two main programs
+build/rangeprobe: tests/tools/rangeprobe.f \
+    $(filter-out build/main.o build/main_d.o,$(OBJS))
+	$(FC) $(FFLAGS) $(WARN) -o $@ $^ $(LDLIBS)
+
 build/test_image.fits: build/mktestimage
 	./build/mktestimage $@
 
-tools: build/maskinfo build/mktestimage
+tools: build/maskinfo build/mktestimage build/rangeprobe
 
 test: all build/test_image.fits
 	./elliprof_native build/test_image.fits X0=127.3 Y0=121.6 R0=3 \

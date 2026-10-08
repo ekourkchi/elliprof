@@ -218,7 +218,7 @@ Add `--csv n1234.csv` for the profile as a CSV table, and `--reg n1234.reg` for 
 elliprof produces two different kinds of result:
 
 - **The profile** (`-o n1234.dat`, `--csv n1234.csv`): numbers, one set per fitted isophote (radius, centre, intensity, position angle, ellipticity, harmonic terms, slope). The `-o` file is ELLIPROF's native text profile format at full precision, with the run settings. **It is a table of numbers, not an image.** (Older elliprof documentation called this file `.prf`; in the traditional naming used here, `.prf` is the model image.) The CSV holds the same profile as a readable table.
-- **Images** (FITS, 32-bit floating point):
+- **Images** (FITS, floating point: 32-bit from the single backend, 64-bit from the double one):
   - **model** (`-m n1234.prf`): the galaxy reconstructed from the fitted isophotes. It follows the fitted intensity, centre, ellipticity and position angle with radius, plus the harmonic terms chosen with `--model-harmonics`. It is relative to the subtracted sky, and it covers masked pixels too. The model is computed after the fit, so it never changes the profile.
   - **prepared** (`--prepared prepared.fits`): `mask × (science − sky)`, the image exactly as ELLIPROF fits it.
   - **residual** (`--residual residual.fits`): `mask × (science − sky − model)`. It is science − sky − model on good pixels and exactly 0 on masked ones. It uses the same model as `-m`; `-m` is not needed.
@@ -255,7 +255,7 @@ Only the selected HDU is fitted, and its header and WCS go into the model, prepa
 
 ### Image data types, including 64-bit
 
-The science image may be stored with any FITS data type: integers (`BITPIX` 8, 16, 32, 64) or floating point (`BITPIX` −32, −64), with `BSCALE`/`BZERO` applied. ELLIPROF itself computes in 32-bit floating point, and that is not changed, so the pixel values are converted to the nearest 32-bit float as they are read. The same values stored as 32-bit or 64-bit therefore give identical results. A 64-bit value that a 32-bit float cannot hold exactly is used as its nearest 32-bit float, and a value beyond the 32-bit range (about 3.4 × 10³⁸) is refused with an error. The summary notes the conversion for 64-bit images. The model, residual and prepared images are always written as 32-bit floating point.
+The science image may be stored with any FITS data type: integers (`BITPIX` 8, 16, 32, 64) or floating point (`BITPIX` −32, −64), with `BSCALE`/`BZERO` applied. elliprof has two backends (`--precision`). **single** is the original ELLIPROF, in 32-bit floating point: pixel values are converted to the nearest 32-bit float as they are read, and the products are 32-bit. **double** is its port to IEEE-754 double precision: the double backend reads and processes 64-bit FITS data without reducing them to float32. Finite values are retained and calculations are performed using IEEE-754 double precision throughout the double path, subject to the representable range of the required intermediate and final mathematical operations; its products are 64-bit. **auto** (the default) uses double only for data single cannot hold: a science or sky image stored with `BITPIX` 64 or −64, or values beyond the 32-bit range or too small for it. The summary says which backend ran and why.
 
 ### Sky and masks
 
@@ -464,15 +464,15 @@ A normal run prints a short summary: the image, sky and mask, the number of isop
 | Platform | Status |
 |---|---|
 | Linux x86_64, aarch64 (manylinux_2_28) | Supported |
-| Linux ppc64le, s390x (manylinux_2_28) | Supported (wheels tested under QEMU emulation) |
+| Linux ppc64le, s390x (manylinux_2_28) | Supported (validated under QEMU emulation; not yet validated on native ppc64le/s390x hardware) |
+| Linux riscv64 (manylinux_2_39) | Supported (validated under QEMU emulation; not yet validated on native riscv64 hardware) |
 | Linux x86_64, aarch64 (musllinux_1_2, e.g. Alpine) | Supported |
 | macOS 10.13+ x86_64 (Intel) | Supported |
 | macOS 11+ arm64 (Apple Silicon) | Supported |
 | Windows x86_64 | Supported |
-| Linux riscv64 (manylinux_2_39) | Experimental: the wheel builds, but its tests have not completed |
-| Windows ARM64 | Experimental: no wheel (no GNU Fortran toolchain yet) |
+| Windows ARM64 | Experimental: no wheel. CFITSIO builds, its Fortran ABI probe passes, and the backend builds and runs (LLVM flang); the full Python-package test cannot complete because PyPI has no Windows ARM64 wheel of pyerfa, which Astropy needs. Not an ELLIPROF numerical or backend failure |
 
-Python 3.6 to 3.14. The Intel macOS wheel is built for macOS 10.13 throughout: the program, its CFITSIO, and the bundled Fortran runtime libraries. Supported means the wheel was installed and passed the installed-wheel and regression tests in a clean environment without a compiler or CFITSIO. On ppc64le and s390x, PyPI has no numpy or pandas wheels, so install those from your Linux distribution or conda. 32-bit systems, Intel Macs older than macOS 10.13, and Apple Silicon Macs older than macOS 11 are not supported.
+Python 3.6 to 3.14. The Intel macOS wheel is built for macOS 10.13 throughout: the program, its CFITSIO, and the bundled Fortran runtime libraries. Supported means the wheel was installed and passed the installed-wheel and regression tests in a clean environment without a compiler or CFITSIO. On ppc64le, s390x and riscv64, PyPI has no numpy or pandas wheels, so install those from your Linux distribution or conda. 32-bit systems, Intel Macs older than macOS 10.13, and Apple Silicon Macs older than macOS 11 are not supported.
 
 ## Development
 

@@ -8,9 +8,10 @@ C     ISC = CNPIX1, ISR = CNPIX2, or 0 when those keywords are absent.
      $     HEAD, IERR)
       CHARACTER*(*) FNAME, HEAD
       INTEGER IUNIT, NCOL, NROW, ISC, ISR, IERR
-      INTEGER STATUS, NAXIS, NAXES(3), NKEYS, NMORE, I, NCARD
-      INTEGER HDUTYP
+      INTEGER STATUS, NAXIS, NAXES(9), NKEYS, NMORE, I, NCARD
+      INTEGER HDUTYP, J
       CHARACTER*80 CARD, COMMENT
+      CHARACTER*120 DIMS
 
       IERR = 1
       STATUS = 0
@@ -44,12 +45,48 @@ C     another HDU.
          CALL FITSCLOSE(IUNIT)
          RETURN
       END IF
-      NAXES(3) = 1
-      CALL FTGISZ(IUNIT, MIN(NAXIS,3), NAXES, STATUS)
+      DO 5 I = 1, 9
+         NAXES(I) = 1
+ 5    CONTINUE
+      CALL FTGISZ(IUNIT, MIN(NAXIS,9), NAXES, STATUS)
+      IF (STATUS .NE. 0) THEN
+         CALL FITSERR('reading the image size of '//
+     $        FNAME(1:LEN_TRIM(FNAME)), STATUS)
+         CALL FITSCLOSE(IUNIT)
+         RETURN
+      END IF
+C     Every axis must hold at least one pixel, before anything is
+C     allocated or fitted.  An empty axis is legal FITS but there is no
+C     image to fit; it is also what a mis-sized CFITSIO Fortran wrapper
+C     returns (CFITSIO 4.7.0 on riscv64 without the f77_wrap.h fix in
+C     tools/ci/build_cfitsio.sh read 256 x 256 as 256 x 0).
+      DO 4 I = 1, MIN(NAXIS,9)
+         IF (NAXES(I) .LT. 1) THEN
+            WRITE (DIMS,'(I0,8(A,I0))') NAXES(1),
+     $           (' x ', NAXES(J), J = 2, MIN(NAXIS,9))
+            WRITE (0,'(5A)') 'elliprof: error: ',
+     $           FNAME(1:LEN_TRIM(FNAME)), ': selected FITS image ',
+     $           'has invalid dimensions (', DIMS(1:LEN_TRIM(DIMS))//')'
+            CALL FITSCLOSE(IUNIT)
+            RETURN
+         END IF
+ 4    CONTINUE
       NCOL = NAXES(1)
       NROW = NAXES(2)
-      IF (NAXIS .GT. 2 .AND. NAXES(3) .GT. 1) WRITE (0,*)
-     $     'elliprof: NAXIS =', NAXIS, '; using the first plane only'
+C     2-D images only.  A cube (or any axis beyond the second longer
+C     than 1) is refused: never fit one plane of it silently.  Degenerate
+C     axes of length 1 are accepted.
+      DO 6 I = 3, MIN(NAXIS,9)
+         IF (NAXES(I) .GT. 1) THEN
+            WRITE (0,'(4A,I0,A,I0,A,I0,2A)') 'elliprof: error: ',
+     $           FNAME(1:LEN_TRIM(FNAME)), ': the selected HDU is not ',
+     $           'a 2-D image (NAXIS = ', NAXIS, ', NAXIS', I, ' = ',
+     $           NAXES(I), '); select a 2-D image HDU, or one plane ',
+     $           'with CFITSIO syntax, e.g. "file.fits[1][*,*,2:2]"'
+            CALL FITSCLOSE(IUNIT)
+            RETURN
+         END IF
+ 6    CONTINUE
 
       CALL FTGKYJ(IUNIT, 'CNPIX1', ISC, COMMENT, STATUS)
       IF (STATUS .EQ. 202) THEN

@@ -163,3 +163,60 @@ C     The second image must match the science image exactly.
       END IF
       RETURN
       END
+
+C     --nonfinite: science pixels that are NaN or +-Inf after the sky and
+C     the mask (pixels the mask already excluded are 0 and never count),
+C     counted by type (NNAN, NPINF, NMINF).  MASK true (--nonfinite
+C     mask): they become 0 and bad in GOOD, the effective mask (user
+C     mask AND finite science; a data-quality selection would be one
+C     more AND).  Otherwise they are only counted (NONFCNTS).
+      SUBROUTINE NONFINS(PIX, NCOL, NROW, GOOD, NNAN, NPINF, NMINF)
+      INTEGER NCOL, NROW, NNAN, NPINF, NMINF, I, J
+      REAL PIX(NCOL,NROW)
+      LOGICAL GOOD(NCOL,NROW), NONFTYPE
+      NNAN = 0
+      NPINF = 0
+      NMINF = 0
+      DO 10 J = 1, NROW
+         DO 11 I = 1, NCOL
+            IF (NONFTYPE(DBLE(PIX(I,J)), NNAN, NPINF, NMINF)) THEN
+               PIX(I,J) = 0.0
+               GOOD(I,J) = .FALSE.
+            END IF
+ 11      CONTINUE
+ 10   CONTINUE
+      RETURN
+      END
+
+C     The counts of NONFINS, without masking (keep, error).
+      SUBROUTINE NONFCNTS(PIX, NCOL, NROW, NNAN, NPINF, NMINF)
+      INTEGER NCOL, NROW, NNAN, NPINF, NMINF, I, J
+      REAL PIX(NCOL,NROW)
+      LOGICAL NONFTYPE, L
+      NNAN = 0
+      NPINF = 0
+      NMINF = 0
+      DO 10 J = 1, NROW
+         DO 11 I = 1, NCOL
+            L = NONFTYPE(DBLE(PIX(I,J)), NNAN, NPINF, NMINF)
+ 11      CONTINUE
+ 10   CONTINUE
+      RETURN
+      END
+
+C     True if V is NaN or +-Inf; counts it by type.
+      LOGICAL FUNCTION NONFTYPE(V, NNAN, NPINF, NMINF)
+      DOUBLE PRECISION V
+      INTEGER NNAN, NPINF, NMINF
+      NONFTYPE = .TRUE.
+      IF (V .NE. V) THEN
+         NNAN = NNAN + 1
+      ELSE IF (V .GT. HUGE(V)) THEN
+         NPINF = NPINF + 1
+      ELSE IF (V .LT. -HUGE(V)) THEN
+         NMINF = NMINF + 1
+      ELSE
+         NONFTYPE = .FALSE.
+      END IF
+      RETURN
+      END

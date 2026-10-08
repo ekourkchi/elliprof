@@ -79,8 +79,9 @@ COMMON WORKFLOW
 INPUT IMAGE AND INITIAL CENTRE
   IMAGE.fits    2-D FITS image of the galaxy (the first argument), stored
                 with any BITPIX: 8, 16, 32, 64 (integers) or -32, -64
-                (floating point).  ELLIPROF works in 32-bit floating point,
-                so the pixels are converted to it when read.  An image in
+                (floating point).  It is read in the precision of the
+                backend (see --precision): 32-bit floats for single, 64-bit
+                for double.  An image in
                 an extension is chosen with CFITSIO syntax, quoted for the
                 shell:  'galaxy.fits[SCI]'  'galaxy.fits[1]'.  The selected
                 HDU is fitted; there is no fallback to another.
@@ -165,6 +166,13 @@ SKY / BACKGROUND AND MASK
                        NaN, Inf, undefined (BLANK) = bad
                      A legacy .dmask bitmap always means 1 = good and is
                      refused with zero-good.
+  --nonfinite auto|mask|keep|error
+                     science pixels that are NaN or +-Inf after the sky and
+                     the mask (e.g. no-data regions): mask excludes them like
+                     masked pixels; keep passes them on, as before 0.2.0, with
+                     a warning; error refuses the image.  auto (default):
+                     keep with --precision single (historical reproduction),
+                     mask otherwise.
   --mask and --sky-image may also select an HDU: 'products.fits[MASK]'.
   --sc VALUE         deprecated alias of --sky; use --sky.
   SKY=s              ELLIPROF's own sky level, used ONLY in the de Vaucouleurs
@@ -223,9 +231,23 @@ OUTPUT FILES
   --residual FILE  mask x (science - sky - model), FITS.
   --prepared FILE  mask x (science - sky), FITS: the image exactly as
                  ELLIPROF fits it.
-  The model, residual and prepared images are 32-bit floating-point FITS
-  with the header of the selected science HDU (WCS, BUNIT, ...), so they
-  overlay the science image exactly in DS9 and other WCS-aware software.
+  The model, residual and prepared images are floating-point FITS (32-bit
+  from the single backend, 64-bit from the double one) with the header of
+  the selected science HDU (WCS, BUNIT, ...), so they overlay the science
+  image exactly in DS9 and other WCS-aware software.
+
+PRECISION
+  --precision auto|single|double
+                 the backend.  single: the original ELLIPROF, in 32-bit
+                 floating point.  double: its port to IEEE-754 double
+                 precision throughout (reading, sky, fit, model, products;
+                 64-bit products, profile values with 18 digits).
+                 auto (default): double only when single cannot hold the
+                 data -- a science or sky image stored with BITPIX 64 or
+                 -64, or values (after BSCALE/BZERO, or the sky) beyond the
+                 float32 range or nonzero but 0 in float32; otherwise
+                 single.  The summary says which ran and why.  GC needs
+                 single.
 
 PROFILE COLUMNS (-o, --csv)
   Rmaj    semi-major axis a of the isophote [pixels]
@@ -337,7 +359,7 @@ USAGE = HELP
 VALUE_OPTS = {"--mask", "--sky", "--sc", "--sky-image", "-o", "--csv",
               "--reg", "-m", "--prepared", "--residual", "--timeout",
               "--model-harmonics", "--harmonic-mode", "--mask-convention",
-              "--niter"}
+              "--niter", "--precision", "--nonfinite"}
 FLAG_OPTS = {"-h": "help", "--help": "help", "-v": "version",
              "--version": "version", "--diagnostics": "diagnostics",
              "-u": "update", "--update": "update",
@@ -391,7 +413,15 @@ _SKY = re.compile(r"^\s*Sky: subtracted (scalar|image)\s+(.*?)\s*$")
 _MASK = re.compile(r"^\s*Mask: (.*) \(BITPIX (-?\d+)\): (\d+) pixels masked"
                    r" \(\s*([\d.]+)%\)")
 _NONF = re.compile(r"^\s*Mask: (\d+) of them NaN")
+_NONFIN = re.compile(r"^\s*Non-finite: policy (.*?); NaN (\d+), \+Inf "
+                     r"(\d+), -Inf (\d+); masked (\d+)")
+_UNDER = re.compile(r"^\s*Model: (\d+) pixels underflowed to zero")
+_SUBN = re.compile(r"^\s*Model: (\d+) pixels are subnormal")
 _BITPIX64 = re.compile(r"^\s*Image: BITPIX (-?64) converted")
+_PREC = re.compile(r"^\s*Precision: (single|double) .*?; requested (\w+)"
+                   r"(?: \(auto: (.*)\))?\s*$")
+_NORM = re.compile(r"Normalization: fit on image x 2\*\*\(-k\), "
+                   r"k = (-?\d+)")
 _NOTES = (
     ("FITCONTOUR: quitting",
      "{n} isophote fit(s) had too few usable samples along the ellipse "
@@ -418,6 +448,13 @@ def _summary(result, opts: dict, nr: str = "") -> None:
                                    if size else "")
           + (f", BITPIX {b64.group(1)} read as 32-bit float" if b64
              else ""))
+    prec = next((m for m in map(_PREC.match, out) if m), None)
+    if prec:
+        how = f"auto: {prec.group(3)}" if prec.group(3) else "requested"
+        norm = next((m for m in map(_NORM.search, out) if m), None)
+        if norm:
+            how += f"; fit on image x 2**-k, k = {norm.group(1)}"
+        print(f"Precision: {prec.group(1)} ({how})")
     if opts.get("--sky") is not None:
         print("Sky:      scalar " + str(opts["--sky"]).strip())
     elif opts.get("--sky-image"):
@@ -434,6 +471,11 @@ def _summary(result, opts: dict, nr: str = "") -> None:
               f"({float(mask.group(4)):.3f}%){extra}; {conv}")
     else:
         print("Mask:     none")
+    nf = next((m for m in map(_NONFIN.match, out) if m), None)
+    if nf and any(int(g) for g in nf.groups()[1:4]):
+        print(f"Non-finite: NaN {nf.group(2)}, +Inf {nf.group(3)}, -Inf "
+              f"{nf.group(4)}; {nf.group(5)} masked (policy "
+              f"{nf.group(1)})")
     if "SURFACE PHOTOMETRY PROFILE COMPUTATION:" in result.stdout:
         table = result.stdout.split(
             "SURFACE PHOTOMETRY PROFILE COMPUTATION:", 1)[1]
@@ -444,6 +486,14 @@ def _summary(result, opts: dict, nr: str = "") -> None:
         print(f"Fit complete: {nr} isophotes.")
     else:
         print("Fit complete.")
+    under = next((m for m in map(_UNDER.match, out) if m), None)
+    if under:
+        print(f"Model: {under.group(1)} pixels underflowed to zero at "
+              "double precision.")
+    subn = next((m for m in map(_SUBN.match, out) if m), None)
+    if subn:
+        print(f"Model: {subn.group(1)} pixels are subnormal (nonzero, below "
+              "the normal double range: reduced precision).")
     sys.stdout.flush()
     for text, note in _NOTES:
         n = sum(text in l for l in out)
@@ -527,6 +577,14 @@ def main(argv: Optional[List[str]] = None) -> int:
                              f"zero-good, not {conv!r}")
         if "--mask-convention" in opts and "--mask" not in opts:
             raise UsageError("--mask-convention needs --mask")
+        nonfinite = opts.get("--nonfinite", "auto")
+        if nonfinite not in ("auto", "mask", "keep", "error"):
+            raise UsageError("--nonfinite must be auto, mask, keep or "
+                             f"error, not {nonfinite!r}")
+        precision = opts.get("--precision", "auto")
+        if precision not in ("auto", "single", "double"):
+            raise UsageError("--precision must be auto, single or double, "
+                             f"not {precision!r}")
         try:
             timeout = float(opts.get("--timeout", DEFAULT_TIMEOUT))
         except ValueError:
@@ -549,7 +607,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 model_harmonics=opts.get("--model-harmonics"),
                 harmonic_mode=opts.get("--harmonic-mode"),
                 sixth_order=opts.get("sixth-order", False),
-                mask_convention=conv,
+                mask_convention=conv, precision=precision,
+                nonfinite=nonfinite,
                 timeout=timeout, check=False, load_profile=False,
                 default_outputs=False,
                 backend_verbose=opts.get("verbose", False))

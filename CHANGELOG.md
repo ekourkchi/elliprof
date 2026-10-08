@@ -1,5 +1,86 @@
 # Changes
 
+## 0.2.0rc1 (release candidate)
+
+A release candidate: install it with `pip install --pre elliprof` or
+`pip install elliprof==0.2.0rc1`; a plain `pip install elliprof` keeps
+0.1.4. An installed pre-release is never offered an automatic update.
+
+### Added
+
+- **True binary64 (double-precision) processing and products, with
+  guarded handling of avoidable intermediate overflow and underflow.**
+  `--precision auto|single|double` (Python `precision=`):
+  - `single` is the original ELLIPROF (32-bit `REAL*4`), unchanged:
+    `--precision single` reproduces 0.1.4.
+  - `double` is its port to IEEE-754 binary64: images, sky and mask in
+    double, an exact power-of-two normalization, the fit and the model
+    in double, profiles with 18 significant digits (`.dat` and CSV with
+    3-digit exponents).
+  - `auto` (the default) runs double only for data single cannot hold:
+    `BITPIX` 64 or −64, values beyond or below the 32-bit range, or a
+    `--sky`/`SKY=` value the single parser cannot read. Every other
+    image gives the same results as 0.1.4. The summary, the CSV and
+    `result.precision` say which backend ran and why.
+- Double model, residual and prepared images are written as
+  `BITPIX = −64`, in physical units.
+- 64-bit input: float64 and int64 images are read as binary64 (exact for
+  integers up to 2⁵³; larger int64 values round to the nearest double,
+  as numpy's float64 conversion does).
+- `--nonfinite auto|mask|keep|error` (`nonfinite=`): what happens to NaN
+  and ±Inf science pixels. The default masks them, except with an
+  explicit `--precision single`, which keeps them as 0.1.4 did. The
+  summary records the policy and the counts.
+- Range protection in double precision: where an intermediate
+  calculation would overflow or underflow although the result is
+  representable (intensity ratios, `AVG` box sums, interpolation near
+  the largest double, intensity updates, isophote slopes, the model's
+  conversion to physical units), it is computed safely -- only there:
+  ordinary images keep the original arithmetic bit for bit. A result
+  that is itself beyond the double range is a clear error, never a
+  silent NaN or infinity. Model pixels that underflow to 0 or are
+  subnormal are counted (summary, CSV, FITS `HISTORY`,
+  `result.model_underflow_zero_count`, `result.model_subnormal_count`).
+- `read_prf`/`read_profile` read double profiles exactly;
+  `subtract_sky`/`apply_mask` take `precision="double"`.
+
+### Changed
+
+- **Linux riscv64 is a supported platform** (wheels for manylinux_2_39).
+- Defensive FITS geometry checks: an image with an empty axis
+  (`NAXISn = 0`) is refused with "selected FITS image has invalid
+  dimensions" before anything is allocated or fitted; an image with a
+  third axis longer than 1 (a cube) is refused instead of being fitted
+  on its first plane (select a plane: `'cube.fits[SCI][*,*,2:2]'`).
+- The CSV header has `# Precision:` and `# Normalization:` lines, and
+  the summary a `Precision:` line. `parse_elliprof_csv` parses numbers
+  round-trip exactly.
+- Expanded platform validation: every wheel is built against a CFITSIO
+  checked by a Fortran-interface probe, installed in a clean
+  environment and tested, including the double-precision range
+  protections, and compared numerically across platforms.
+
+### Fixed
+
+- The riscv64 wheel read images with the wrong size: CFITSIO 4.7.0's
+  Fortran interface passed integer arguments with the wrong width on
+  riscv64. The wheel build corrects CFITSIO's configuration for riscv64
+  only.
+
+### Known limitations
+
+- GC mode runs in single precision only.
+- The historical sixth-order model limitation remains: beyond a
+  position-angle wrap across 0/180° the model gives the 6th-order term
+  the wrong sign (the measurements are valid; a warning is printed).
+- Windows ARM64 remains experimental: the backend builds and runs, but
+  the Python dependencies (Astropy's `pyerfa`) have no Windows ARM64
+  wheels.
+- The ppc64le, s390x and riscv64 wheels are validated under QEMU
+  emulation, not yet on native hardware.
+- Double precision needs about 32 bytes per pixel for its baseline
+  arrays (4096 × 4096: 512 MiB); peak memory use is higher.
+
 ## 0.1.4 (2026-10-06)
 
 The numerical results are unchanged: for the same input, mask

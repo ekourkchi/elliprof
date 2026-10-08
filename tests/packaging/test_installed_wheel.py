@@ -278,7 +278,9 @@ print("ok")
 def test_014_model_masks_niter_float64(tmp_path):
     """0.1.4 on the installed wheel: -m alone writes the model (same data
     as legacy MODEL -m), the zero-good mask convention, --niter, and a
-    BITPIX = -64 image."""
+    BITPIX = -64 image -- in the single backend, which converts it to the
+    same float32 values (--precision single; the default auto fits a
+    64-bit image in double)."""
     fits = pytest.importorskip("astropy.io.fits")   # test-only dependency
     data = fits.getdata(GALAXY).astype(np.float32)
     a = run(GALAXY, *FIT, "--sky", "100", "RMSTAR", "NITER=5",
@@ -304,7 +306,8 @@ def test_014_model_masks_niter_float64(tmp_path):
                             (tmp_path / "f64.fits", "A.fits", [])):
         out = tmp_path / f"m{len(outs)}.dat"
         p = run(img, *FIT, "--sky", "100", "--mask", tmp_path / mask,
-                *conv, "-o", out, "--residual", out.with_suffix(".fits"))
+                *conv, "--precision", "single", "-o", out, "--residual",
+                out.with_suffix(".fits"))
         assert p.returncode == 0, p.stderr
         assert f"{int(bad.sum())} pixels masked" in p.stdout
         outs.append((np.asarray(_read_prf(out)), fits.getdata(
@@ -312,8 +315,99 @@ def test_014_model_masks_niter_float64(tmp_path):
     for prof, res in outs[1:]:
         assert np.array_equal(prof, outs[0][0])
         assert np.array_equal(res, outs[0][1])
+    # 0.2.0: by default the 64-bit image is fitted in double precision
+    p = run(tmp_path / "f64.fits", *FIT, "--sky", "100", "-o",
+            tmp_path / "d.dat")
+    assert p.returncode == 0, p.stderr
+    assert "Precision: double" in p.stdout
 
 
 def _read_prf(path):
     from elliprof import read_prf
     return read_prf(str(path))["params"]
+
+
+def test_double_range_guards(tmp_path):
+    """R4 to R7 of the double backend on this platform's binary:
+    gradual underflow, SCALE and the range boundaries must behave as
+    IEEE binary64 requires (a platform that flushes subnormals to zero,
+    or scales inexactly, fails here)."""
+    fits = pytest.importorskip("astropy.io.fits")
+    tiny, dmax = np.finfo(float).tiny, np.finfo(float).max
+    rot = HERE.parent / "data" / "regression" / "rotated.fits"
+    g = fits.getdata(rot).astype(np.float64)
+    j, i = np.indices(g.shape)
+    r = np.hypot(i + 0.5 - 100.3, j + 0.5 - 99.6)
+    fit = ["X0=100.3", "Y0=99.6", "R0=3", "R1=80", "NR=25", "NITER=5"]
+
+    def go(img, name, *args, fit=fit, model=True):
+        path = tmp_path / f"{name}.fits"
+        fits.PrimaryHDU(img).writeto(path)
+        m = ["-m", tmp_path / f"{name}_m.fits"] if model else []
+        p = run(path, *fit, *args, "--precision", "double",
+                "-o", tmp_path / f"{name}.dat", *m)
+        return p, tmp_path / f"{name}.dat", tmp_path / f"{name}_m.fits"
+
+    # R4: a block of exactly DBL_MAX (k = 0) == the block two ulp lower
+    syn = (fits.getdata(GALAXY).astype(np.float64) - 100.0) * 1e-3
+    dats = []
+    for name, v in (("a", dmax), ("b", np.nextafter(np.nextafter(dmax, 0), 0))):
+        img = syn.copy()
+        img[113:130, 159:176] = v
+        p, dat, _ = go(img, name, fit=FIT)
+        assert p.returncode == 0, p.stderr
+        dats.append(dat.read_bytes())
+    assert dats[0] == dats[1] and b"NaN" not in dats[0]
+
+    # R6, k > 0: physical model values, scale-exact where normal
+    wing = np.where(r > 60, g * 1e-30, g)
+    models = {}
+    for m in (300, 900):
+        p, _, mod = go(np.ldexp(wing, m), f"w{m}")
+        assert p.returncode == 0, p.stderr
+        model = fits.getdata(mod).astype(np.float64)
+        sub = [l for l in p.stdout.splitlines() if "are subnormal" in l]
+        assert sub and int(sub[0].split()[1]) == \
+            ((model != 0) & (np.abs(model) < tiny)).sum() > 0
+        models[m] = model
+    a, b = models[300], models[900]
+    both = (np.abs(a) >= tiny) & (np.abs(b) >= tiny)
+    assert np.array_equal(np.ldexp(a[both], 600), b[both])
+    assert (a == 0).sum() > (b == 0).sum() and not ((b == 0) & (a != 0)).any()
+
+    # R6, k < 0: masked nucleus, model extrapolated beyond the internal
+    # range but representable in physical units
+    img = g / g.max() * 1e10
+    img[r > 50] = 1e-300 * (1 + 0.01 * np.sin(r[r > 50]))
+    fits.PrimaryHDU((r >= 8).astype(np.int16)).writeto(tmp_path / "nm.fits")
+    p, _, mod = go(img, "n", "--mask", tmp_path / "nm.fits",
+                   fit=["X0=100.3", "Y0=99.6", "R0=10", "R1=45", "NR=15",
+                        "NITER=5"])
+    assert p.returncode == 0, p.stderr
+    assert np.isfinite(fits.getdata(mod)).all()
+
+    # R7: a slope whose intermediate (I(k-1)-I(k+1))/I(k) overflows
+    # (coarse grid, |r/dr| < 1) while the slope itself is representable
+    from fractions import Fraction as F
+    jj, ii = np.indices((120, 120))
+    rr = np.hypot(ii + 0.5 - 60.3, jj + 0.5 - 59.6)
+    img = np.where(rr < 6, 1e300, np.where(rr < 15, 5e-9, 1e-300)) * (
+        1 + 0.001 * np.cos(3 * np.arctan2(jj - 59.6, ii - 60.3)))
+    p, dat, _ = go(img, "s", fit=["X0=60.3", "Y0=59.6", "R0=4", "R1=25",
+                                  "NR=3", "NITER=5", "RLAW=1"],
+                   model=False)   # its model is genuinely beyond DBL_MAX
+    assert p.returncode == 0, p.stderr
+    tok = dat.read_text().split(None, 3002)
+    v = np.array([float(t) for t in tok[2:3002]]).reshape(250, 12)[:3]
+    exact = float((F(v[0, 3]) - F(v[2, 3])) / F(v[1, 3]) * F(v[1, 0])
+                  / (F(v[0, 0]) - F(v[2, 0])))
+    assert -dmax < exact < -1e307
+    assert abs(v[1, 10] - exact) <= 4 * np.spacing(abs(exact))
+
+    # R5: the 1.5e308 core stops at its first genuine range error
+    img = g * 1e-300
+    img[r < 4] = 1.5e308
+    p, _, _ = go(img, "c")
+    assert p.returncode == 1
+    assert "slope dlnI/dlnr of isophote 4 is beyond the double range" \
+        in p.stderr

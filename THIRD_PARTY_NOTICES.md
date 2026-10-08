@@ -33,7 +33,7 @@ The wheel-repair tools (auditwheel, delocate) and, on Windows, the build put the
 |---|---|
 | macOS arm64, x86_64 | libgfortran, libquadmath, libgcc_s |
 | manylinux x86_64, ppc64le | libgfortran, libquadmath |
-| manylinux aarch64, s390x | libgfortran |
+| manylinux aarch64, s390x, riscv64 | libgfortran |
 | musllinux x86_64 | libgcc_s, libgfortran, libquadmath |
 | musllinux aarch64 | libgcc_s, libgfortran |
 | Windows x86_64 | libgcc_s_seh-1, libgfortran-5, libquadmath-0, libwinpthread-1, zlib1 |

@@ -1,42 +1,31 @@
-C     Extra, human-oriented outputs made from the final /PRF/ contents
-C     after ELLIPROF returns.  PARAM_PRF(J,K) for contour K, as filled
-C     at the end of ELLIPROF (elliprof.f, loop 30) and printed by
-C     the original profile printout (the comments in profile.inc are
-C     out of date):
-C        1 Rmaj   2 x0 (+ISC)   3 y0 (+ISR)   4 I0
-C        5 alpha  (ELLIPROF internal PA, CCW from +x, minus 90 deg)
-C        6 ellip  (1 - b/a)
-C        7 I3   8 A3   9 I4   10 A4   11 slope (d log I / d log r)
-C     Row 12 holds ELLIPROF's run flags, not a contour value.
+C     The CSV table and DS9 regions of the double backend, from /PRFD/
+C     (see profout.f for the single ones and the column meanings).
 
-C     DS9 region file, one ellipse per contour, image coordinates.
-C     ELLIPROF puts the centre of DATA(ix,iy) at ix-0.5, DS9 at ix,
-C     and x0/y0 include the CNPIX origin, so the DS9 centre is
-C     x0 - ISC + 0.5, y0 - ISR + 0.5.  The DS9 angle is alpha - 90
-C     (the major axis is at alpha + 90; the two differ by 180 deg).
-      SUBROUTINE WRITEREG(FNAME, ISC, ISR, IERR)
+C     DS9 regions: as WRITEREG, from the double profile.
+      SUBROUTINE WRITEREGD(FNAME, ISC, ISR, IERR)
+      IMPLICIT NONE
       CHARACTER*(*) FNAME
       INTEGER ISC, ISR, IERR
-      INCLUDE 'profile.inc'
+      INCLUDE 'profile_d.inc'
       INTEGER K, NBAD
-      REAL XC, YC, A, B, ANG
+      DOUBLE PRECISION XC, YC, A, B, ANG
 
       OPEN (7, FILE=FNAME, FORM='FORMATTED', STATUS='UNKNOWN',
      $     IOSTAT=IERR)
       IF (IERR .NE. 0) THEN
-         WRITE (0,*) 'elliprof: cannot open ', FNAME(1:LEN_TRIM(FNAME))
+         WRITE (0,'(3A)') 'elliprof: error (double precision, output):'
+     $        //' cannot open ', FNAME(1:LEN_TRIM(FNAME))
          RETURN
       END IF
       WRITE (7,'(A)') '# Region file format: DS9 version 4.1',
      $     'global color=green width=1', 'image'
       NBAD = 0
       DO 10 K = 1, N_PRF
-         XC = PARAM_PRF(2,K) - ISC + 0.5
-         YC = PARAM_PRF(3,K) - ISR + 0.5
+         XC = PARAM_PRF(2,K) - ISC + 0.5D0
+         YC = PARAM_PRF(3,K) - ISR + 0.5D0
          A = PARAM_PRF(1,K)
          B = PARAM_PRF(1,K) * (1 - PARAM_PRF(6,K))
          ANG = PARAM_PRF(5,K) - 90
-C     NaN compares unequal to itself; DS9 cannot parse such a line
          IF (XC.NE.XC .OR. YC.NE.YC .OR. A.NE.A .OR. B.NE.B .OR.
      $        ANG.NE.ANG) THEN
             NBAD = NBAD + 1
@@ -47,28 +36,31 @@ C     NaN compares unequal to itself; DS9 cannot parse such a line
  10   CONTINUE
  1000 FORMAT ('ellipse(',F0.4,',',F0.4,',',F0.4,',',F0.4,',',F0.4,')')
       CLOSE (7)
-      IF (NBAD .GT. 0) WRITE (0,*) 'elliprof: ', NBAD,
+      IF (NBAD .GT. 0) WRITE (0,'(A,I0,2A)') 'elliprof: ', NBAD,
      $     ' contour(s) with NaN left out of ', FNAME(1:LEN_TRIM(FNAME))
       RETURN
       END
 
-C     Comma-separated profile with fixed-width columns and # comments.
-C     Values are PARAM_PRF exactly as stored.  PARAMS is the ELLIPROF
-C     keyword line, recorded for provenance.
-C     MASK and SKY describe the preparation ('none' if not used);
-C     PRECLN the backend precision and how it was chosen.
-      SUBROUTINE WRITECSV(FNAME, IMAGE, MASK, SKY, PARAMS, PRECLN,
-     $     ISC, ISR, IERR)
-      CHARACTER*(*) FNAME, IMAGE, MASK, SKY, PARAMS, PRECLN
+C     The CSV table: the columns of WRITECSV, every value as ES25.17E3
+C     (18 significant digits, explicit 3-digit exponent: the whole
+C     double range, read back exactly), and more comment lines for the
+C     precision (PRECLN), the normalization (NORMLN) and, with a model,
+C     the model pixels that underflowed to zero (UNDLN).
+      SUBROUTINE WRITECSVD(FNAME, IMAGE, MASK, SKY, PARAMS, ISC, ISR,
+     $     PRECLN, NORMLN, UNDLN, SUBLN, IERR)
+      IMPLICIT NONE
+      CHARACTER*(*) FNAME, IMAGE, MASK, SKY, PARAMS, PRECLN, NORMLN
+      CHARACTER*(*) UNDLN, SUBLN
       INTEGER ISC, ISR, IERR
-      INCLUDE 'profile.inc'
+      INCLUDE 'profile_d.inc'
       INCLUDE 'version.inc'
       INTEGER K, J
 
       OPEN (7, FILE=FNAME, FORM='FORMATTED', STATUS='UNKNOWN',
      $     IOSTAT=IERR)
       IF (IERR .NE. 0) THEN
-         WRITE (0,*) 'elliprof: cannot open ', FNAME(1:LEN_TRIM(FNAME))
+         WRITE (0,'(3A)') 'elliprof: error (double precision, output):'
+     $        //' cannot open ', FNAME(1:LEN_TRIM(FNAME))
          RETURN
       END IF
       WRITE (7,'(A)') '# ELLIPROF surface photometry profile',
@@ -77,7 +69,12 @@ C     PRECLN the backend precision and how it was chosen.
      $     '# Sky: '//SKY(1:LEN_TRIM(SKY)),
      $     '# Parameters: '//PARAMS(1:LEN_TRIM(PARAMS)),
      $     '# elliprof version: '//VERSTR,
-     $     '# Precision: '//PRECLN(1:LEN_TRIM(PRECLN))
+     $     '# Precision: '//PRECLN(1:LEN_TRIM(PRECLN)),
+     $     '# Normalization: '//NORMLN(1:LEN_TRIM(NORMLN))
+      IF (UNDLN .NE. ' ') WRITE (7,'(A)')
+     $     '# Model underflow to zero: '//UNDLN(1:LEN_TRIM(UNDLN))
+      IF (SUBLN .NE. ' ') WRITE (7,'(A)')
+     $     '# Model subnormal (nonzero): '//SUBLN(1:LEN_TRIM(SUBLN))
       WRITE (7,1001) N_PRF, PRF_SC, ISC, ISR
  1001 FORMAT ('# Contours: ',I0,'   SCALE: ',G0,
      $     '   Image origin (CNPIX1,CNPIX2): ',I0,',',I0)
@@ -91,21 +88,17 @@ C     PRECLN the backend precision and how it was chosen.
      $ ' plus image origin (DS9 image x = x0 - CNPIX1 + 0.5)',
      $ '# alpha: position angle; major axis at alpha+90 deg CCW '//
      $ 'from +x'
-C     6th-order mode (COS3X < 0): the I3/A3 columns hold the 6th order
       IF (PARAM_PRF(12,15) .LT. 0) WRITE (7,'(A)')
      $ '# Harmonic order: 6 (COS3X < 0): I3 = 6th-order amplitude, '//
      $ 'A3 = 2 x 6th-order phase (deg); there is no 3rd-order term'
       WRITE (7,'(A)') '#'
       WRITE (7,1002) '#', 'Rmaj', 'x0', 'y0', 'I0', 'alpha', 'ellip',
      $     'I3', 'A3', 'I4', 'A4', 'slope'
- 1002 FORMAT (A1,A9,', ',A10,', ',A10,', ',A15,', ',A10,', ',A10,
-     $     ', ',A15,', ',A10,', ',A15,', ',A10,', ',A10)
+ 1002 FORMAT (A1,A24,10(', ',A25))
       DO 10 K = 1, N_PRF
          WRITE (7,1003) (PARAM_PRF(J,K),J=1,11)
  10   CONTINUE
- 1003 FORMAT (F10.4,', ',F10.4,', ',F10.4,', ',ES15.7,', ',F10.4,
-     $     ', ',F10.6,', ',ES15.7,', ',F10.4,', ',ES15.7,', ',F10.4,
-     $     ', ',F10.6)
+ 1003 FORMAT (ES25.17E3,10(', ',ES25.17E3))
       CLOSE (7)
       RETURN
       END

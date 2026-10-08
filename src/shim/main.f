@@ -22,12 +22,16 @@ C     coordinates); ELLIPROF refines it during the fit.
       CHARACTER*1024 ARG, FITSFILE, PRFFILE, MODFILE, CSVFILE, REGFILE
       CHARACTER*1024 MASKFILE, SKYIMG, SKYSTR, SKYDESC, MSKDESC
       CHARACTER*1024 PREPFILE, RESFILE, MCONV
+      CHARACTER*16 PRECREQ, PRECSEL, NONFIN, NFREQ
+      CHARACTER*256 PRECWHY
+      CHARACTER*512 PRECLN
       CHARACTER*289 OSTRNG, LCSTRNG
       LOGICAL ERR, DOMODEL, DOGC, HASX0, HASY0, HASR0, HASR1, HASNR
       LOGICAL PREPONLY, HASNIT, INTMODEL, ZGOOD, KWMODEL
       INTEGER UPPER, NARGS, IARG, IWORD, JCHAR, IB, ICON, NSKYOPT
       INTEGER NTYPE, NUM, NCHAR, NCOL, NROW, IUNIT, IERR, L, I, J
-      INTEGER ICOS3X, MBITPIX, NBAD, NNONF, IBITPIX
+      INTEGER ICOS3X, MBITPIX, NBAD, NNONF, IBITPIX, ISTAT
+      INTEGER NNAN, NPINF, NMINF
       REAL FNUM, SKYVAL, CFV, VX0, VY0, VR0, VR1, VNR, VNIT
 C     --verbose: row-by-row model progress (stubs.f TELLME) and the
 C     profile table even when it is written to a file
@@ -48,6 +52,9 @@ C     ---- Command line: image file, options, ELLIPROF words
       PREPFILE = ' '
       RESFILE = ' '
       MCONV = 'nonzero-good'
+      PRECREQ = 'auto'
+      NONFIN = 'auto'
+      PRECWHY = ' '
       PREPONLY = .FALSE.
       SHVERB = .FALSE.
       INTMODEL = .FALSE.
@@ -76,7 +83,8 @@ C     CFITSIO reports its version as major + minor/100
      $        ARG .EQ. '--mask' .OR. ARG .EQ. '--sky' .OR.
      $        ARG .EQ. '--sc' .OR. ARG .EQ. '--sky-image' .OR.
      $        ARG .EQ. '--prepared' .OR. ARG .EQ. '--residual' .OR.
-     $        ARG .EQ. '--mask-convention') THEN
+     $        ARG .EQ. '--mask-convention' .OR.
+     $        ARG .EQ. '--precision' .OR. ARG .EQ. '--nonfinite') THEN
          IF (IARG .EQ. NARGS) THEN
             WRITE (0,'(3A)') 'elliprof: error: ', ARG(1:LEN_TRIM(ARG)),
      $           ' needs a value'
@@ -102,6 +110,10 @@ C     CFITSIO reports its version as major + minor/100
             CALL GET_COMMAND_ARGUMENT(IARG, RESFILE)
          ELSE IF (ARG .EQ. '--mask-convention') THEN
             CALL GET_COMMAND_ARGUMENT(IARG, MCONV)
+         ELSE IF (ARG .EQ. '--precision') THEN
+            CALL GET_COMMAND_ARGUMENT(IARG, PRECREQ)
+         ELSE IF (ARG .EQ. '--nonfinite') THEN
+            CALL GET_COMMAND_ARGUMENT(IARG, NONFIN)
          ELSE
             IF (ARG .EQ. '--sc') WRITE (0,'(A)')
      $           'elliprof: --sc is deprecated, use --sky'
@@ -146,6 +158,39 @@ C     convention before 0.1.4.
      $        //'nonzero-good or zero-good, got "',
      $        MCONV(1:LEN_TRIM(MCONV)), '"'
          CALL EXIT(1)
+      END IF
+
+C     --precision: the backend.  single is ELLIPROF compiled unchanged
+C     (REAL*4); double is the precision port (src/double) with its own
+C     driver (src/shim/double/main_d.f); auto chooses from the data
+C     (src/shim/double/auto_d.f).
+      IF (PRECREQ .NE. 'single' .AND. PRECREQ .NE. 'double' .AND.
+     $     PRECREQ .NE. 'auto') THEN
+         WRITE (0,'(3A)') 'elliprof: error: --precision must be single'
+     $        //', double or auto, got "',
+     $        PRECREQ(1:LEN_TRIM(PRECREQ)), '"'
+         CALL EXIT(1)
+      END IF
+
+C     --nonfinite: NaN/Inf science pixels left after the sky and the
+C     mask.  mask: excluded like masked pixels; keep: passed to
+C     ELLIPROF, with a warning (the behaviour before 0.2.0); error:
+C     refused.  auto (default): keep with an explicit --precision
+C     single (the historical reproduction), mask otherwise.
+      IF (NONFIN .NE. 'auto' .AND. NONFIN .NE. 'keep' .AND.
+     $     NONFIN .NE. 'mask' .AND. NONFIN .NE. 'error') THEN
+         WRITE (0,'(3A)') 'elliprof: error: --nonfinite must be auto, '
+     $        //'keep, mask or error, got "',
+     $        NONFIN(1:LEN_TRIM(NONFIN)), '"'
+         CALL EXIT(1)
+      END IF
+      NFREQ = NONFIN
+      IF (NONFIN .EQ. 'auto') THEN
+         IF (PRECREQ .EQ. 'single') THEN
+            NONFIN = 'keep'
+         ELSE
+            NONFIN = 'mask'
+         END IF
       END IF
 
 C     ---- Tokenise with the original parser: UPPER, then DISSECT each
@@ -331,7 +376,17 @@ C     would treat them like one of these.
       CALL CHKMODE('COS3X', -3, 2, IERR)
       IF (IERR .EQ. 0) CALL CHKMODE('COS4X', 0, 2, IERR)
       IF (IERR .NE. 0) CALL EXIT(1)
-      IF (SKYSTR .NE. ' ') THEN
+C     --precision auto: decide now, from the data (the single backend
+C     then reads them exactly as with --precision single)
+      PRECSEL = PRECREQ
+      PRECWHY = ' '
+      IF (PRECREQ .EQ. 'auto') THEN
+         CALL AUTOPREC(FITSFILE, SKYIMG, SKYSTR, PRECSEL, PRECWHY,
+     $        IERR)
+         IF (IERR .NE. 0) CALL EXIT(1)
+      END IF
+C     (the double driver parses --sky itself, exactly, in double)
+      IF (SKYSTR .NE. ' ' .AND. PRECSEL .EQ. 'single') THEN
          CALL PARSENUM(SKYSTR, SKYVAL, IERR)
          IF (IERR .NE. 0) THEN
             WRITE (0,'(2A)') 'elliprof: error: --sky needs one '
@@ -364,6 +419,22 @@ C     variable names come from the unchanged include files)
       TTYLUN = 6
       REDIRLUN = 6
 
+C     ---- Double precision: the double backend takes over from here
+
+      IF (PRECSEL .EQ. 'double') THEN
+         IF (DOGC) THEN
+            WRITE (0,'(3A)') 'elliprof: error: double-precision GC '
+     $           //'mode is not yet supported', PRECWHY(1:LEN_TRIM(
+     $           PRECWHY)), '; GC needs --precision single'
+            CALL EXIT(1)
+         END IF
+         CALL ELLIPROFDRV(FITSFILE, PRFFILE, MODFILE, CSVFILE,
+     $        REGFILE, MASKFILE, SKYIMG, SKYSTR, PREPFILE, RESFILE,
+     $        ZGOOD, PREPONLY, DOMODEL, PRECREQ, PRECWHY, NONFIN,
+     $        NFREQ, ISTAT)
+         CALL EXIT(ISTAT)
+      END IF
+
 C     ---- Read the image into buffer 1 (what RD 1 file does)
 
       CALL FITSOPENIM(FITSFILE, IUNIT, NCOL, NROW, ISC, ISR,
@@ -388,6 +459,10 @@ C     ---- Read the image into buffer 1 (what RD 1 file does)
      $     ISC, ISR
  1000 FORMAT (1X,A,': ',I6,' cols x',I6,' rows, origin (col,row) = (',
      $     I6,',',I6,')')
+      WRITE (PRECLN,'(3A)') 'single (REAL*4, the original ELLIPROF); '
+     $     //'requested ', PRECREQ(1:LEN_TRIM(PRECREQ)),
+     $     PRECWHY(1:LEN_TRIM(PRECWHY))
+      WRITE (6,'(2A)') ' Precision: ', PRECLN(1:LEN_TRIM(PRECLN))
 C     ELLIPROF works in REAL*4: 64-bit pixels are rounded to the nearest
 C     32-bit float by CFITSIO (BSCALE/BZERO applied first)
       IF (IBITPIX .EQ. 64 .OR. IBITPIX .EQ. -64) WRITE (6,1002) IBITPIX
@@ -422,8 +497,10 @@ C     ---- Sky, then mask (prep.f): the order matters
       END IF
 
 C     The logical mask (all good without --mask) is kept for --residual
+C     and is the effective mask with --nonfinite mask
       MSKDESC = 'none'
-      IF (MASKFILE .NE. ' ' .OR. RESFILE .NE. ' ') THEN
+      IF (MASKFILE .NE. ' ' .OR. RESFILE .NE. ' ' .OR.
+     $     NONFIN .NE. 'keep') THEN
          ALLOCATE (GOOD(NCOL,NROW))
          GOOD = .TRUE.
       END IF
@@ -441,6 +518,14 @@ C     The logical mask (all good without --mask) is kept for --residual
      $        //'(0 = good, nonzero = bad)'
          MSKDESC = MASKFILE
       END IF
+      IF (NONFIN .EQ. 'mask') THEN
+         CALL NONFINS(PIX, NCOL, NROW, GOOD, NNAN, NPINF, NMINF)
+      ELSE
+         CALL NONFCNTS(PIX, NCOL, NROW, NNAN, NPINF, NMINF)
+      END IF
+      CALL NONFINRPT(NNAN, NPINF, NMINF, NONFIN, NFREQ, 'single')
+      IF (NNAN+NPINF+NMINF .GT. 0 .AND. NONFIN .EQ. 'error')
+     $     CALL EXIT(1)
 
 C     ---- The prepared image, exactly as ELLIPROF receives it:
 C     good(mask) x (science - sky)
@@ -542,7 +627,7 @@ C     ---- Optional CSV table and DS9 regions from the final /PRF/
             IF (CSVFILE .NE. ' ') THEN
                L = LEN_TRIM(ORIGCOMMAND)
                CALL WRITECSV(CSVFILE, FITSFILE, MSKDESC, SKYDESC,
-     $              ORIGCOMMAND(10:MAX(10,L)), ISC, ISR, IERR)
+     $              ORIGCOMMAND(10:MAX(10,L)), PRECLN, ISC, ISR, IERR)
                IF (IERR .NE. 0) CALL EXIT(1)
             END IF
             IF (REGFILE .NE. ' ') THEN
@@ -716,6 +801,46 @@ C     only for the test is removed again; an existing one is kept.
      $ '  --prepare-only    stop after writing --prepared (no fit)',
      $ '  --verbose         model progress, and the profile table',
      $ '                    even when it is written to a file',
+     $ '  --precision single|double|auto',
+     $ '                    the backend: single (REAL*4, the original',
+     $ '                    ELLIPROF), double (IEEE-754 binary64',
+     $ '                    throughout) or auto (default: double',
+     $ '                    for 64-bit data or values beyond float32)',
+     $ '  --nonfinite auto|mask|keep|error',
+     $ '                    NaN/Inf science pixels left after the sky',
+     $ '                    and mask: mask (excluded like masked',
+     $ '                    pixels), keep (passed on, with a warning)',
+     $ '                    or error; auto (default): keep with an',
+     $ '                    explicit --precision single, else mask',
      $ '  --version         print the backend version'
+      RETURN
+      END
+
+C     The --nonfinite report, for both backends: one summary line with
+C     the policy (NFREQ: as requested), the counts by type and how many
+C     were masked; plus a warning (keep) or an error (error).
+      SUBROUTINE NONFINRPT(NNAN, NPINF, NMINF, NONFIN, NFREQ, PREC)
+      INTEGER NNAN, NPINF, NMINF, NTOT, NMASK
+      CHARACTER*(*) NONFIN, NFREQ, PREC
+      CHARACTER*24 HOW
+      NTOT = NNAN + NPINF + NMINF
+      NMASK = 0
+      IF (NONFIN .EQ. 'mask') NMASK = NTOT
+      HOW = NONFIN
+      IF (NFREQ .EQ. 'auto') HOW = NONFIN(1:LEN_TRIM(NONFIN))//' (auto)'
+      WRITE (6,'(3A,I0,A,I0,A,I0,A,I0)') ' Non-finite: policy ',
+     $     HOW(1:LEN_TRIM(HOW)), '; NaN ', NNAN, ', +Inf ', NPINF,
+     $     ', -Inf ', NMINF, '; masked ', NMASK
+      IF (NTOT .EQ. 0) RETURN
+      IF (NONFIN .EQ. 'error') THEN
+         WRITE (0,'(3A,I0,A,I0,A,I0,A,I0,A)') 'elliprof: error (',
+     $        PREC, ' precision, preparation): ', NTOT,
+     $        ' non-finite science pixel(s) are not masked (NaN ', NNAN,
+     $        ', +Inf ', NPINF, ', -Inf ', NMINF, '; --nonfinite error)'
+      ELSE IF (NONFIN .EQ. 'keep') THEN
+         WRITE (0,'(A,I0,A)') 'elliprof: warning: ', NTOT, ' NaN/Inf '
+     $        //'science pixel(s) are not masked; ELLIPROF meets them '
+     $        //'in its samples (--nonfinite mask excludes them)'
+      END IF
       RETURN
       END

@@ -2,8 +2,10 @@
 
 The fit itself always runs in the compiled backend.  The array helpers
 here (:func:`subtract_sky`, :func:`apply_mask`) reproduce the backend's
-REAL*4 preparation for inspection and plotting; the exact image the
-backend fits can be saved with ``run_elliprof(..., prepared=...)``.
+preparation for inspection and plotting: in float32 as the single
+backend (the default), or in float64 as the double backend
+(``precision="double"``).  The exact image the backend fits can be
+saved with ``run_elliprof(..., prepared=...)``.
 """
 
 import os
@@ -75,15 +77,30 @@ def check_same_geometry(image: str, other: str, what: str) -> None:
                 f"image {key} = {origin_a[key]:g}")
 
 
-def subtract_sky(data: np.ndarray, sky=None, sky_image=None) -> np.ndarray:
-    """``data - sky`` in float32, as the backend does it."""
-    out = np.asarray(data, dtype=np.float32)
+def _dtype(precision: str):
+    if precision == "single":
+        return np.float32
+    if precision == "double":
+        return np.float64
+    raise ValueError("precision must be 'single' or 'double', got "
+                     f"{precision!r}")
+
+
+def subtract_sky(data: np.ndarray, sky=None, sky_image=None,
+                 precision: str = "single") -> np.ndarray:
+    """``data - sky`` as the backend does it: in float32 (``precision=
+    "single"``, the default) or in float64 (``"double"``, where float64
+    data stay float64)."""
+    dtype = _dtype(precision)
+    out = np.asarray(data, dtype=dtype)
     if sky is not None and sky_image is not None:
         raise ValueError("--sky and --sky-image cannot be used together")
     if sky is not None:
+        if dtype is np.float64:
+            return out - np.float64(sky)
         return out + np.float32(-np.float32(sky))
     if sky_image is not None:
-        sky_image = np.asarray(sky_image, dtype=np.float32)
+        sky_image = np.asarray(sky_image, dtype=dtype)
         if sky_image.shape != out.shape:
             raise GeometryError(f"sky image shape {sky_image.shape} != "
                                 f"image shape {out.shape}")
@@ -110,14 +127,17 @@ def logical_mask(mask: np.ndarray,
 
 
 def apply_mask(data: np.ndarray, mask: np.ndarray,
-               convention: str = "nonzero-good") -> np.ndarray:
-    """What the backend does with a mask, in float32: bad pixels become
-    exactly 0, good pixels keep their value (see :func:`logical_mask`
-    for ``convention``).  The mask is logical; its values are not
+               convention: str = "nonzero-good",
+               precision: str = "single") -> np.ndarray:
+    """What the backend does with a mask: bad pixels become exactly 0,
+    good pixels keep their value (see :func:`logical_mask` for
+    ``convention``), in float32 (``precision="single"``, the default)
+    or float64 (``"double"``).  The mask is logical; its values are not
     weights."""
-    data = np.asarray(data, dtype=np.float32)
+    dtype = _dtype(precision)
+    data = np.asarray(data, dtype=dtype)
     mask = np.asarray(mask)
     if data.shape != mask.shape:
         raise GeometryError(f"mask shape {mask.shape} != image "
                             f"shape {data.shape}")
-    return np.where(logical_mask(mask, convention), data, np.float32(0))
+    return np.where(logical_mask(mask, convention), data, dtype(0))

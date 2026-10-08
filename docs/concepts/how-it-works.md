@@ -34,7 +34,7 @@ lower case, in Python.
 ```mermaid
 flowchart TD
     subgraph PKG ["elliprof package: preparation"]
-        A["Science FITS image<br/>any BITPIX, read as 32-bit float"] --> B["subtract the sky<br/>--sky or --sky-image"]
+        A["Science FITS image<br/>any BITPIX, read as 32- or 64-bit float"] --> B["subtract the sky<br/>--sky or --sky-image"]
         B --> C["apply the mask: bad pixels set to 0<br/>--mask, --mask-convention"]
     end
     C --> P[("prepared image<br/>--prepared")]
