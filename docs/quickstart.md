@@ -43,7 +43,7 @@ elliprof u12517j.fits \
 elliprof prints a short summary:
 
 ```text
-elliprof 0.1.4
+elliprof 0.2.0rc1
 Fitting 23 isophotes...
 Image:    u12517j.fits (1025 x 1022)
 Sky:      scalar 3246

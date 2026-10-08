@@ -1,66 +1,85 @@
 # Changes
 
-## Unreleased (candidate 0.2.0, branch precision64)
+## 0.2.0rc1 (release candidate)
+
+A release candidate: install it with `pip install --pre elliprof` or
+`pip install elliprof==0.2.0rc1`; a plain `pip install elliprof` keeps
+0.1.4. An installed pre-release is never offered an automatic update.
 
 ### Added
 
-- **A double-precision backend.** `--precision single|double|auto`
-  (Python `precision=`). single is the original ELLIPROF (32-bit
-  floating point, unchanged); double is its port to IEEE-754 double
-  precision: images read as 64-bit floats, sky and mask in double, an
-  exact power-of-two normalization, the fit and the model in double,
-  64-bit model/residual/prepared images, profiles with 18 significant
-  digits. `auto` (the default) runs double only for data single cannot
-  hold (`BITPIX` ±64, values beyond or below the 32-bit range); every
-  other image gives the same results as 0.1.4. The summary, the CSV and
-  `result.precision` say which backend ran and why.
+- **True binary64 (double-precision) processing and products, with
+  guarded handling of avoidable intermediate overflow and underflow.**
+  `--precision auto|single|double` (Python `precision=`):
+  - `single` is the original ELLIPROF (32-bit `REAL*4`), unchanged:
+    `--precision single` reproduces 0.1.4.
+  - `double` is its port to IEEE-754 binary64: images, sky and mask in
+    double, an exact power-of-two normalization, the fit and the model
+    in double, profiles with 18 significant digits (`.dat` and CSV with
+    3-digit exponents).
+  - `auto` (the default) runs double only for data single cannot hold:
+    `BITPIX` 64 or −64, values beyond or below the 32-bit range, or a
+    `--sky`/`SKY=` value the single parser cannot read. Every other
+    image gives the same results as 0.1.4. The summary, the CSV and
+    `result.precision` say which backend ran and why.
+- Double model, residual and prepared images are written as
+  `BITPIX = −64`, in physical units.
+- 64-bit input: float64 and int64 images are read as binary64 (exact for
+  integers up to 2⁵³; larger int64 values round to the nearest double,
+  as numpy's float64 conversion does).
 - `--nonfinite auto|mask|keep|error` (`nonfinite=`): what happens to NaN
-  and ±Inf science pixels (e.g. no-data regions). The default `auto`
-  masks them, except with an explicit `--precision single`, which keeps
-  them as 0.1.4 did; `--precision single` therefore still reproduces
-  0.1.4 exactly. The summary records the policy and the counts.
-- In double precision, intensity ratios along an isophote and `AVG` box
-  sums that would exceed the double range are computed safely (only
-  then; ordinary images keep the original arithmetic bit for bit), and
-  a fit that still leaves the double range stops with a clear error.
-  The same holds for the four-pixel interpolation near the largest
-  double and for the multiplicative update of an isophote intensity by
-  `exp(d)`, and for the slope between neighbouring isophotes on coarse
-  radius grids; and normalization alone never turns a representable
-  physical model value into 0, a subnormal or infinity. Model pixels
-  that underflow to 0, and those that are subnormal, are counted and
-  reported (`model_subnormal_count`).
-- `auto` also chooses double when the single backend's parser cannot
-  read a `--sky` or `SKY=` value (0.1.4 failed on, e.g., `--sky 1e-40`).
+  and ±Inf science pixels. The default masks them, except with an
+  explicit `--precision single`, which keeps them as 0.1.4 did. The
+  summary records the policy and the counts.
+- Range protection in double precision: where an intermediate
+  calculation would overflow or underflow although the result is
+  representable (intensity ratios, `AVG` box sums, interpolation near
+  the largest double, intensity updates, isophote slopes, the model's
+  conversion to physical units), it is computed safely -- only there:
+  ordinary images keep the original arithmetic bit for bit. A result
+  that is itself beyond the double range is a clear error, never a
+  silent NaN or infinity. Model pixels that underflow to 0 or are
+  subnormal are counted (summary, CSV, FITS `HISTORY`,
+  `result.model_underflow_zero_count`, `result.model_subnormal_count`).
 - `read_prf`/`read_profile` read double profiles exactly;
   `subtract_sky`/`apply_mask` take `precision="double"`.
 
 ### Changed
 
-- An image with a third axis longer than 1 (a cube) is refused instead
-  of being fitted on its first plane; select a plane with a CFITSIO
-  section, `'cube.fits[SCI][*,*,2:2]'`.
-- An image with an empty axis (`NAXISn = 0`, e.g. 256 x 0) is refused
-  with "selected FITS image has invalid dimensions" before anything is
-  allocated or fitted, in every precision (it used to hang or fit
-  nothing).
-- The CSV header has a `# Precision:` line, and the backend summary a
-  `Precision:` line.
-- `parse_elliprof_csv` parses numbers round-trip exactly.
-- Linux riscv64 (manylinux_2_39) is a Supported platform, like ppc64le
-  and s390x validated under QEMU emulation (not yet on native
-  hardware). Windows ARM64 stays Experimental: CFITSIO, its Fortran ABI
-  probe and the backend work there, but PyPI has no Windows ARM64
-  pyerfa wheel, so Astropy and the full Python test cannot install.
+- **Linux riscv64 is a supported platform** (wheels for manylinux_2_39).
+- Defensive FITS geometry checks: an image with an empty axis
+  (`NAXISn = 0`) is refused with "selected FITS image has invalid
+  dimensions" before anything is allocated or fitted; an image with a
+  third axis longer than 1 (a cube) is refused instead of being fitted
+  on its first plane (select a plane: `'cube.fits[SCI][*,*,2:2]'`).
+- The CSV header has `# Precision:` and `# Normalization:` lines, and
+  the summary a `Precision:` line. `parse_elliprof_csv` parses numbers
+  round-trip exactly.
+- Expanded platform validation: every wheel is built against a CFITSIO
+  checked by a Fortran-interface probe, installed in a clean
+  environment and tested, including the double-precision range
+  protections, and compared numerically across platforms.
 
 ### Fixed
 
-- Wheel builds: CFITSIO 4.7.0's Fortran wrappers passed every C `long`
-  argument with the wrong size on riscv64 (its `f77_wrap.h` lists the
-  64-bit architectures and omits riscv64), so the riscv64 backend read
-  images as 256 x 0. `tools/ci/build_cfitsio.sh` adds riscv64 to that
-  list (no change on any other architecture) and runs a Fortran ABI
-  probe (`tools/ci/cfitsio_f77_probe.f`) after every CFITSIO build.
+- The riscv64 wheel read images with the wrong size: CFITSIO 4.7.0's
+  Fortran interface passed integer arguments with the wrong width on
+  riscv64. The wheel build corrects CFITSIO's configuration for riscv64
+  only.
+
+### Known limitations
+
+- GC mode runs in single precision only.
+- The historical sixth-order model limitation remains: beyond a
+  position-angle wrap across 0/180° the model gives the 6th-order term
+  the wrong sign (the measurements are valid; a warning is printed).
+- Windows ARM64 remains experimental: the backend builds and runs, but
+  the Python dependencies (Astropy's `pyerfa`) have no Windows ARM64
+  wheels.
+- The ppc64le, s390x and riscv64 wheels are validated under QEMU
+  emulation, not yet on native hardware.
+- Double precision needs about 32 bytes per pixel for its baseline
+  arrays (4096 × 4096: 512 MiB); peak memory use is higher.
 
 ## 0.1.4 (2026-10-06)
 

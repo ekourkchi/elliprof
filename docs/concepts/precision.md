@@ -56,7 +56,10 @@ and the CSV records it (`# Precision:`). In Python,
 
 1. The science and sky images are read with CFITSIO in double
    precision (`BSCALE`/`BZERO` applied in double). `--sky` is parsed
-   exactly (correctly rounded).
+   exactly (correctly rounded). 64-bit integer images (`BITPIX` 64) are
+   within the double *range*, but double holds integers *exactly* only
+   up to 2⁵³ (about 9 × 10¹⁵): larger values are rounded to the nearest
+   double, as numpy's `astype(float64)` does (2⁵³ + 1 becomes 2⁵³).
 2. Sky subtraction and the mask, as in single, in double precision.
 3. **Normalization.** The fit runs on the prepared image multiplied by
    2⁻ᵏ, an exact power of two, so that typical values are near 1. k is
@@ -144,12 +147,12 @@ or a sky image (8) is read. With a mask and `--residual` that is
 
 | Image | Pixels | Per-pixel arrays (32 B/pixel) |
 |---|---|---|
-| 4096 × 4096 | 16.8 million | 512 MiB |
+| 4096 × 4096 | 16.8 million | 512 MiB (536,870,912 bytes) |
 | 8192 × 8192 | 67.1 million | 2 GiB |
 | 10000 × 10000 | 100 million | 3.0 GiB (3052 MiB) |
 
-This is a baseline for the per-pixel arrays, not the peak memory of the
-process: the fit's own arrays, CFITSIO buffers, the header, the Fortran
+This is a baseline for the accounted per-pixel arrays, **not the peak
+memory (peak RSS) of the process**: the fit's own arrays, CFITSIO buffers, the header, the Fortran
 run time and, with the Python API, Python itself come on top.
 `--verbose` prints the estimate for the run. If the memory is not
 there, elliprof says so and stops. There is no size limit.

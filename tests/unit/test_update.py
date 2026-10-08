@@ -12,7 +12,6 @@ import time
 import pytest
 
 from elliprof import cli, update
-from elliprof._version import __version__
 
 
 @pytest.fixture(autouse=True)
@@ -23,12 +22,28 @@ def no_network(monkeypatch, tmp_path):
     monkeypatch.setattr(update, "_cache_file",
                         lambda: tmp_path / "cache" / "update_check.json")
     monkeypatch.delenv(update.ENV_OFF, raising=False)
+    # updates are offered only between plain releases: the mechanism is
+    # tested as installed release INSTALLED, whatever this checkout's
+    # version is (a pre-release, e.g. 0.2.0rc1, is never offered one;
+    # see test_prerelease_is_never_offered_an_update)
+    monkeypatch.setattr(update, "__version__", INSTALLED)
+
+
+INSTALLED = "1.2.3"
 
 
 def newer():
-    parts = [int(p) for p in __version__.split(".")]
-    parts[-1] += 1
-    return ".".join(map(str, parts))
+    return "1.2.4"
+
+
+def test_prerelease_is_never_offered_an_update(monkeypatch, capsys):
+    monkeypatch.setattr(update, "__version__", "0.2.0rc1")
+    monkeypatch.setattr(update, "latest_version", lambda **k: "9.9.9")
+    assert not update.is_newer("9.9.9", "0.2.0rc1")
+    update.check_update(out=sys.stdout)
+    out = capsys.readouterr().out
+    assert "Installed: elliprof 0.2.0rc1" in out
+    assert "elliprof --update" not in out
 
 
 def test_versions():
@@ -72,10 +87,10 @@ def test_check_update_never_installs(monkeypatch, capsys):
                         lambda *a: pytest.fail("pip run by --check-update"))
     assert update.check_update() == 0
     out = capsys.readouterr().out
-    assert f"Installed: elliprof {__version__}" in out
+    assert f"Installed: elliprof {INSTALLED}" in out
     assert f"Latest:    elliprof {newer()}" in out
     assert "elliprof --update" in out and "pip install --upgrade" in out
-    monkeypatch.setattr(update, "latest_version", lambda **k: __version__)
+    monkeypatch.setattr(update, "latest_version", lambda **k: INSTALLED)
     assert update.check_update() == 0
     assert "up to date" in capsys.readouterr().out
 
@@ -94,7 +109,7 @@ def test_update_runs_pip_of_this_python(monkeypatch, capsys):
 
 def test_update_when_current_does_nothing(monkeypatch, capsys):
     monkeypatch.setattr(update, "source_checkout", lambda: None)
-    monkeypatch.setattr(update, "latest_version", lambda **k: __version__)
+    monkeypatch.setattr(update, "latest_version", lambda **k: INSTALLED)
     monkeypatch.setattr(update.subprocess, "call",
                         lambda *a: pytest.fail("pip run when up to date"))
     assert update.update() == 0
@@ -162,7 +177,7 @@ def test_notice_once_a_day(monkeypatch, capsys):
 
 def test_notice_silent_when_current_or_offline(monkeypatch, capsys):
     tty(monkeypatch)
-    monkeypatch.setattr(update, "latest_version", lambda **k: __version__)
+    monkeypatch.setattr(update, "latest_version", lambda **k: INSTALLED)
     update.finish_notice(update.start_notice())
     assert capsys.readouterr().err == ""
     update._cache_file().unlink()
