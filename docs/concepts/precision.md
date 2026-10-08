@@ -109,13 +109,16 @@ outermost isophotes by about as much as single and double differ.
   largest double: evaluated at a quarter of the scale, the interpolated
   value kept within its four pixels), and the update of an isophote
   intensity by `exp(d)` when `exp(d)` alone is beyond the normal range
-  (as four factors `exp(d/4)`). Every ordinary image keeps the original
+  (as four factors `exp(d/4)`), and the slope d ln I / d ln r between
+  neighbouring isophotes when an intermediate ratio would overflow while
+  the slope itself is representable (coarse radius grids; evaluated with
+  exact power-of-two scaling). Every ordinary image keeps the original
   arithmetic, bit for bit.
 - If the fit itself still leaves the double range -- an isophote
   intensity overflowing or underflowing to 0 during the iteration, or a
-  slope between neighbouring isophotes whose intensities differ by more
-  than 10³⁰⁸ -- elliprof stops with a clear error naming the isophote,
-  never a silent NaN.
+  slope between neighbouring isophotes that is itself beyond 10³⁰⁸ --
+  elliprof stops with a clear error naming the isophote, never a silent
+  NaN.
 - A `LINEAR` fit, which squares intensities, refuses an image spanning
   more than about 2¹⁵⁷³ with a clear error.
 - The **single** backend's parser limit (above) still applies with

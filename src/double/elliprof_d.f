@@ -820,8 +820,11 @@ C Improve the estimates of d logI / d logr
          do 130 k = 1,nrad
             k1 = max(1,k-1)
             k2 = min(nrad,k+1)
-            par(11,k) = (par(4,k1)-par(4,k2))/par(4,k) * 
-     $           par(1,k)/(par(1,k1)-par(1,k2))
+C     PRECISION PORT (R7): the same expression, evaluated by SLOPED
+C     (src/shim/double/prep_d.f), range-safe where it could leave
+C     the double range while the slope is representable
+            par(11,k) = sloped(par(4,k1),par(4,k2),par(4,k),
+     $           par(1,k),par(1,k1),par(1,k2))
 C We will NOT accept non-monotonic decreasing profiles
             if(par(11,k).gt.0) then
                par(11,k) = -2

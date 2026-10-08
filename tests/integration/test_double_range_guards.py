@@ -207,3 +207,40 @@ def test_ordinary_products_in_physical_units(run_native, tmp_path):
     assert p.returncode == 0, p.stderr
     check_units(out)
     assert model_lines(p.stdout) == []
+
+
+# ---- R7 -----------------------------------------------------------------
+
+def annuli():
+    """Three flat annuli matching a coarse log grid (radii 4, 10, 25:
+    ratio 2.5, so |r/(r(k-1)-r(k+1))| = 0.48 < 1 at the middle one):
+    I(k-1)/I(k) ~ 2e308 overflows, the slope (~ -9.5e307) does not."""
+    j, i = np.indices((120, 120))
+    r = np.hypot(i + 0.5 - 60.3, j + 0.5 - 59.6)
+    return np.where(r < 6, 1e300, np.where(r < 15, 5e-9, 1e-300)) * (
+        1 + 0.001 * np.cos(3 * np.arctan2(j - 59.6, i - 60.3)))
+
+
+R7FIT = ["X0=60.3", "Y0=59.6", "R0=4", "R1=25", "NR=3", "NITER=5",
+         "RLAW=1"]
+
+
+def test_slope_with_overflowing_intermediate(run_native, tmp_path):
+    """Before R7: "the slope dlnI/dlnr of isophote 2 is beyond the
+    double range", exit 1.  Now the slope, exactly as recomputed in
+    rational arithmetic from the printed I0 and radii.  (With -m the run
+    then stops at the model, genuinely beyond DBL_MAX at the centre.)"""
+    from fractions import Fraction as F
+    fits.PrimaryHDU(annuli()).writeto(tmp_path / "r7.fits")
+    # profile only: the model of this profile, extrapolated inward from
+    # r = 4 (ln I falls by ~710 between r = 4 and 10), is genuinely
+    # beyond DBL_MAX at the centre (ln I ~ 3448) -- a model range error
+    p = run_native(tmp_path / "r7.fits", *R7FIT, "--precision", "double",
+                   "-o", tmp_path / "r7.dat")
+    assert p.returncode == 0, p.stderr
+    v = read_dat(tmp_path / "r7.dat")
+    rad, i0, slope = v[:, 0], v[:, 3], v[:, 10]
+    exact = float((F(i0[0]) - F(i0[2])) / F(i0[1]) * F(rad[1])
+                  / (F(rad[0]) - F(rad[2])))
+    assert -DMAX < exact < -1e307
+    assert abs(slope[1] - exact) <= 4 * np.spacing(abs(exact))

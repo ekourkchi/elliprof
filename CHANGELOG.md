@@ -25,7 +25,8 @@
   a fit that still leaves the double range stops with a clear error.
   The same holds for the four-pixel interpolation near the largest
   double and for the multiplicative update of an isophote intensity by
-  `exp(d)`; and normalization alone never turns a representable
+  `exp(d)`, and for the slope between neighbouring isophotes on coarse
+  radius grids; and normalization alone never turns a representable
   physical model value into 0, a subnormal or infinity. Model pixels
   that underflow to 0, and those that are subnormal, are counted and
   reported (`model_subnormal_count`).

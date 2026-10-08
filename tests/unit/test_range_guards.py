@@ -280,3 +280,113 @@ def test_expsc2d_against_reference(rangeprobe):
             assert abs(g - r) <= 2 * SUB, (a, k, g, r)     # subnormal
         else:
             assert abs(g - r) <= 5 * math.ulp(r), (a, k, g, r)
+
+
+# ---- R7 -----------------------------------------------------------------
+
+def slope_historical(a1, a2, a0, r0, r1, r2):
+    """(a1 - a2)/a0 * r0/(r1 - r2), left to right, in IEEE binary64."""
+    import numpy as np
+    with np.errstate(all="ignore"):
+        a1, a2, a0, r0, r1, r2 = map(np.float64, (a1, a2, a0, r0, r1, r2))
+        return float((a1 - a2) / a0 * r0 / (r1 - r2))
+
+
+def slope_exact(a1, a2, a0, r0, r1, r2):
+    F = Fraction
+    return (F(a1) - F(a2)) / F(a0) * F(r0) / (F(r1) - F(r2))
+
+
+def radii(q):
+    """r0, r1, r2 with r0/(r1 - r2) = q (to rounding), r0 = 10."""
+    return 10.0, 5.0, 5.0 - 10.0 / q
+
+
+NEIGHBOURS = [(M, -M), (-M, M), (M, M1), (M, 1e-300), (M2, -M2),
+              (1e300, 1e-300), (1e-310, 1e-300), (TINY, -TINY), (SUB, -SUB),
+              (2.0, 1.0)]
+CENTRES = [0.9 * M, 1.0, 5e-9, 1e-300, TINY, 1e-310]
+QS = [0.999, 0.5, 0.1, 1e-6, 1e-100, 1.001, 3.0]
+
+
+def test_r7_adversarial(rangeprobe):
+    """Every representable slope finite and within a few ulp, every
+    slope beyond DBL_MAX still +-Inf (the existing range error), never
+    clamped; q of both signs."""
+    cases = [(a1, a2, a0, *radii(s * q)) for a1, a2 in NEIGHBOURS
+             for a0 in CENTRES for q in QS for s in (1, -1)]
+    got = run(rangeprobe, [("S", c) for c in cases])
+    rescued = 0
+    for c, g in zip(cases, got):
+        exact = slope_exact(*c)
+        r = to_double(exact)
+        h_ = slope_historical(*c)
+        if not math.isfinite(r):
+            assert g == r, (c, g)                    # genuine: +-Inf
+            continue
+        assert math.isfinite(g), c
+        if abs(r) < TINY:
+            assert abs(g - r) <= 2 * SUB, (c, g, r)
+        else:
+            assert abs(g - r) <= 4 * math.ulp(r), (c, g, r)
+        rescued += not (math.isfinite(h_) and (h_ == r or (
+            r != 0 and abs(h_ - r) <= 4 * math.ulp(r))))
+    assert rescued > 0           # the historical expression fails here
+
+
+@pytest.mark.parametrize("case,what", [
+    ((1e300, 1e-300, 5e-9, 10.0, 4.0, 25.0), "division"),    # the R7 report
+    ((M, -M, 4.0, *radii(-0.1)), "subtraction"),
+    ((-M, M, 4.0, *radii(0.1)), "subtraction"),
+    ((M, 1.0, 0.9, *radii(-0.5)), "division"),
+    ((1e-200, 0.0, 1e200, 1e100, 2.0, 1.0), "underflow"),
+])
+def test_r7_avoidable_failures_now_representable(rangeprobe, case, what):
+    h_ = slope_historical(*case)
+    r = to_double(slope_exact(*case))
+    assert math.isfinite(r) and r != 0
+    assert not math.isfinite(h_) or h_ == 0 or \
+        abs(h_ - r) > 4 * math.ulp(r), what       # the old failure
+    g = run(rangeprobe, [("S", case)])[0]
+    assert abs(g - r) <= 4 * math.ulp(r), (what, g, r)
+
+
+def test_r7_demonstrated_case():
+    """The R7 finding: the old expression gives -Inf, the slope is
+    -9.5e307 (kept as a permanent regression)."""
+    assert slope_historical(1e300, 1e-300, 5e-9, 10.0, 4.0, 25.0) == \
+        -math.inf
+    assert abs(to_double(slope_exact(1e300, 1e-300, 5e-9, 10.0, 4.0, 25.0))
+               + 9.523809523809523e307) < 1e293
+
+
+@pytest.mark.parametrize("case", [
+    (2.0, 1.0, 0.0, 10.0, 5.0, 15.0), (0.0, 0.0, 0.0, 10.0, 5.0, 15.0),
+    (2.0, 1.0, 1.0, 10.0, 5.0, 5.0), (M, -M, 1.0, 10.0, 5.0, 5.0),
+    (math.nan, 1.0, 1.0, 10.0, 5.0, 15.0), (math.inf, 1.0, 1.0, 10.0, 5.0, 15.0),
+    (1.0, -math.inf, 1.0, 10.0, 5.0, 15.0), (1.0, 2.0, math.inf, 10.0, 5.0, 15.0),
+    (1.0, 2.0, 3.0, math.nan, 5.0, 15.0), (1.0, 2.0, 3.0, 10.0, math.inf, 15.0),
+    (M, -M, 1e-300, 10.0, 5.0, 15.0)])
+def test_r7_singular_inputs_keep_the_historical_result(rangeprobe, case):
+    """I(k) = 0, r(k-1) = r(k+1), non-finite input: unchanged; and a
+    genuinely unrepresentable slope stays non-finite."""
+    g = run(rangeprobe, [("S", case)])[0]
+    if math.isfinite(case[0]) and case[2] not in (0.0,) and \
+            case[4] != case[5] and all(map(math.isfinite, case)):
+        assert not math.isfinite(g)                 # genuine overflow
+    else:
+        assert same(g, slope_historical(*case))
+
+
+def test_r7_ordinary_slopes_unchanged(rangeprobe):
+    rng = random.Random(7)
+    cases = []
+    for _ in range(20000):
+        r1 = rng.uniform(3, 500)
+        r0 = r1 * rng.uniform(1.01, 2.5)
+        r2 = r0 * rng.uniform(1.01, 2.5)
+        a0 = 10 ** rng.uniform(-300, 300)
+        cases.append((a0 * rng.uniform(1, 100), a0 * rng.uniform(0.001, 1),
+                      a0, r0, r1, r2))
+    got = run(rangeprobe, [("S", c) for c in cases])
+    assert all(same(g, slope_historical(*c)) for c, g in zip(cases, got))

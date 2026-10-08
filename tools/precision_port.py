@@ -405,6 +405,17 @@ REVIEWED = {
         # normal number although the product can be
         (r"         f0 = f0 \* exp\(gain\*\(fcoeff\(1\)\+fcoeff\(4\)\)\)\n",
          lambda m: ALTEREXP, "alter-exp"),
+        # R7: the slope (I(k-1)-I(k+1))/I(k) * r/(r(k-1)-r(k+1)) can
+        # overflow in an intermediate while it is representable (coarse
+        # radius grids): the same expression in SLOPED (prep_d.f), with
+        # a range-safe fallback only there
+        (r"            par\(11,k\) = \(par\(4,k1\)-par\(4,k2\)\)/par\(4,k\) \* \n"
+         r"     \$           par\(1,k\)/\(par\(1,k1\)-par\(1,k2\)\)\n",
+         "C     PRECISION PORT (R7): the same expression, evaluated by SLOPED\n"
+         "C     (src/shim/double/prep_d.f), range-safe where it could leave\n"
+         "C     the double range while the slope is representable\n"
+         "            par(11,k) = sloped(par(4,k1),par(4,k2),par(4,k),\n"
+         "     $           par(1,k),par(1,k1),par(1,k2))\n", "slope-range"),
         # R6: the model in physical units (normalization alone never
         # turns a representable physical model into 0 or Inf)
         (r"               data\(ix,iy\) = data\(ix,iy\)\*\(1\+corr\)\n"

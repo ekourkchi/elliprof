@@ -158,6 +158,61 @@ C     power, three products).
       RETURN
       END
 
+C     The slope d lnI / d lnr of an isophote (R7; FITPROFILED):
+C        (A1 - A2)/A0 * R0/(R1 - R2)
+C     A1, A2 = I0 of the neighbouring isophotes, A0 its own, R0, R1, R2
+C     their radii.  Evaluated left to right as in the original, unless
+C     an intermediate could leave the normal range while the slope is
+C     representable: A1 - A2 (|A1| or |A2| > HUGE/4), (A1-A2)/A0,
+C     its product with R0 (|R0/(R1-R2)| < 1 rescues an overflow there;
+C     coarse radius grids), or an underflow of those.  With D = A1-A2,
+C     |D/A0| lies in (2**(ED-1), 2**(ED+1)), ED = EXPONENT(D) -
+C     EXPONENT(A0); every intermediate and the result lie within a
+C     factor 2**(MAX(0,ER,EQ)+2) above and 2**(MIN(0,ER,EQ)-3) below,
+C     ER = EXPONENT(R0), EQ = ER - EXPONENT(R1-R2).  If that is within
+C     2**-1000 .. 2**1000 the historical expression cannot over- or
+C     underflow and is used (every ordinary isophote).  Otherwise:
+C     A1 and A2 scaled by 2**-E1 (E1 = EXPONENT(MAX(|A1|,|A2|))), A0
+C     by 2**-E0 (its own exponent, so it never scales to 0), all exact;
+C     ((a1 - a2) * (R0/(R1-R2))) / a0 is then of modest size, and one
+C     exact SCALE by 2**(E1-E0) gives the slope: rounded once more at
+C     most (subnormal), Inf when the slope itself is beyond DBL_MAX (a
+C     range error, as before).  A0 = 0, R1 = R2, R0 = 0 or a non-finite
+C     input keep the historical expression.
+      DOUBLE PRECISION FUNCTION SLOPED(A1, A2, A0, R0, R1, R2)
+      IMPLICIT NONE
+      DOUBLE PRECISION A1, A2, A0, R0, R1, R2, AM, D
+      INTEGER ED, ER, EQ, E1, E0
+      LOGICAL FINITED, FALL
+      FALL = .FALSE.
+      AM = MAX(ABS(A1), ABS(A2))
+      IF (FINITED(A1) .AND. FINITED(A2) .AND. FINITED(A0) .AND.
+     $     FINITED(R0) .AND. FINITED(R1) .AND. FINITED(R2) .AND.
+     $     A0 .NE. 0 .AND. R0 .NE. 0 .AND. R1 .NE. R2) THEN
+         IF (AM .GT. 0.25D0*HUGE(AM)) THEN
+            FALL = .TRUE.
+         ELSE
+            D = A1 - A2
+            IF (D .NE. 0) THEN
+               ED = EXPONENT(D) - EXPONENT(A0)
+               ER = EXPONENT(R0)
+               EQ = ER - EXPONENT(R1 - R2)
+               FALL = ED + MAX(0, ER, EQ) .GT. 1000 .OR.
+     $              ED + MIN(0, ER, EQ) .LT. -1000
+            END IF
+         END IF
+      END IF
+      IF (FALL) THEN
+         E1 = EXPONENT(AM)
+         E0 = EXPONENT(A0)
+         SLOPED = SCALE(((SCALE(A1, -E1) - SCALE(A2, -E1))
+     $        * (R0/(R1 - R2))) / SCALE(A0, -E0), E1 - E0)
+      ELSE
+         SLOPED = (A1 - A2)/A0 * R0/(R1 - R2)
+      END IF
+      RETURN
+      END
+
 C     SYNTHESIZED stopped early (no convergence; R6): the pixels from
 C     (IX,IY) on, not modelled, to physical units as well -- exactly as
 C     the driver scales a whole internal array -- so that the model is

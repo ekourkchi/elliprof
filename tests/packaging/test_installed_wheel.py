@@ -328,7 +328,7 @@ def _read_prf(path):
 
 
 def test_double_range_guards(tmp_path):
-    """R4, R5 and R6 of the double backend on this platform's binary:
+    """R4 to R7 of the double backend on this platform's binary:
     gradual underflow, SCALE and the range boundaries must behave as
     IEEE binary64 requires (a platform that flushes subnormals to zero,
     or scales inexactly, fails here)."""
@@ -340,11 +340,12 @@ def test_double_range_guards(tmp_path):
     r = np.hypot(i + 0.5 - 100.3, j + 0.5 - 99.6)
     fit = ["X0=100.3", "Y0=99.6", "R0=3", "R1=80", "NR=25", "NITER=5"]
 
-    def go(img, name, *args, fit=fit):
+    def go(img, name, *args, fit=fit, model=True):
         path = tmp_path / f"{name}.fits"
         fits.PrimaryHDU(img).writeto(path)
+        m = ["-m", tmp_path / f"{name}_m.fits"] if model else []
         p = run(path, *fit, *args, "--precision", "double",
-                "-o", tmp_path / f"{name}.dat", "-m", tmp_path / f"{name}_m.fits")
+                "-o", tmp_path / f"{name}.dat", *m)
         return p, tmp_path / f"{name}.dat", tmp_path / f"{name}_m.fits"
 
     # R4: a block of exactly DBL_MAX (k = 0) == the block two ulp lower
@@ -384,6 +385,24 @@ def test_double_range_guards(tmp_path):
                         "NITER=5"])
     assert p.returncode == 0, p.stderr
     assert np.isfinite(fits.getdata(mod)).all()
+
+    # R7: a slope whose intermediate (I(k-1)-I(k+1))/I(k) overflows
+    # (coarse grid, |r/dr| < 1) while the slope itself is representable
+    from fractions import Fraction as F
+    jj, ii = np.indices((120, 120))
+    rr = np.hypot(ii + 0.5 - 60.3, jj + 0.5 - 59.6)
+    img = np.where(rr < 6, 1e300, np.where(rr < 15, 5e-9, 1e-300)) * (
+        1 + 0.001 * np.cos(3 * np.arctan2(jj - 59.6, ii - 60.3)))
+    p, dat, _ = go(img, "s", fit=["X0=60.3", "Y0=59.6", "R0=4", "R1=25",
+                                  "NR=3", "NITER=5", "RLAW=1"],
+                   model=False)   # its model is genuinely beyond DBL_MAX
+    assert p.returncode == 0, p.stderr
+    tok = dat.read_text().split(None, 3002)
+    v = np.array([float(t) for t in tok[2:3002]]).reshape(250, 12)[:3]
+    exact = float((F(v[0, 3]) - F(v[2, 3])) / F(v[1, 3]) * F(v[1, 0])
+                  / (F(v[0, 0]) - F(v[2, 0])))
+    assert -dmax < exact < -1e307
+    assert abs(v[1, 10] - exact) <= 4 * np.spacing(abs(exact))
 
     # R5: the 1.5e308 core stops at its first genuine range error
     img = g * 1e-300
