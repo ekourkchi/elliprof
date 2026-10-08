@@ -1,5 +1,18 @@
 # Install
 
+!!! note "Release status"
+    These pages describe **elliprof 0.2.0rc1, a pre-release** for testing.
+    The current **stable release is 0.1.4**: `python -m pip install elliprof`
+    installs 0.1.4. To try the release candidate, install it explicitly:
+
+    ```sh
+    python -m pip install elliprof==0.2.0rc1     # or: python -m pip install --pre elliprof
+    ```
+
+    Once 0.2.0 final is published, `python -m pip install -U elliprof` will
+    select it. The double-precision backend (`--precision`, 64-bit products)
+    is new in 0.2.0rc1 and not part of 0.1.4.
+
 ```sh
 python -m pip install elliprof
 ```
@@ -37,7 +50,9 @@ After a fit in an interactive terminal, elliprof asks PyPI at most once a
 day, in the background, whether a newer version exists, and prints one
 line if so. It never installs anything by itself, never delays a fit,
 and is silent offline and in scripts or batch jobs. Set
-`ELLIPROF_NO_UPDATE_CHECK=1` to turn the check off.
+`ELLIPROF_NO_UPDATE_CHECK=1` to turn the check off. An installed
+pre-release (0.2.0rc1) is not offered updates by `--check-update`,
+`--update` or this notice; update it with pip directly.
 
 ## Supported systems
 
